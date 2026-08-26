@@ -79,9 +79,9 @@ def test_desteklenmeyen_bicim_reddedilir(tmp_path: Path) -> None:
 
 def test_personel_raporu_baslik_satirini_bulur() -> None:
     rapor = personel_raporu_coz(personel_satirlari(ORNEK_PERSONEL), "ozet")
-    assert len(rapor.kayitlar) == 6
+    assert len(rapor.kayitlar) == len(ORNEK_PERSONEL)
     assert rapor.yonetici_sayisi == 2
-    assert rapor.ogretmen_sayisi == 4
+    assert rapor.ogretmen_sayisi == len(ORNEK_PERSONEL) - 2
     assert "Rehberlik" in rapor.branslar()
 
 

@@ -61,12 +61,19 @@ def personel_satirlari(kisiler: list[tuple[str, str, str, str]]) -> list[list[ob
     return satirlar
 
 
+# Sınav görevlendirmesi her oturumda 2 komisyon üyesi (en az biri alan) ve
+# salon başına 1 gözcü ister; kadro bunu karşılayacak genişlikte tutulur.
 ORNEK_PERSONEL = [
     ("Uydurma Müdür", "Müdür", "Kadrolu", "Coğrafya"),
     ("Uydurma Yardımcı", "Müdür Yardımcısı", "Kadrolu", "Tarih"),
     ("Uydurma Matematikçi", "Öğretmen", "Kadrolu", "Matematik"),
+    ("Uydurma Matematikçi İki", "Öğretmen", "Kadrolu", "Matematik"),
     ("Uydurma Fizikçi", "Öğretmen", "Kadrolu", "Fizik"),
+    ("Uydurma Fizikçi İki", "Öğretmen", "Kadrolu", "Fizik"),
+    ("Uydurma İngilizceci", "Öğretmen", "Kadrolu", "İngilizce"),
+    ("Uydurma İngilizceci İki", "Öğretmen", "Kadrolu", "İngilizce"),
     ("Uydurma Edebiyatçı", "Öğretmen", "Sözleşmeli", "Türk Dili ve Edebiyatı"),
+    ("Uydurma Tarihçi", "Öğretmen", "Kadrolu", "Tarih"),
     ("Uydurma Rehber", "Öğretmen", "Kadrolu", "Rehberlik"),
 ]
 
