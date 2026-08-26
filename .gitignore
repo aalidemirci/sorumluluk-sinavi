@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# Yapım çıktıları
+/build/
+/dist/
+/dist-kurulum/
+
+# Yerel veritabanı ve günlükler.
+# DİKKAT: burada "veri/" YAZMAYIN — o, uygulamanın kaynak paketidir.
+# Çalışma zamanı verisi %LOCALAPPDATA% / ~/.local/share altındadır, depoda değildir.
+*.db
+*.db-wal
+*.db-shm
+*.db.goc-oncesi-*
+*.log
+
+# Gerçek kişi verisi içerebilecek dosyalar (KVKK).
+# Testlerin anonim örnekleri testler/veri/ altında ve beyaz listede.
+*.xls
+*.xlsx
+*.csv
+*.docx
+!testler/veri/*.xlsx
+!testler/veri/*.csv
+!sablonlar/fabrika/*.docx

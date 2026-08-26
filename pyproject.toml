@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sorumluluk-sinavi"
+version = "0.2.0"
+description = "Çevrimdışı sorumluluk sınavı planlama ve görevlendirme uygulaması"
+requires-python = ">=3.11"
+dependencies = [
+  "openpyxl>=3.1,<4",
+  "python-docx>=1.1,<2",
+  "PyYAML>=6,<7",
+  "xlrd==2.0.2",
+  "tzdata>=2026.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+build-windows = ["pyinstaller>=6,<7"]
+
+[project.scripts]
+sorumluluk-sinavi = "sorumluluk_sinavi:main"
+
+[tool.setuptools]
+py-modules = ["sorumluluk_sinavi"]
+packages = ["cekirdek", "veri", "evrak", "arayuz"]
+
+[tool.pytest.ini_options]
+testpaths = ["testler"]
+addopts = "-q"
+cache_dir = "build/pytest-cache"
