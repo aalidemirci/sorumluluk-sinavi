@@ -119,11 +119,21 @@ class DersAyari:
     `iki_asamali_mi` OKY md.58/2-e kapsamındaki Türk dili ve edebiyatı ile
     yabancı dil derslerini işaretler; bu dersler yazılı ve uygulama olmak
     üzere iki oturumla planlanır.
+
+    `esdeger_branslar`, dersin alanı tek bir branşa karşılık gelmediğinde
+    kullanılır. "Görsel Sanatlar/Müzik" gibi birleşik derslerde komisyon iki
+    alandan da kurulabilir; mümkünse her alandan bir üye alınır.
     """
 
     brans: str
     iki_asamali_mi: bool = False
     yabanci_dil_mi: bool = False
+    esdeger_branslar: tuple[str, ...] = ()
+
+    @property
+    def alan_branslari(self) -> tuple[str, ...]:
+        """Komisyon üyeliği için kabul edilen branşlar; ilki asıl alandır."""
+        return (self.brans, *self.esdeger_branslar)
 
 
 @dataclass(frozen=True)
@@ -167,9 +177,14 @@ class Oturum:
     sure_dakika: int
     salon_kimlikleri: tuple[int, ...] = ()
     alan_bransi: str = ""
+    esdeger_branslar: tuple[str, ...] = ()
     birim_anahtari: str = ""   # iki aşamalı dersin iki oturumunu birbirine bağlar
     hafta_sonu_gerekcesi: str = ""
     kilitli_mi: bool = False
+
+    @property
+    def alan_branslari(self) -> tuple[str, ...]:
+        return (self.alan_bransi, *self.esdeger_branslar)
 
     @property
     def salon_sayisi(self) -> int:

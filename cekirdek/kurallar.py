@@ -22,7 +22,7 @@ from .modeller import (
     Ciddiyet, GorevRolu, Gorevlendirme, IkiAsamaliSayim, Ihlal, Oturum,
     OturumTuru, Personel, Plan, Salon,
 )
-from .metin import siralama_anahtari
+from .metin import esitle, siralama_anahtari
 
 
 # OKY md.58/2-c: farklı sınıflardaki aynı dersin öğrenci sayısı toplamda
@@ -351,10 +351,11 @@ def _sp02_sp03_gorevlendirme(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal
                 f"{oturum.ders_adi} sınavı {oturum.salon_sayisi} salonda yapılıyor ama "
                 f"{len(gozcu)} gözcü atanmış."))
 
+        kabul_edilen = {esitle(b) for b in oturum.alan_branslari if b}
         alan_sayisi = sum(
             1 for g in komisyon
             if g.personel_kimligi in baglam.personel
-            and baglam.personel[g.personel_kimligi].brans == oturum.alan_bransi)
+            and esitle(baglam.personel[g.personel_kimligi].brans) in kabul_edilen)
         if alan_sayisi < 1:
             ihlaller.append(ihlal(
                 "SP-02", oturum.anahtar,
