@@ -103,3 +103,20 @@ def test_ayni_kisi_bir_oturumda_iki_gorev_alamaz(vt: Veritabani) -> None:
     with pytest.raises(sqlite3.IntegrityError):
         with vt.baglan() as b:
             b.execute("INSERT INTO gorevlendirme(oturum_id,personel_id,rol) VALUES(1,1,'gozcu')")
+
+
+def test_ilk_kurulumda_anlamsiz_yedek_birakilmaz(tmp_path: Path) -> None:
+    """Boş veritabanı WAL kipi yüzünden sıfır bayt değildir; yine de içinde
+    kullanıcı verisi olmadığı için yedeklenmemelidir."""
+    veritabani = Veritabani(tmp_path / "sorumluluk.db")
+    veritabani.gocleri_uygula()
+    assert list(tmp_path.glob("*.yedek")) == []
+
+
+def test_veri_varken_goc_oncesi_yedek_alinir(tmp_path: Path) -> None:
+    veritabani = Veritabani(tmp_path / "sorumluluk.db")
+    veritabani.gocleri_uygula()
+    with veritabani.baglan() as b:
+        b.execute("INSERT INTO salon(ad,ad_anahtari,kapasite) VALUES('A-101','a-101',30)")
+    assert veritabani._yedekle("deneme") is not None
+    assert len(list(tmp_path.glob("*.yedek"))) == 1

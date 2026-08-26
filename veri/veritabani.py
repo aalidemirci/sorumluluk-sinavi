@@ -84,6 +84,14 @@ class Veritabani:
         """
         if not self.yol.exists() or not self.yol.stat().st_size:
             return None
+        # İlk kurulumda dosya WAL kipi açıldığı için boş değildir ama içinde
+        # kullanıcı verisi yoktur; anlamsız bir yedek dosyası bırakmayalım.
+        with self.baglan() as b:
+            tablo_sayisi = b.execute(
+                "SELECT count(*) FROM sqlite_master WHERE type='table'"
+                " AND name NOT LIKE 'sqlite_%'").fetchone()[0]
+        if not tablo_sayisi:
+            return None
         damga = datetime.now(ISTANBUL).strftime("%Y%m%d_%H%M%S")
         hedef = self.yol.with_suffix(f".db.{etiket}-{damga}.yedek")
         kaynak = sqlite3.connect(self.yol, timeout=MESGUL_ZAMAN_ASIMI_SN)
