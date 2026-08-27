@@ -120,17 +120,40 @@ BOLUMLER = [
         ],
     ),
     (
+        "Beklemeli ve devamsız öğrencinin başvurusu",
+        [
+            "Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı "
+            "yapıldığı hâlde okula veya sınavlara katılımları sağlanamayan öğrenciler "
+            "otomatik olarak plana ALINMAZ; sınav tarihinden 5 iş günü öncesine kadar "
+            "yazılı başvurmaları hâlinde dâhil edilir. (OKY md.58/2-d)",
+            "Akış şudur: önce duyuru yayımlanır, sonra başvurular toplanır, en son plan "
+            "üretilir ve takvim ilan edilir. Başvuru bu yüzden bir oturuma değil pencereye "
+            "bağlanır — mevzuat başvuruyu plandan önce ister.",
+            "e-Okul sorumluluk raporu bu iki grubu ayırt etmez; öğrencileri Başvuru "
+            "adımında elle işaretlersiniz. İşaret öğrenciye aittir ve öğretim yılı boyunca "
+            "kalır, başvuru ise her pencerede yenilenir: Eylülde başvuran öğrenci Şubata "
+            "başvurmuş sayılmaz.",
+            "Mevzuattaki süre sınav tarihine bağlıdır. Okul tek bir başvuru son günü ilan "
+            "ettiğinde program bu günün, pencerenin en erken gününden en az 5 iş günü önce "
+            "olmasını arar; böylece son güne kadar başvuran herkes kendi sınav tarihinden "
+            "5 iş günü önce başvurmuş olur.",
+            "Son günü kaçıran başvuru reddedilemez. Mevzuat “bildirmeleri hâlinde plana "
+            "dâhil edilir” der; okulun ilan ettiği son gün iç düzenlemedir ve bu hakkı "
+            "ortadan kaldırmaz. Böyle bir başvuru, fiilî sınav tarihinden en az 5 iş günü "
+            "önce yapılmışsa müdür onayıyla plana eklenir.",
+            "Duyurunun pencereden 15 gün önce yayımlanması okul uygulamasıdır; mevzuatta "
+            "duyuru süresi yoktur. Program geç duyuruda uyarır ama engellemez.",
+            "Başvuru adımından iki belge üretilir: web sayfasında yayımlanacak başvuru "
+            "duyurusu (kişi adı taşımaz) ve plan dışı bırakılanların tutanağı (okul içi "
+            "kayıttır, ilan edilmez).",
+        ],
+    ),
+    (
         "Program dışında kalan hükümler",
         [
             "Aşağıdaki hükümler sorumluluk sınavlarıyla ilgilidir ama programın işlemediği "
             "konulardır; burada başvuru kolaylığı için yer alır. Bu işleri e-Okul'da ya da "
             "okul müdürlüğü kayıtlarında yürütürsünüz.",
-            "• Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı "
-            "yapıldığı hâlde okula veya sınavlara katılımları sağlanamayan öğrenciler, "
-            "sınav tarihinden 5 iş günü öncesine kadar yazılı talepte bulunmaları hâlinde "
-            "plana dâhil edilir. Programın bu talepler için bir kaydı yoktur; talebi alan "
-            "öğrenciyi e-Okul listesine dâhil edip raporu yeniden aktarırsınız. "
-            "(OKY md.58/2-d)",
             "• Bir dersin sorumluluğu, o dersin sorumluluk sınavından en az 50 puan "
             "alınması hâlinde kalkar. (OKY md.58/4)",
             "• Sorumluluk sınavlarına girenler için diploma tarihi, sınavların bitimini "
@@ -155,14 +178,18 @@ BOLUMLER = [
             "yapılabileceğini belirler.",
             "• 04 e-Okul Sorumluluk — OOK12001R010 raporunu yükleyin. Rapor okulun "
             "tamamını kapsıyorsa 'tam listedir' işaretli kalsın.",
-            "• 05 Ders / Branş — her dersi bir branşa eşleyin, iki aşamalı dersleri "
+            "• 05 Başvuru — beklemeli ve devamsız öğrencileri işaretleyin, duyuruyu "
+            "kaydedin ve başvuru kararlarını girin. Bu adım atlanırsa bu öğrenciler "
+            "plana alınmaz; diğer öğrenciler etkilenmez. (OKY md.58/2-d)",
+            "• 06 Ders / Branş — her dersi bir branşa eşleyin, iki aşamalı dersleri "
             "işaretleyin. Eşlenmemiş ders varken plan üretilmez.",
-            "• 06 Sınav Planı — parametreleri seçin, isterseniz önce 'Yükü çözümle' ile "
+            "• 07 Sınav Planı — parametreleri seçin, isterseniz önce 'Yükü çözümle' ile "
             "sonucu görün, sonra planı üretin. Sürükle-bırakla düzeltip kaydedin, müdür "
             "onayıyla kesinleştirin.",
-            "• 07 Evrak ve Teslim — altı belgeyi üretin; sınavlardan sonra komisyondan "
-            "geri alınan evrakı çizelgeye işleyin.",
-            "• 08 Yardım, 09 Lisans — bu sayfa ve program bilgisi.",
+            "• 08 Evrak ve Teslim — plan belgelerini üretin; sınavlardan sonra komisyondan "
+            "geri alınan evrakı çizelgeye işleyin. Başvuru duyurusu ve plan dışı tutanağı "
+            "05 Başvuru adımından üretilir, çünkü ikisi de plandan önce doğar.",
+            "• 09 Yardım, 10 Lisans — bu sayfa ve program bilgisi.",
         ],
     ),
     (

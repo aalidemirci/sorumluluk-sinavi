@@ -14,9 +14,19 @@ import pytest
 
 tkinter = pytest.importorskip("tkinter")
 
+from arayuz.uygulama import ADIMLAR  # noqa: E402
 from testler.test_hizmet import AYARLAR, _personel_xlsx, _sorumluluk_csv  # noqa: E402
 from veri import hizmet  # noqa: E402
 from veri.veritabani import Veritabani  # noqa: E402
+
+
+def sayfa(ad: str) -> int:
+    """Adım adından sıra numarası.
+
+    Sabit indis yazılırsa araya yeni bir adım eklendiğinde testler sessizce
+    yanlış sayfayı açar; ADIMLAR'dan türetmek bunu önler.
+    """
+    return next(i for i, (_, baslik, _) in enumerate(ADIMLAR) if baslik == ad)
 
 
 @pytest.fixture()
@@ -46,13 +56,15 @@ def uygulama(tmp_path: Path, monkeypatch):
     pencere.kok.destroy()
 
 
-def test_tum_sayfalar_acilir(uygulama) -> None:
-    for sayfa in range(6):
-        uygulama._sayfa_goster(sayfa)
+def test_tum_sayfalar_hatasiz_cizilir(uygulama) -> None:
+    """Adım eklendiğinde dağıtımın ADIMLAR ile uyumsuz kalmadığını doğrular."""
+    for sira in range(len(ADIMLAR)):
+        uygulama._sayfa_goster(sira)
+        uygulama.kok.update_idletasks()
 
 
 def test_plan_ekraninda_plan_uretilir(uygulama) -> None:
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     assert uygulama.plan_sonucu is not None
     assert len(uygulama.plan_sonucu.plan.oturumlar) == 4
@@ -61,7 +73,7 @@ def test_plan_ekraninda_plan_uretilir(uygulama) -> None:
 
 
 def test_surukle_birak_gecerli_tasimayi_uygular(uygulama) -> None:
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     plan = uygulama.plan_sonucu.plan
     # Tek aşamalı bir oturumu bir gün ileri taşı.
@@ -77,7 +89,7 @@ def test_surukle_birak_gecerli_tasimayi_uygular(uygulama) -> None:
 
 
 def test_geri_al_ve_ileri_al_calisir(uygulama) -> None:
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     plan = uygulama.plan_sonucu.plan
     oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
@@ -99,7 +111,7 @@ def test_geri_al_ve_ileri_al_calisir(uygulama) -> None:
 
 def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, monkeypatch) -> None:
     """Aynı öğrencinin iki sınavı aynı saate getirilemez."""
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     plan = uygulama.plan_sonucu.plan
     # 101 numaralı öğrenci hem MATEMATİK hem FİZİK sınavına giriyor.
@@ -116,7 +128,7 @@ def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, monkeypatch) -> None:
 
 def test_kaydet_plani_veritabanina_yazar(uygulama, monkeypatch) -> None:
     monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     uygulama._plan_kaydet()
     assert uygulama.aktif_plan_id is not None
@@ -129,19 +141,19 @@ def test_kaydet_plani_veritabanina_yazar(uygulama, monkeypatch) -> None:
 
 def test_kaydedilen_plan_yeniden_acildiginda_yuklenir(uygulama, monkeypatch) -> None:
     monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     uygulama._plan_kaydet()
     plan_id = uygulama.aktif_plan_id
-    uygulama._sayfa_goster(0)
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Kurum Ayarları"))
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     assert uygulama.aktif_plan_id == plan_id
     assert uygulama.kaydedilmemis is False
 
 
 def test_kesinlesen_plan_kilitlenir(uygulama, monkeypatch) -> None:
     monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     uygulama._plan_kaydet()
     uygulama.onay_girdisi.delete(0, "end")
@@ -157,7 +169,7 @@ def test_kilitli_oturum_tasinamaz(uygulama, monkeypatch) -> None:
     hatalar = []
     monkeypatch.setattr("arayuz.uygulama.messagebox.showerror",
                         lambda baslik, mesaj, **k: hatalar.append(mesaj))
-    uygulama._sayfa_goster(5)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
     uygulama._plan_uret()
     uygulama._plan_kaydet()
     uygulama.onay_girdisi.delete(0, "end")
@@ -168,3 +180,23 @@ def test_kilitli_oturum_tasinamaz(uygulama, monkeypatch) -> None:
     from datetime import timedelta
     uygulama._kart_birakildi(oturum.anahtar, oturum.tarih + timedelta(days=1), oturum.saat)
     assert hatalar and "kilitli oturum" in hatalar[0].lower()
+
+
+def test_basvuru_sayfasi_acilir_ve_bayrakli_ogrenciyi_gosterir(uygulama) -> None:
+    """Başvuru sayfası servis katmanına bağlı mı; bayraklı öğrenci görünüyor mu."""
+    from datetime import date
+
+    with uygulama.vt.baglan() as b:
+        ogrenci_id = b.execute("SELECT id FROM v_ogrenci ORDER BY okul_no").fetchone()[0]
+    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, ogrenci_id, True, False)
+    hizmet.duyuru_kaydet(uygulama.vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
+                         "Duyuru 2026/1", "Okul web sayfası")
+
+    uygulama._sayfa_goster(sayfa("Başvuru"))
+    uygulama.kok.update_idletasks()
+
+    satirlar = hizmet.basvuru_tablosu(uygulama.vt, "P1")
+    bayrakli = [s for s in satirlar if s["bayrakli_mi"]]
+    assert len(bayrakli) == 1
+    assert bayrakli[0]["ozet"] == "KARAR BEKLİYOR"
+    assert len(hizmet.basvuru_bekleyenler(uygulama.vt, "P1")) == 1

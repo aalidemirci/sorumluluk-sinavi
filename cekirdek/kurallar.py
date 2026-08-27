@@ -90,11 +90,23 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
     _k("SP-06", "İki aşamalı dersler", "OKY md.58/2-e (Ek:RG-22/2/2025-32821)", Ciddiyet.ENGEL,
        "Türk dili ve edebiyatı ile yabancı dil derslerinin sorumluluk sınavları yazılı ve "
        "uygulamalı olarak iki aşamada yapılır. Komisyonların aynı üyelerden oluşturulması esastır."),
+    _k("SP-07", "Beklemeli ve devamsız öğrencinin başvurusu",
+       "OKY md.58/2-d (Ek:RG-8/9/2023-32303)", Ciddiyet.ENGEL,
+       "Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı yapıldığı hâlde "
+       "okula veya sınavlara katılımları sağlanamayan öğrenciler otomatik olarak plana alınmaz; "
+       "sınav tarihinden 5 iş günü öncesine kadar yazılı başvurmaları hâlinde dâhil edilir. "
+       "Okulun ilan ettiği son günü kaçıran başvuru, fiilî sınav tarihine göre 5 iş günü "
+       "şartını sağlıyorsa müdür onayıyla plana eklenir; mevzuat bu hâlde takdir tanımaz."),
     _k("SP-10", "Sınav süresi", "ÖDY md.5/1-l", Ciddiyet.ENGEL,
        "Zorunlu hâller dışında yazılı sınav süresi bir ders saatini aşamaz."),
     _k("SP-11", "Günlük sınav sayısı", "ÖDY md.5/1-k", Ciddiyet.UYARI,
        "Bir günde yapılacak yazılı ve uygulamalı sınavların sayısının ikiyi geçmemesi esastır; "
        "zorunlu hâllerde bir sınav daha yapılabilir. Uygulama, sınırı öğrenci başına uygular."),
+    _k("SP-15", "Şubat ve Haziran için güncel liste", "Okul uygulaması", Ciddiyet.UYARI,
+       "Nakil giden, açık öğretime geçen ya da sorumluluğu kalkan öğrenci ancak yeniden "
+       "aktarılan OOK12001R010 listesiyle plandan düşer. Eylül planı aktarımın hemen ardından "
+       "yapıldığı için hatırlatma gerekmez; Şubat (P2) ve Haziran (P3) planlarında liste "
+       "aylar öncesine ait olabilir."),
     # --- EK: görev sayacı (parasal hesap yok) -----------------------------
     _k("EK-03", "Aynı sınavda çifte rol yok", "Karar md.12/2-b", Ciddiyet.ENGEL,
        "Bir sınavda aynı kişiye hem komisyon üyeliği hem gözcülük verilemez."),
@@ -192,6 +204,11 @@ class DogrulamaBaglami:
     iki_asamali_dersler: frozenset[str] = frozenset()
     ogretim_yili: str = ""
     kisisel_gunluk_sinir: dict[str, int] = None    # öğrenci anahtarı -> yükseltilmiş sınır
+    # SP-07 / OKY md.58/2-d. Kural motoru veritabanı görmez; başvuru bilgisi
+    # buradan verilir. `basvuru_kapsami` bayraklı öğrencilerin anahtarları,
+    # `gecerli_basvurular` bunlardan planına alınabilecek olanlarınkidir.
+    basvuru_kapsami: frozenset[str] = frozenset()
+    gecerli_basvurular: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if self.ogrenci_adlari is None:
@@ -204,6 +221,28 @@ class DogrulamaBaglami:
 
     def sinir(self, ogrenci: str, varsayilan: int) -> int:
         return self.kisisel_gunluk_sinir.get(ogrenci, varsayilan)
+
+
+def _sp07_basvuru(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
+    """Bayraklı öğrenci plana ancak geçerli başvurusuyla girer (OKY md.58/2-d).
+
+    Planlayıcı bu öğrencileri zaten dışarıda bırakır; bu denetim elle yapılan
+    düzenlemeler içindir. İki yol da aynı kapıdan geçmelidir.
+    """
+    if not baglam.basvuru_kapsami:
+        return []
+    kacaklar: dict[str, list[str]] = defaultdict(list)
+    for oturum in plan.oturumlar:
+        for anahtar in oturum.ogrenci_anahtarlari:
+            if anahtar in baglam.basvuru_kapsami and anahtar not in baglam.gecerli_basvurular:
+                kacaklar[anahtar].append(oturum.ders_adi)
+    return [
+        ihlal("SP-07", anahtar,
+              f"{baglam.ogrenci_etiketi(anahtar)} yazılı başvurusu bulunmadan plana alınmış: "
+              f"{', '.join(sorted(set(dersler), key=siralama_anahtari))}.")
+        for anahtar, dersler in sorted(kacaklar.items(),
+                                       key=lambda x: siralama_anahtari(baglam.ogrenci_etiketi(x[0])))
+    ]
 
 
 def _sp01_pencere(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
@@ -448,6 +487,7 @@ def dogrula_plan(plan: Plan, baglam: DogrulamaBaglami,
     """
     ihlaller: list[Ihlal] = []
     ihlaller += _sp01_pencere(plan, baglam)
+    ihlaller += _sp07_basvuru(plan, baglam)
     ihlaller += _sp04_birlestirme(plan)
     ihlaller += _sp05_hafta_sonu(plan)
     ihlaller += _sp06_iki_asamali(plan, baglam)

@@ -460,3 +460,86 @@ def test_teslim_tutanagi_belge_setinden_cikti() -> None:
     anahtarlar = {e.anahtar for e in uretici.EVRAKLAR}
     assert "05_evrak_teslim_tutanagi" not in anahtarlar
     assert len(uretici.EVRAKLAR) == 6
+
+
+# ================================================ başvuru kapısı belgeleri
+
+def _basvuru_hazir(tmp_path: Path):
+    """Duyurusu kaydedilmiş, bir öğrencisi işaretlenmiş veritabanı."""
+    vt = Veritabani(tmp_path / "basvuru.db")
+    vt.gocleri_uygula()
+    _kur(vt, tmp_path)
+    with vt.baglan() as b:
+        ogrenci_id = b.execute("SELECT id FROM v_ogrenci ORDER BY okul_no").fetchone()[0]
+    hizmet.ogrenci_bayrak_guncelle(vt, ogrenci_id, True, False)
+    hizmet.duyuru_kaydet(vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
+                         "Duyuru 2026/1", "Okul web sayfası ve pano")
+    return vt, ogrenci_id, tmp_path
+
+
+def test_basvuru_duyurusu_ilan_metnini_ve_son_gunu_tasir(tmp_path: Path) -> None:
+    vt, _, klasor = _basvuru_hazir(tmp_path)
+    yol = klasor / "duyuru.docx"
+    uretici.basvuru_duyurusu(vt, "P1", yol)
+    metin = _metin(yol)
+    assert "07.09.2026" in metin                      # başvuru son günü
+    assert "mezun olamayan 12. sınıf" in metin.lower()
+    assert "devamsızlık tebligatı" in metin.lower()
+    assert "58 inci maddesinin" in metin              # dayanak
+    assert "Okul Müdürlüğü" in metin
+
+
+def test_basvuru_duyurusunda_kisi_adi_gecmez(tmp_path: Path) -> None:
+    """İlan belgesidir: ne öğrenci ne müdür adı yayımlanır."""
+    vt, _, klasor = _basvuru_hazir(tmp_path)
+    yol = klasor / "duyuru.docx"
+    uretici.basvuru_duyurusu(vt, "P1", yol)
+    metin = _metin(yol)
+    assert AYARLAR["mudur_adi"] not in metin
+    for satir in hizmet.basvuru_tablosu(vt, "P1"):
+        assert satir["ad_soyad"] not in metin
+    assert "07_ilan_basvuru_duyurusu" in uretici.ILAN_EVRAKLARI
+
+
+def test_duyuru_yoksa_ilan_uretilemez(tmp_path: Path) -> None:
+    vt = Veritabani(tmp_path / "bos.db")
+    vt.gocleri_uygula()
+    _kur(vt, tmp_path)
+    with pytest.raises(HizmetHatasi, match="duyuru kaydedilmemiş"):
+        uretici.basvuru_duyurusu(vt, "P1", tmp_path / "duyuru.docx")
+
+
+def test_plan_disi_tutanagi_ogrenciyi_ve_duyuru_dayanagini_yazar(tmp_path: Path) -> None:
+    """Tutanak ilan değildir; öğrenci adını ve duyuru referansını taşır."""
+    vt, ogrenci_id, klasor = _basvuru_hazir(tmp_path)
+    hizmet.basvuru_kaydet(vt, ogrenci_id, "P1", "basvurmadi")
+    yol = klasor / "tutanak.docx"
+    uretici.plan_disi_tutanagi(vt, "P1", yol)
+    metin = _metin(yol)
+    with vt.baglan() as b:
+        ad = b.execute("SELECT ad_soyad FROM v_ogrenci WHERE id=?", (ogrenci_id,)).fetchone()[0]
+    assert ad in metin
+    assert "Duyuru 2026/1" in metin
+    assert "Başvurmadı" in metin
+    assert "ilan edilmez" in metin
+    assert "08_basvuru_plan_disi_tutanagi" not in uretici.ILAN_EVRAKLARI
+
+
+def test_plan_disi_tutanagi_bos_donemde_de_uretilir(tmp_path: Path) -> None:
+    vt, ogrenci_id, klasor = _basvuru_hazir(tmp_path)
+    hizmet.basvuru_kaydet(vt, ogrenci_id, "P1", "basvurdu", date(2026, 9, 3), "Dilekçe")
+    yol = klasor / "tutanak.docx"
+    uretici.plan_disi_tutanagi(vt, "P1", yol)
+    assert "plan dışı bırakılan öğrenci bulunmamaktadır" in _metin(yol)
+
+
+def test_pencere_evraki_uret_ikisini_de_uretir_ve_surumler(tmp_path: Path) -> None:
+    vt, _, klasor = _basvuru_hazir(tmp_path)
+    hedef = klasor / "cikti"
+    uretilen = uretici.pencere_evraki_uret(vt, "P1", hedef)
+    assert len(uretilen) == 2
+    assert all(yol.exists() for yol, _ in uretilen)
+    # Aynı içerik yeniden üretilirse yeni sürüm açılmaz.
+    ilk = hizmet.evrak_gecmisi(vt, "2026-2027|P1")
+    uretici.pencere_evraki_uret(vt, "P1", hedef)
+    assert len(hizmet.evrak_gecmisi(vt, "2026-2027|P1")) == len(ilk)

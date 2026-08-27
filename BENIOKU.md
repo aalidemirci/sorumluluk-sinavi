@@ -13,12 +13,14 @@ tarafından elle yapılır.
 1. e-Okul **OOK01001R1** personel raporunu içe aktarır; branş havuzu bu
    rapordan kurulur.
 2. e-Okul **OOK12001R010** sorumluluk raporunu içe aktarır.
-3. Dersleri branşlara eşler; iki aşamalı dersleri işaretler.
-4. Sınav planını üretir: oturumları günlere ve saatlere yerleştirir,
+3. Beklemeli ve devamsız öğrencilerin başvurularını toplar; başvurusu olmayanı
+   plandan çıkarır (OKY md.58/2-d).
+4. Dersleri branşlara eşler; iki aşamalı dersleri işaretler.
+5. Sınav planını üretir: oturumları günlere ve saatlere yerleştirir,
    komisyon ve gözcüleri görevlendirir.
-5. Planı sürükle-bırakla düzenletir, çakışmaları gösterir, müdür onayıyla
+6. Planı sürükle-bırakla düzenletir, çakışmaları gösterir, müdür onayıyla
    kesinleştirir.
-6. Sınav evrakını .docx olarak üretir ve sınav sonrası komisyondan geri
+7. Sınav evrakını .docx olarak üretir ve sınav sonrası komisyondan geri
    alınan evrakı izler.
 
 ## Ne yapmaz
@@ -31,7 +33,7 @@ gözcülük sınırı için görev sayacı tutar, tutar hesabı MYS'de yapılır
 ## Üretilen evrak
 
 Belgeler şablon dosyasından değil koddan üretilir; sayfa düzeni tek yerde
-tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
+tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır (ikisi başvuru kapısına aittir):
 
 | Belge | İçerik |
 |---|---|
@@ -41,6 +43,8 @@ tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
 | Öğretmen görev sayacı | Üç dönemin dökümü, komisyon/gözcülük sayıları, 12/15 durumu |
 | **İLAN:** sınav takvimi | Web sayfasında yayımlanmak üzere; kişisel veri içermez |
 | **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden sınava gireceği, ad maskeli |
+| **İLAN:** başvuru duyurusu | Beklemeli/devamsız öğrencinin başvuru zorunluluğu ve son gün; kişi adı içermez |
+| Plan dışı bırakılanlar tutanağı | Başvurusu bulunmadığı için plana alınmayanlar; okul içi kayıt, ilan edilmez |
 
 Komisyon tutanağı, yoklama/salon listesi, kâğıt sarf tutanağı ve evrak teslim
 tutanağı bu setten çıkarılmıştır. İlk üçü e-Okul'dan alınır; teslim takibi ise
@@ -140,7 +144,7 @@ kapasitesi, branş arzı ya da bir öğrencinin günlük oturum tavanı.
 
 ## Uygulanan kurallar
 
-16 kural tek dosyada (`cekirdek/kurallar.py`) tanımlanır ve tek yerde
+18 kural tek dosyada (`cekirdek/kurallar.py`) tanımlanır ve tek yerde
 uygulanır. Motorun ürettiği plan da elle düzenlenen plan da aynı doğrulayıcıdan
 geçer.
 
@@ -152,8 +156,10 @@ geçer.
 | SP-04 düzey birleştirme (30 sınırı) | OKY md.58/2-c |
 | SP-05 hafta sonu ve müdür onayı | OKY md.58/2-ç |
 | SP-06 iki aşamalı dersler | OKY md.58/2-e |
+| SP-07 beklemeli/devamsız öğrencinin başvurusu | OKY md.58/2-d |
 | SP-10 sınav süresi | ÖDY md.5/1-l |
 | SP-11 günlük sınav sayısı | ÖDY md.5/1-k |
+| SP-15 Şubat/Haziran için güncel liste | Okul uygulaması |
 | EK-03 aynı sınavda çifte rol yok | Karar md.12/2-b |
 | EK-04 yönetici görevi ücretsizdir | Karar md.12/2-c |
 | EK-05 yıllık görev sayacı | Karar md.12/2-a |

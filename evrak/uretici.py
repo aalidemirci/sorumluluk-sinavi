@@ -56,7 +56,8 @@ EVRAKLAR = (
 
 # Okul web sayfasında yayımlanmak üzere üretilen, kişisel veri barındırmayan
 # ya da maskelenmiş çıktılar.
-ILAN_EVRAKLARI = frozenset({"05_ilan_sinav_takvimi", "06_ilan_ogrenci_cizelgesi"})
+ILAN_EVRAKLARI = frozenset({"05_ilan_sinav_takvimi", "06_ilan_ogrenci_cizelgesi",
+                            "07_ilan_basvuru_duyurusu"})
 
 
 def _kurum(vt: Veritabani) -> dict[str, str]:
@@ -332,6 +333,138 @@ def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path,
     b.dayanak_notu(KVKK_NOTU)
     b.makam_satiri("Okul Müdürlüğü")
     return b.kaydet(hedef)
+
+# --------------------------------------------- 07 / 08 başvuru kapısı belgeleri
+# Bu ikisi PLANA değil PENCEREYE bağlıdır: duyuru plan doğmadan önce
+# yayımlanır. Bu yüzden plan kapsamlı URETICILER sözleşmesine girmezler.
+
+def basvuru_duyurusu(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
+    """Okul web sayfasında ilan edilecek başvuru duyurusu.
+
+    İLAN belgesidir: kişi adı taşımaz, makam satırıyla çıkar. Beklemeli ve
+    devamsız öğrencilerin sorumluluk sınavına alınabilmesi için yazılı başvuru
+    yapmaları gerektiğini ve son günü duyurur — OKY md.58/2-d.
+    """
+    kurum = _kurum(vt)
+    duyuru = hizmet.duyuru_getir(vt, pencere_kodu)
+    if not duyuru:
+        raise hizmet.HizmetHatasi(
+            f"{pencere_adi(pencere_kodu)} penceresi için duyuru kaydedilmemiş; "
+            "önce Başvuru adımından duyuruyu kaydedin.")
+    pencere = hizmet.pencereleri_getir(vt)[pencere_kodu]
+    b = Belge(kurum["ustbilgi"], "Sorumluluk Sınavı Başvuru Duyurusu",
+              _alt_baslik(kurum, pencere_kodu))
+    b.paragraf(
+        f"{kurum['yil']} öğretim yılı {pencere_adi(pencere_kodu)} dönemi sorumluluk "
+        f"sınavları {tr_tarih(pencere[0])} – {tr_tarih(pencere[1])} tarihleri arasında "
+        "yapılacaktır.", bosluk=10)
+    b.paragraf(
+        "Okulumuzdan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı "
+        "yapıldığı hâlde okula veya sınavlara katılımları sağlanamayan öğrenciler, "
+        "sorumluluk sınavına girmek istediklerini yazılı olarak okul müdürlüğüne "
+        "bildirmedikleri takdirde sınav planına dâhil EDİLMEZ.", kalin=True, bosluk=10)
+    b.bilgi_satirlari([
+        ("Başvuru son günü", tr_tarih(duyuru["basvuru_son_gunu"])),
+        ("Başvuru şekli", "Okul müdürlüğüne yazılı dilekçe"),
+        ("Sınav dönemi", f"{tr_tarih(pencere[0])} – {tr_tarih(pencere[1])}"),
+        ("Duyuru tarihi", tr_tarih(duyuru["duyuru_tarihi"])),
+        ("Yayım yeri", duyuru["yayim_yeri"] or "Okul müdürlüğünce belirlenir"),
+    ])
+    b.paragraf(
+        "Belirtilen son günden sonra yapılan başvurular, sınav tarihinden en az beş iş günü "
+        "önce ulaşmış olmak kaydıyla okul müdürünün onayıyla değerlendirilir. Diğer "
+        "öğrencilerimizin başvuru yapmasına gerek yoktur; onlar plana doğrudan alınır.",
+        bosluk=8, boyut=9.5)
+    b.dayanak_notu(
+        "Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesinin "
+        "ikinci fıkrasının (d) bendi (Ek:RG-8/9/2023-32303). " + KVKK_NOTU)
+    b.makam_satiri("Okul Müdürlüğü")
+    return b.kaydet(hedef)
+
+
+def plan_disi_tutanagi(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
+    """Başvurusu bulunmadığı için plana alınmayan öğrencilerin tutanağı.
+
+    İLAN DEĞİLDİR: okul içi kayıttır ve öğrenci adı taşır. Bir öğrenciyi
+    plandan çıkarmak hakkını etkileyen bir karardır; itiraz gelirse dayanağı
+    bu tutanaktır.
+    """
+    kurum = _kurum(vt)
+    duyuru = hizmet.duyuru_getir(vt, pencere_kodu)
+    satirlar_ham = hizmet.plan_disi_birakilanlar(vt, pencere_kodu)
+    b = Belge(kurum["ustbilgi"], "Başvuru Yapmayanların Plan Dışı Bırakılması Tutanağı",
+              _alt_baslik(kurum, pencere_kodu))
+    if not duyuru:
+        b.uyari("Bu pencere için başvuru duyurusu kaydedilmemiştir; tutanağın dayanağı eksiktir.")
+    b.paragraf(
+        f"{kurum['yil']} öğretim yılı {pencere_adi(pencere_kodu)} dönemi sorumluluk sınavı "
+        "planı hazırlanırken, aşağıda kimlikleri yazılı öğrencilerin yazılı başvurusu "
+        "bulunmadığından plana dâhil edilmedikleri tespit edilmiştir.", bosluk=10)
+    if duyuru:
+        b.bilgi_satirlari([
+            ("Duyuru tarihi", tr_tarih(duyuru["duyuru_tarihi"])),
+            ("Duyuru belge referansı", duyuru["belge_referansi"]),
+            ("Yayım yeri", duyuru["yayim_yeri"] or "—"),
+            ("Başvuru son günü", tr_tarih(duyuru["basvuru_son_gunu"])),
+        ])
+    if satirlar_ham:
+        b.tablo(
+            ["Okul no", "Adı Soyadı", "Şube", "Grup", "Durum"],
+            [(s["okul_no"], s["ad_soyad"], s["sube"], s["grup"], s["ozet"])
+             for s in satirlar_ham],
+            [12, 30, 10, 30, 18])
+    else:
+        b.paragraf("Bu dönemde plan dışı bırakılan öğrenci bulunmamaktadır.", bosluk=8)
+    b.paragraf(
+        f"Toplam {len(satirlar_ham)} öğrenci plan dışında bırakılmıştır. "
+        "\"Karar bekliyor\" durumundaki öğrenciler için henüz başvuru kararı girilmemiştir; "
+        "plan üretilmeden önce bu kayıtların tamamlanması gerekir.", bosluk=8, boyut=9.5)
+    b.dayanak_notu(
+        "Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesinin "
+        "ikinci fıkrasının (d) bendi (Ek:RG-8/9/2023-32303) uyarınca, yazılı başvurusu "
+        "bulunmayan öğrenciler sorumluluk sınavı planına dâhil edilmemiştir. Bu belge okul "
+        "içi kayıt niteliğindedir; ilan edilmez.")
+    b.imza_blogu([("Düzenleyen", ""), ("Düzenleyen", "")], olur_adi=kurum["mudur"])
+    return b.kaydet(hedef)
+
+
+PENCERE_EVRAKLARI = (
+    EvrakTuru("07_ilan_basvuru_duyurusu", "İLAN: başvuru duyurusu (KVKK uyumlu)",
+              "07_ilan_basvuru_duyurusu.docx"),
+    EvrakTuru("08_basvuru_plan_disi_tutanagi", "Plan dışı bırakılanlar tutanağı",
+              "08_basvuru_plan_disi_tutanagi.docx"),
+)
+
+PENCERE_URETICILER = {
+    "07_ilan_basvuru_duyurusu": basvuru_duyurusu,
+    "08_basvuru_plan_disi_tutanagi": plan_disi_tutanagi,
+}
+
+
+def pencere_evraki_uret(vt: Veritabani, pencere_kodu: str, hedef_klasor: Path,
+                        secilenler: list[str] | None = None) -> list[tuple[Path, str]]:
+    """Pencere kapsamlı başvuru belgelerini üretir.
+
+    Sürüm izi plan kimliğine değil `öğretim yılı|pencere` anahtarına bağlanır;
+    bu belgeler plandan önce doğar.
+    """
+    hedef_klasor = Path(hedef_klasor)
+    hedef_klasor.mkdir(parents=True, exist_ok=True)
+    istenen = list(secilenler) if secilenler else [e.anahtar for e in PENCERE_EVRAKLARI]
+    dosya_adlari = {e.anahtar: e.dosya_adi for e in PENCERE_EVRAKLARI}
+    ogretim_yili = hizmet.ayarlari_getir(vt).get("ogretim_yili", "")
+    kayit_anahtari = f"{ogretim_yili}|{pencere_kodu}"
+    uretilen: list[tuple[Path, str]] = []
+    for anahtar in istenen:
+        uretici = PENCERE_URETICILER.get(anahtar)
+        if uretici is None:
+            raise hizmet.HizmetHatasi(f"Bilinmeyen evrak türü: {anahtar}")
+        yol = hedef_klasor / dosya_adlari[anahtar]
+        ozet = uretici(vt, pencere_kodu, yol)
+        hizmet.evrak_surumu_kaydet(vt, anahtar, kayit_anahtari, yol, ozet)
+        uretilen.append((yol, ozet))
+    return uretilen
+
 
 # ----------------------------------------------------------------- paket
 

@@ -32,7 +32,8 @@ def test_her_kuralin_dayanagi_ve_ciddiyeti_vardir() -> None:
 def test_kural_kimlikleri_beklenen_kumedir() -> None:
     assert set(KURALLAR) == {
         "SG-05", "SG-06",
-        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-10", "SP-11",
+        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-07", "SP-10",
+        "SP-11", "SP-15",
         "EK-03", "EK-04", "EK-05",
         "TS-01", "TS-02", "TS-03",
     }
