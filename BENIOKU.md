@@ -39,13 +39,18 @@ tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
 | Sınav programı (görevli nüshası) | + komisyon ve gözcüler |
 | Görevlendirme çizelgesi | Komisyon bazlı: ders(ler), öğrenci sayısı, tarih, saat, salon, komisyon üyeleri, gözcüler + tebliğ-tebellüğ sayfası |
 | Öğretmen görev sayacı | Üç dönemin dökümü, komisyon/gözcülük sayıları, 12/15 durumu |
-| Evrak teslim tutanağı | Teslim-tesellüm çizelgesi ve gecikme uyarısı |
 | **İLAN:** sınav takvimi | Web sayfasında yayımlanmak üzere; kişisel veri içermez |
 | **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden sınava gireceği, ad maskeli |
 
-Komisyon tutanağı, yoklama/salon listesi ve kâğıt sarf tutanağı bu setten
-çıkarılmıştır: bunlar e-Okul'dan alınır, burada ikinci bir kaynak yaratmak
-yersizdir.
+Komisyon tutanağı, yoklama/salon listesi, kâğıt sarf tutanağı ve evrak teslim
+tutanağı bu setten çıkarılmıştır. İlk üçü e-Okul'dan alınır; teslim takibi ise
+ekrandaki çizelgeden yürütülür, ayrıca belge üretmeye gerek yoktur.
+
+Belgelerde program logosu yer almaz: evrak okulun evrakıdır, yazılımın tanıtımı
+değildir. İmza bloğu "Düzenleyen" ve müdür "OLUR" makamından oluşur.
+
+Görev sayacı raporu kesinleşmemiş plandan da üretilir; görev yükünü onaydan
+önce görmek gerekir. Taslak dönem varsa belgeye uyarı düşülür.
 
 Her belgenin altında dayanağı yazılıdır. Belgeler EBYS/DYS kayıt numarası ve
 güvenli elektronik imza ibaresi üretmez; okulun kendi kayıtlarından hazırlanmış
@@ -100,7 +105,9 @@ veritabanı çelişir. Böyle bir kişi pasife alınır.
 
 ## Görev dengesi ve üç dönem
 
-Bir öğretim yılında üç sınav dönemi vardır (P1, P2, P3). Görev sayaçları
+Bir öğretim yılında üç sınav dönemi vardır: **Eylül** (birinci dönemin ilk iki
+haftası), **Şubat** (ikinci dönemin ilk iki haftası) ve **Haziran** (ikinci
+dönemin son iki haftası). Görev sayaçları
 dönemler arasında taşınır: ikinci dönem planlanırken birinci dönemde çok görev
 almış öğretmen geri plana düşer. Görev sayacı raporu her dönemin dökümünü ayrı
 sütunda gösterir.
@@ -210,6 +217,16 @@ uygulama simgesinde görünür. Renk ya da biçim değişirse betik yeniden
 ```bash
 python araclar/logo_uret.py
 ```
+
+## Lisans
+
+Sorumluluk Sınavı, [PolyForm Noncommercial License 1.0.0](LICENSE) ile
+yayımlanır. Eğitim kurumları, kamu kurumları, kâr amacı gütmeyen kuruluşlar ve
+bireyler programı ticari olmayan amaçlarla kullanabilir. Bağlayıcı koşullar
+`LICENSE`, telif bildirimi `NOTICE` dosyasındadır. Aynı bilgiler uygulamanın
+Lisans sayfasında da yer alır.
+
+Geliştirici: Ahmet Ali DEMİRCİ — aalidemirci@gmail.com
 
 ## Geliştirme
 

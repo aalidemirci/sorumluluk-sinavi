@@ -22,7 +22,9 @@ from cekirdek.modeller import (
 )
 from cekirdek.planlayici import PlanlamaSonucu, plan_uret
 from cekirdek.kurallar import yillik_sayac_asildi_mi
-from cekirdek.takvim import gunleri_listele, is_gunu_ekle, sinav_pencereleri
+from cekirdek.takvim import (
+    gunleri_listele, is_gunu_ekle, pencere_adi, sinav_pencereleri,
+)
 from cekirdek.talep import SinavBirimi, YukOzeti, birimleri_olustur, yuk_ozeti
 from .rapor_okuma import (
     PersonelRaporu, SorumlulukRaporu, personel_raporu_oku, sorumluluk_raporu_oku,
@@ -1398,3 +1400,21 @@ def gorev_havuzu_ozeti(vt: Veritabani) -> list[dict]:
             ogretim_yili, kayit["komisyon"], kayit["gozcu"])
         kayit["ucretlendirilebilir"] = not Personel(0, "", "", kayit["unvan"]).yonetici_mi
     return sorted(kisiler.values(), key=lambda x: siralama_anahtari(x["ad"]))
+
+
+def taslak_pencereler(vt: Veritabani) -> list[str]:
+    """Bu öğretim yılında kesinleşmemiş planı olan dönemlerin adları.
+
+    Görev sayacı raporu kesinleşmemiş plandan da üretilir; sayıların
+    değişebileceğini belgeye yazabilmek için hangi dönemlerin taslak olduğu
+    bilinmelidir.
+    """
+    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    if not ogretim_yili:
+        return []
+    with vt.baglan() as b:
+        kodlar = [r[0] for r in b.execute(
+            "SELECT DISTINCT pencere_kodu FROM v_plan"
+            " WHERE ogretim_yili=? AND durum='taslak' ORDER BY pencere_kodu",
+            (ogretim_yili,))]
+    return [pencere_adi(k) for k in kodlar]

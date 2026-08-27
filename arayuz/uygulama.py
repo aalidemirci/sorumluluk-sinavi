@@ -21,6 +21,7 @@ from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 from cekirdek.kaynak import varlik_yolu
 from cekirdek.modeller import IkiAsamaliSayim, PlanParametreleri
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
+from cekirdek.takvim import pencere_adi
 from veri import hizmet
 from veri.hizmet import HizmetHatasi
 from veri.rapor_okuma import RaporHatasi
@@ -45,6 +46,7 @@ ADIMLAR = (
     ("06", "Sınav Planı", "Plan üretme, düzenleme ve kesinleştirme"),
     ("07", "Evrak ve Teslim", "Belge üretimi ve sınav evrakının teslim takibi"),
     ("08", "Yardım", "Mevzuat hükümleri, kullanım ve çalışma mantığı"),
+    ("09", "Lisans", "Program bilgisi, geliştirici ve kullanım koşulları"),
 )
 
 AYAR_ALANLARI = (
@@ -57,6 +59,9 @@ AYAR_ALANLARI = (
     ("ikinci_donem_baslangic", "2. dönem başlangıcı (YYYY-AA-GG)"),
     ("ikinci_donem_bitis", "2. dönem bitişi (YYYY-AA-GG)"),
 )
+
+
+SURUM = "0.3.0"
 
 
 def veri_klasoru() -> Path:
@@ -218,7 +223,7 @@ class Uygulama:
                   font=("Segoe UI", 9)).pack(anchor="w", pady=(1, 12))
         (self._sayfa_kurum, self._sayfa_personel, self._sayfa_salon,
          self._sayfa_sorumluluk, self._sayfa_ders, self._sayfa_plan,
-         self._sayfa_evrak, self._sayfa_yardim)[sira]()
+         self._sayfa_evrak, self._sayfa_yardim, self._sayfa_lisans)[sira]()
 
     # --------------------------------------------------------- yardımcılar
 
@@ -288,7 +293,7 @@ class Uygulama:
             self.pencere_etiketi.configure(text="Tarihler girilince sınav pencereleri hesaplanır.")
             return
         metin = "   ".join(
-            f"{kod}: {bas.strftime('%d.%m.%Y')}–{bit.strftime('%d.%m.%Y')}"
+            f"{pencere_adi(kod)}: {bas.strftime('%d.%m.%Y')}–{bit.strftime('%d.%m.%Y')}"
             for kod, (bas, bit) in pencereler.items())
         self.pencere_etiketi.configure(text="Sınav pencereleri →  " + metin)
 
@@ -690,7 +695,8 @@ class Uygulama:
         ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
         self.pencere_secimi = ttk.Combobox(
             ust, state="readonly", width=30,
-            values=[f"{kod}  {bas.strftime('%d.%m.%Y')}–{bit.strftime('%d.%m.%Y')}"
+            values=[f"{pencere_adi(kod)}  {bas.strftime('%d.%m.%Y')}–"
+                    f"{bit.strftime('%d.%m.%Y')}"
                     for kod, (bas, bit) in pencereler.items()])
         self.pencere_secimi.current(0)
         self.pencere_secimi.pack(side=LEFT, padx=6)
@@ -760,7 +766,10 @@ class Uygulama:
     # ------------------------------------------------- plan yardımcıları
 
     def _pencere_kodu(self) -> str:
-        return self.pencere_secimi.get().split()[0]
+        """Seçili dönemin kısa kodu. Ekranda ay adı yazar, veritabanında kod durur."""
+        secili = self.pencere_secimi.get().split()[0]
+        return next((kod for kod in ("P1", "P2", "P3") if pencere_adi(kod) == secili),
+                    secili)
 
     def _parametreleri_topla(self) -> PlanParametreleri:
         return PlanParametreleri(
@@ -980,9 +989,11 @@ class Uygulama:
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=(12, 4))
         ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
-        self.evrak_pencere = ttk.Combobox(ust, state="readonly", width=10,
-                                          values=list(pencereler))
+        self.evrak_pencere = ttk.Combobox(
+            ust, state="readonly", width=12,
+            values=[pencere_adi(kod) for kod in pencereler])
         self.evrak_pencere.current(0)
+        self._evrak_pencere_kodlari = list(pencereler)
         self.evrak_pencere.pack(side=LEFT, padx=6)
         self.evrak_durum = ttk.Label(ust, text="", style="Soluk.TLabel")
         self.evrak_durum.pack(side=LEFT, padx=12)
@@ -999,7 +1010,8 @@ class Uygulama:
         self._evrak_plani_bul()
 
     def _evrak_plani_bul(self) -> int | None:
-        plan_id = hizmet.son_plani_getir(self.vt, self.evrak_pencere.get())
+        kod = self._evrak_pencere_kodlari[self.evrak_pencere.current()]
+        plan_id = hizmet.son_plani_getir(self.vt, kod)
         if plan_id is None:
             self.evrak_durum.configure(
                 text="Bu pencerede kayıtlı plan yok. Önce Sınav Planı adımında planı kaydedin.",
@@ -1220,3 +1232,49 @@ class Uygulama:
                       "SADECE VERİ seçeneğini işaretleyin. Biçimlendirilmiş çıktı okunamaz.",
                  bg="#EEF4FA", fg=RENK["engel"], font=("Segoe UI Semibold", 9),
                  anchor="w", justify=LEFT, wraplength=980).pack(fill=X, padx=12, pady=(0, 9))
+
+    # ============================================================ 09 lisans
+
+    def _sayfa_lisans(self) -> None:
+        kart = self._kart()
+        ust = tk.Frame(kart, bg=RENK["kart"])
+        ust.pack(fill=X, padx=15, pady=(14, 4))
+        png = varlik_yolu("logo.png")
+        if png is not None:
+            try:
+                self._lisans_simgesi = tk.PhotoImage(file=str(png)).subsample(6, 6)
+                tk.Label(ust, image=self._lisans_simgesi, bg=RENK["kart"]).pack(
+                    side=LEFT, padx=(0, 14))
+            except tk.TclError:
+                pass
+        yazi = tk.Frame(ust, bg=RENK["kart"])
+        yazi.pack(side=LEFT, anchor="n")
+        tk.Label(yazi, text="Sorumluluk Sınavı", bg=RENK["kart"], fg=RENK["kenar"],
+                 font=("Segoe UI Semibold", 16), anchor="w").pack(anchor="w")
+        tk.Label(yazi, text=f"Sürüm {SURUM}", bg=RENK["kart"], fg=RENK["soluk"],
+                 font=("Segoe UI", 10), anchor="w").pack(anchor="w")
+        tk.Label(yazi, text="Ortaöğretim kurumları için çevrimdışı sorumluluk sınavı\n"
+                            "planlama ve görevlendirme uygulaması",
+                 bg=RENK["kart"], fg=RENK["yazi"], font=("Segoe UI", 10),
+                 justify=LEFT, anchor="w").pack(anchor="w", pady=(4, 0))
+
+        sarmal = tk.Frame(kart, bg=RENK["kart"])
+        sarmal.pack(fill=BOTH, expand=True, padx=15, pady=(10, 14))
+        metin = tk.Text(sarmal, wrap="word", font=("Segoe UI", 10), bd=0,
+                        bg=RENK["kart"], fg=RENK["yazi"], padx=12, pady=8,
+                        spacing1=2, spacing3=4, cursor="arrow")
+        kaydirma = ttk.Scrollbar(sarmal, orient="vertical", command=metin.yview)
+        metin.configure(yscrollcommand=kaydirma.set)
+        metin.pack(side=LEFT, fill=BOTH, expand=True)
+        kaydirma.pack(side=RIGHT, fill=Y)
+        metin.tag_configure("baslik", font=("Segoe UI Semibold", 12),
+                            foreground=RENK["kenar"], spacing1=12, spacing3=5)
+        metin.tag_configure("paragraf", spacing3=6)
+        metin.tag_configure("madde", spacing3=3, lmargin1=16, lmargin2=30)
+
+        for baslik, paragraflar in yardim_metni.LISANS_BOLUMLERI:
+            metin.insert(END, f"{baslik}\n", "baslik")
+            for paragraf in paragraflar:
+                etiket = "madde" if paragraf.startswith("•") else "paragraf"
+                metin.insert(END, f"{paragraf}\n", etiket)
+        metin.configure(state="disabled")

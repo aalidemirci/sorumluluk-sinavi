@@ -13,12 +13,14 @@ from PyInstaller.utils.hooks import collect_data_files
 pathlib = __import__("pathlib")
 gocler = [(str(yol), "veri/gocler") for yol in pathlib.Path("veri/gocler").glob("*.sql")]
 varliklar = [(str(yol), "varliklar") for yol in pathlib.Path("varliklar").glob("*.*")]
+# Lisans sayfası bu dosyalara atıf yapar; pakette bulunmaları gerekir.
+lisans = [(ad, ".") for ad in ("LICENSE", "NOTICE") if pathlib.Path(ad).exists()]
 
 analiz = Analysis(
     ["sorumluluk_sinavi.py"],
     pathex=["."],
     binaries=[],
-    datas=gocler + varliklar + collect_data_files("tzdata"),
+    datas=gocler + varliklar + lisans + collect_data_files("tzdata"),
     hiddenimports=[
         "tzdata",
         "openpyxl",

@@ -16,6 +16,14 @@ Tatiller = frozenset[date] | set[date]
 # 14 gün.
 PENCERE_GUN_SAYISI = 14
 
+# Pencerelerin kullanıcıya gösterilen adları. Veritabanında kısa kod (P1/P2/P3)
+# saklanır; ekranlarda ve evrakta dönemin düştüğü ay adı yazılır.
+PENCERE_ADLARI = {"P1": "Eylül", "P2": "Şubat", "P3": "Haziran"}
+
+
+def pencere_adi(kod: str) -> str:
+    return PENCERE_ADLARI.get(kod, kod)
+
 
 def is_gunu_mu(gun: date, tatiller: Tatiller = frozenset()) -> bool:
     return gun.weekday() < 5 and gun not in tatiller

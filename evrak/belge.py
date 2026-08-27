@@ -14,7 +14,6 @@ import hashlib
 from datetime import date
 from pathlib import Path
 
-from cekirdek.kaynak import varlik_yolu
 from cekirdek.metin import buyult
 
 
@@ -117,14 +116,12 @@ class Belge:
 
     def _ustbilgi(self, kurum_adi: str) -> None:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.shared import Mm, Pt
+        from docx.shared import Pt
+        # Evrakta program logosu yoktur: belge okulun evrakıdır, yazılımın
+        # tanıtımı değildir. Logo yalnız uygulama arayüzünde görünür.
         paragraf = self.belge.sections[0].header.paragraphs[0]
         paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraf.paragraph_format.space_after = Pt(2)
-        logo = varlik_yolu("logo_evrak.png")
-        if logo is not None:
-            paragraf.add_run().add_picture(str(logo), height=Mm(6))
-            self._yazi(paragraf.add_run("  "), 8.5)
         self._yazi(paragraf.add_run(kurum_adi), 8.5, True, SOLUK)
         self._kenarlik(paragraf, "bottom", CIZGI, "4")
 

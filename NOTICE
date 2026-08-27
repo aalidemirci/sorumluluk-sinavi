@@ -1,0 +1,19 @@
+Required Notice: Copyright 2026 Ahmet Ali DEMİRCİ
+
+Sorumluluk Sınavı, PolyForm Noncommercial License 1.0.0 ile yayımlanır.
+Bağlayıcı koşullar LICENSE dosyasındadır.
+
+Üçüncü taraf bileşenler
+-----------------------
+
+Uygulama şu açık kaynaklı paketleri kullanır; lisansları ilgili projelerin
+kendi dağıtımlarındadır:
+
+- openpyxl (MIT) — .xlsx okuma
+- xlrd (BSD) — .xls okuma
+- python-docx (MIT) — .docx üretimi
+- PyYAML (MIT) — yapılandırma
+- tzdata (Apache-2.0) — IANA saat dilimi verisi
+
+Uygulama simgesi ve evrak düzeni bu projeye aittir; üçüncü taraf görsel
+varlık içermez.

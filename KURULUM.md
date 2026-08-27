@@ -47,6 +47,7 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
 7. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
    sonra geri alınan evrakı teslim çizelgesine işleyin.
 8. **Yardım** — mevzuat hükümleri, kullanım ve çalışma mantığı bu sayfadadır.
+9. **Lisans** — program bilgisi, geliştirici ve kullanım koşulları.
 
 ## e-Okul raporlarını indirme
 

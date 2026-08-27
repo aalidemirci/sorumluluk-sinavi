@@ -104,6 +104,7 @@ def test_sinav_programi_oturumlari_ve_kurumu_icerir(hazir) -> None:
     assert AYARLAR["okul_adi"] in metin
     assert "MATEMATİK" in metin
     assert "TASLAK" in metin           # plan henüz kesinleşmedi
+    assert "Eylül" in metin            # dönem adı P1 değil
 
 
 def test_kesinlesen_planin_programinda_onay_no_yazar(hazir) -> None:
@@ -255,13 +256,7 @@ def test_gecersiz_evrak_turu_reddedilir(hazir) -> None:
                              personel[0].kimlik, personel[1].kimlik)
 
 
-def test_teslim_tutanagi_gecikmeyi_gosterir(hazir) -> None:
-    vt, plan_id, tmp_path = hazir
-    yol = tmp_path / "teslim.docx"
-    uretici.evrak_teslim_tutanagi(vt, plan_id, yol, bugun=date(2099, 1, 1))
-    metin = _metin(yol)
-    assert "gecikti" in metin
-    assert "süresinde teslim edilmemiştir" in metin
+
 
 
 def test_baslik_turkce_buyutulur(tmp_path: Path) -> None:
@@ -404,3 +399,64 @@ def test_kesinlesen_planin_ilaninda_uyari_yok(hazir) -> None:
     yol = tmp_path / "takvim.docx"
     uretici.ilan_sinav_takvimi(vt, plan_id, yol)
     assert "TASLAK" not in _metin(yol)
+
+
+# ============================================ son düzenlemeler (regresyon)
+
+def test_evrakta_program_logosu_yok(hazir) -> None:
+    """Belge okulun evrakıdır; yazılımın tanıtımı değildir."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "program.docx"
+    uretici.sinav_programi(vt, plan_id, yol)
+    from docx import Document
+    belge = Document(yol)
+    gorseller = [p for p in belge.part.package.parts
+                 if p.partname.startswith("/word/media/")]
+    assert gorseller == []
+
+
+def test_imza_blogunda_kontrol_eden_yok(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "program.docx"
+    uretici.sinav_programi(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "Düzenleyen" in metin
+    assert "OLUR" in metin
+    assert "Kontrol eden" not in metin
+
+
+def test_donem_adlari_ay_olarak_yazilir(hazir) -> None:
+    """Ekranda ve evrakta P1/P2/P3 değil ay adı görünür."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "takvim.docx"
+    uretici.ilan_sinav_takvimi(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "Eylül dönemi" in metin
+    assert "P1" not in metin
+
+
+def test_sayac_raporu_taslak_plandan_da_uretilir(hazir) -> None:
+    """Görev yükü kesinleştirmeden önce görülebilmelidir."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "sayac.docx"
+    uretici.gorev_sayac_raporu(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "TASLAK VERİ" in metin
+    assert "Eylül" in metin
+    gorevliler = hizmet.gorevli_listesi(vt, plan_id)
+    assert gorevliler
+    assert gorevliler[0]["ad"] in metin      # taslakta da satırlar dolu
+
+
+def test_kesinlesen_planda_taslak_uyarisi_yok(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    hizmet.plan_kesinlestir(vt, plan_id, "2026/144")
+    yol = tmp_path / "sayac.docx"
+    uretici.gorev_sayac_raporu(vt, plan_id, yol)
+    assert "TASLAK VERİ" not in _metin(yol)
+
+
+def test_teslim_tutanagi_belge_setinden_cikti() -> None:
+    anahtarlar = {e.anahtar for e in uretici.EVRAKLAR}
+    assert "05_evrak_teslim_tutanagi" not in anahtarlar
+    assert len(uretici.EVRAKLAR) == 6

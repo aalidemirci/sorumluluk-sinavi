@@ -13,6 +13,7 @@ from pathlib import Path
 
 from veri import hizmet
 from veri.veritabani import Veritabani
+from cekirdek.takvim import pencere_adi
 from .belge import Belge, tr_tarih
 
 
@@ -43,21 +44,19 @@ EVRAKLAR = (
               "03_gorevlendirme_cizelgesi.docx"),
     EvrakTuru("04_gorev_sayac_raporu", "Öğretmen görev sayacı raporu",
               "04_gorev_sayac_raporu.docx"),
-    EvrakTuru("05_evrak_teslim_tutanagi", "Evrak teslim tutanağı",
-              "05_evrak_teslim_tutanagi.docx"),
-    EvrakTuru("06_ilan_sinav_takvimi", "İLAN: sınav takvimi (KVKK uyumlu)",
-              "06_ilan_sinav_takvimi.docx"),
-    EvrakTuru("07_ilan_ogrenci_cizelgesi", "İLAN: öğrenci sınav çizelgesi (KVKK uyumlu)",
-              "07_ilan_ogrenci_cizelgesi.docx"),
+    EvrakTuru("05_ilan_sinav_takvimi", "İLAN: sınav takvimi (KVKK uyumlu)",
+              "05_ilan_sinav_takvimi.docx"),
+    EvrakTuru("06_ilan_ogrenci_cizelgesi", "İLAN: öğrenci sınav çizelgesi (KVKK uyumlu)",
+              "06_ilan_ogrenci_cizelgesi.docx"),
 )
 
-# Komisyon tutanağı, yoklama listesi ve kâğıt sarf tutanağı bu setten
-# çıkarıldı: bunlar e-Okul'dan alınıyor, burada yeniden üretmek yersiz
-# ikinci bir kaynak yaratıyordu.
+# Komisyon tutanağı, yoklama listesi, kâğıt sarf tutanağı ve evrak teslim
+# tutanağı bu setten çıkarıldı. İlk üçü e-Okul'dan alınır; teslim takibi ise
+# ekrandaki çizelgeden yürütülür, ayrıca belge üretmeye gerek yoktur.
 
 # Okul web sayfasında yayımlanmak üzere üretilen, kişisel veri barındırmayan
 # ya da maskelenmiş çıktılar.
-ILAN_EVRAKLARI = frozenset({"06_ilan_sinav_takvimi", "07_ilan_ogrenci_cizelgesi"})
+ILAN_EVRAKLARI = frozenset({"05_ilan_sinav_takvimi", "06_ilan_ogrenci_cizelgesi"})
 
 
 def _kurum(vt: Veritabani) -> dict[str, str]:
@@ -74,7 +73,8 @@ def _kurum(vt: Veritabani) -> dict[str, str]:
 
 
 def _alt_baslik(kurum: dict, pencere_kodu: str) -> str:
-    return f"{kurum['yil']} Öğretim Yılı • Sorumluluk Sınavları • {pencere_kodu} dönemi"
+    return (f"{kurum['yil']} Öğretim Yılı • Sorumluluk Sınavları • "
+            f"{pencere_adi(pencere_kodu)} dönemi")
 
 
 def _oturum_saat(oturum: dict) -> str:
@@ -117,7 +117,7 @@ def sinav_programi(vt: Veritabani, plan_id: int, hedef: Path,
     b.dayanak_notu(
         "Sınav tarihleri OKY md.58/2-a uyarınca dönem pencereleri içinde belirlenmiştir. "
         "Sınav süresi ÖDY md.5/1-l gereği bir ders saatini aşmaz. " + ALTBILGI_NOTU)
-    b.imza_blogu([("Düzenleyen", ""), ("Kontrol eden", "")], kurum["mudur"])
+    b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
     return b.kaydet(hedef)
 
 
@@ -201,11 +201,19 @@ def gorevlendirme_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
 # -------------------------------------------------- 07 görev sayacı raporu
 
 def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
-    """Öğretim yılı boyunca kişi başına görev dağılımı; dönem dökümü dâhil."""
+    """Öğretim yılı boyunca kişi başına görev dağılımı; dönem dökümü dâhil.
+
+    Rapor kesinleşmemiş planlardan da üretilir: görev yükünü kesinleştirmeden
+    önce görmek gerekir. Taslak plan varsa belgeye uyarı düşülür.
+    """
     kurum = _kurum(vt)
     sayaclar = hizmet.gorev_havuzu_ozeti(vt)
+    taslaklar = hizmet.taslak_pencereler(vt)
     b = Belge(kurum["ustbilgi"], "Öğretmen Sınav Görevi Sayacı",
               f"{kurum['yil']} Öğretim Yılı — üç sınav dönemi toplamı")
+    if taslaklar:
+        b.uyari("TASLAK VERİ — şu dönemlerin planı henüz müdür onayıyla kesinleşmemiştir: "
+                + ", ".join(taslaklar) + ". Sayılar plan değiştikçe değişebilir.")
     b.paragraf(
         "Aşağıdaki sayılar okulun kendi kayıtlarından alınmıştır; ek ders ücreti tutarı "
         "hesaplanmamıştır. Tahakkuk işlemleri yetkili sistemde yapılır. Görev dağılımı "
@@ -215,14 +223,18 @@ def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
         komisyon, gozcu = kayit["pencereler"].get(kod, (0, 0))
         return f"{komisyon}+{gozcu}" if (komisyon or gozcu) else "—"
 
-    b.tablo(["Adı Soyadı", "Branşı", "P1", "P2", "P3", "Komisyon", "Gözcülük",
-             "Toplam", "Durum"],
-            [(s["ad"], s["brans"], donem(s, "P1"), donem(s, "P2"), donem(s, "P3"),
-              s["komisyon"], s["gozcu"], s["toplam"],
-              "sınır aşıldı" if s["asildi_mi"]
-              else ("ücretlendirilemez" if not s["ucretlendirilebilir"] else ""))
-             for s in sayaclar],
-            [22, 16, 6, 6, 6, 9, 9, 8, 14])
+    b.tablo(["Adı Soyadı", "Branşı", "Eylül", "Şubat", "Haziran", "Komisyon",
+             "Gözcülük", "Toplam", "Durum"],
+            [(k["ad"], k["brans"], donem(k, "P1"), donem(k, "P2"), donem(k, "P3"),
+              k["komisyon"], k["gozcu"], k["toplam"],
+              "sınır aşıldı" if k["asildi_mi"]
+              else ("ücretlendirilemez" if not k["ucretlendirilebilir"] else ""))
+             for k in sayaclar],
+            [22, 16, 7, 7, 7, 9, 9, 8, 12])
+    if not sayaclar:
+        b.paragraf(
+            "Henüz görevlendirme yapılmamıştır. Sınav Planı adımında planı üretip "
+            "kaydettikten sonra bu rapor dolacaktır.", bosluk=8)
     b.dayanak_notu(
         "Dönem sütunlarında komisyon üyeliği + gözcülük sayısı gösterilir. "
         "Karar md.12/2-a: bir öğretim yılında bir kişiye 12'den fazla sınav komisyon "
@@ -232,36 +244,6 @@ def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
         "ödenmez. " + ALTBILGI_NOTU)
     b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
     return b.kaydet(hedef)
-
-
-# ------------------------------------------------- 08 evrak teslim tutanağı
-
-def evrak_teslim_tutanagi(vt: Veritabani, plan_id: int, hedef: Path,
-                          bugun: date | None = None) -> str:
-    kurum = _kurum(vt)
-    plan, _ = hizmet.plan_yukle(vt, plan_id)
-    cizelge = hizmet.teslim_cizelgesi(vt, plan_id)
-    ozet = hizmet.teslim_ozeti(vt, plan_id, bugun)
-    b = Belge(kurum["ustbilgi"], "Sınav Evrakı Teslim-Tesellüm Tutanağı",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
-    b.paragraf(
-        f"Toplam {ozet['toplam']} evrak kaleminden {ozet['teslim']} adedi teslim alınmış, "
-        f"{ozet['bekliyor']} adedi beklenmekte, {ozet['gecikti']} adedi gecikmiştir.",
-        bosluk=10)
-    if ozet["gecikti"]:
-        b.uyari(f"{ozet['gecikti']} evrak kalemi süresinde teslim edilmemiştir.")
-
-    b.tablo(["Sınav", "Tarih", "Evrak", "Adet", "Teslim eden", "Teslim alan", "Durum"],
-            [(s.oturum_etiketi, tr_tarih(s.tarih), s.evrak_adi,
-              "" if s.adet is None else s.adet, s.teslim_eden or "",
-              s.teslim_alan or "", s.durum(bugun)) for s in cizelge],
-            [22, 10, 20, 7, 16, 16, 12])
-    b.dayanak_notu(
-        "Teslim eden komisyon üyesi ile teslim alan görevli aynı kişi olamaz. Teslim süresi "
-        "sınav tarihini izleyen ilk iş günüdür; süre okul uygulamasıdır. " + ALTBILGI_NOTU)
-    b.imza_blogu([("Teslim eden", ""), ("Teslim alan", "")], kurum["mudur"])
-    return b.kaydet(hedef)
-
 
 
 # ============================================ 09 / 10 ilan çizelgeleri (KVKK)
@@ -358,12 +340,11 @@ URETICILER = {
     "02_sinav_programi_gorevli": lambda vt, pid, yol: sinav_programi(vt, pid, yol, True),
     "03_gorevlendirme_cizelgesi": gorevlendirme_cizelgesi,
     "04_gorev_sayac_raporu": gorev_sayac_raporu,
-    "05_evrak_teslim_tutanagi": evrak_teslim_tutanagi,
-    "06_ilan_sinav_takvimi": ilan_sinav_takvimi,
+    "05_ilan_sinav_takvimi": ilan_sinav_takvimi,
 }
 
 # Öğrenci gösterim biçimi yalnız bu evraka geçirilir.
-GOSTERIM_ALAN_URETICILER = {"07_ilan_ogrenci_cizelgesi": ilan_ogrenci_cizelgesi}
+GOSTERIM_ALAN_URETICILER = {"06_ilan_ogrenci_cizelgesi": ilan_ogrenci_cizelgesi}
 
 
 def evrak_uret(vt: Veritabani, plan_id: int, hedef_klasor: Path,

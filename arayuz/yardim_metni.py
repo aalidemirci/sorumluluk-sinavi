@@ -59,8 +59,9 @@ BOLUMLER = [
         "Sınav ne zaman yapılır",
         [
             "Sorumluluk sınavları birinci dönemin ilk iki haftası, ikinci dönemin ilk iki "
-            "haftası ile son iki haftası içinde yapılır. Program bu üç pencereyi girdiğiniz "
-            "dönem tarihlerinden hesaplar; pencereler koda gömülü değildir. (OKY md.58/2-a)",
+            "haftası ile son iki haftası içinde yapılır. Program bu üç dönemi girdiğiniz "
+            "dönem tarihlerinden hesaplar ve düştükleri aya göre Eylül, Şubat ve Haziran "
+            "diye adlandırır; tarihler koda gömülü değildir. (OKY md.58/2-a)",
             "Sınavlar dersleri aksatmayacak biçimde hafta içinde planlanır; gerektiğinde "
             "cumartesi ve pazar günleri de kullanılabilir. Program hafta sonunu ancak hafta "
             "içi yetmediğinde kullanır ve gerekçesini belgeye yazar. (OKY md.58/2-ç)",
@@ -181,6 +182,62 @@ BOLUMLER = [
             "Uygulamayı kapatıp veri klasöründeki veritabanı dosyasını kurumun yedek "
             "ortamına kopyalayın. Şema yükseltmelerinde program göç öncesi otomatik yedek "
             "alır. Gerçek veriyi e-posta, kişisel bulut veya herkese açık depoya koymayın.",
+        ],
+    ),
+]
+
+
+LISANS_BOLUMLERI = [
+    (
+        "Geliştirici",
+        [
+            "Ahmet Ali DEMİRCİ — aalidemirci@gmail.com",
+            "Bir ortaöğretim kurumunda çalışıyorum. Bu program, okulda karşılaştığım "
+            "sorumluluk sınavı planlama ve görevlendirme işini elle yürütmenin zorluğundan "
+            "doğdu; mevzuata bağlı kalarak, kurum verisini dışarı çıkarmadan çalışacak "
+            "biçimde geliştirildi.",
+        ],
+    ),
+    (
+        "Lisans",
+        [
+            "Sorumluluk Sınavı, PolyForm Noncommercial License 1.0.0 ile yayımlanır. "
+            "Tam metin uygulama klasöründeki LICENSE dosyasındadır; telif bildirimi "
+            "NOTICE dosyasındadır.",
+            "Bu lisans kapsamında programı ticari olmayan amaçlarla kullanabilecekler:",
+            "• eğitim kurumları ve kamu kurumları,",
+            "• kâr amacı gütmeyen kuruluşlar,",
+            "• kişisel kullanım için bireyler.",
+            "Ticari kullanım lisans kapsamı dışındadır. Programı değiştirebilir ve "
+            "dağıtabilirsiniz; bu durumda telif bildirimi ile lisans metnini birlikte "
+            "iletmeniz gerekir.",
+            "Program olduğu gibi, herhangi bir garanti verilmeksizin sunulur. Ürettiği "
+            "plan, görevlendirme ve evrakın mevzuata ve kurum uygulamasına uygunluğunu "
+            "onaylamak kullanıcının sorumluluğundadır.",
+        ],
+    ),
+    (
+        "Üçüncü taraf bileşenler",
+        [
+            "Uygulama şu açık kaynaklı paketleri kullanır:",
+            "• openpyxl (MIT) — .xlsx okuma",
+            "• xlrd (BSD) — .xls okuma",
+            "• python-docx (MIT) — .docx üretimi",
+            "• PyYAML (MIT) — yapılandırma",
+            "• tzdata (Apache-2.0) — IANA saat dilimi verisi",
+            "Uygulama simgesi ve evrak düzeni bu projeye aittir; üçüncü taraf görsel "
+            "varlık içermez.",
+        ],
+    ),
+    (
+        "Veri sorumluluğu",
+        [
+            "Program hiçbir ağ isteği yapmaz; veri yalnız bu bilgisayarda kalır. "
+            "Öğrenci, veli ve personel verisi 6698 sayılı Kanun kapsamındadır. "
+            "Veritabanını e-posta, kişisel bulut veya herkese açık depoya koymayın.",
+            "Sorun bildiriminde günlük dosyası paylaşılabilir; günlük kişisel veri "
+            "içermeyecek biçimde yazılır. Yine de kurum dışına çıkarmadan önce gözle "
+            "kontrol edin.",
         ],
     ),
 ]
