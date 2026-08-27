@@ -1,9 +1,10 @@
 """Uygulamanın tek sürüm kaynağı.
 
-Sürüm numarası yalnızca burada yazılır. Diğer üç yer bu dosyadan okur:
+Sürüm numarası yalnızca burada yazılır. Diğer dört yer bu dosyadan okur:
 
   * ``arayuz/uygulama.py``      — hakkında penceresinde gösterir
   * ``pyproject.toml``          — ``dynamic version`` ile ``SURUM``u okur
+  * ``SorumlulukSinavi.spec``   — exe'ye gömülen Windows sürüm kaynağı
   * ``yapim/sorumluluk_sinavi.iss`` — kurulum dosyasının adını ve sürüm
     bilgisini buradan üretir
 

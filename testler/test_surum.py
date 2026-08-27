@@ -44,3 +44,21 @@ def test_inno_setup_betigi_surumu_elle_yazmaz() -> None:
 def test_arayuz_surumu_cekirdekten_alir() -> None:
     from arayuz import uygulama
     assert uygulama.SURUM is SURUM
+
+
+def test_pyinstaller_betigi_surumu_elle_yazmaz() -> None:
+    betik = (KOK / "SorumlulukSinavi.spec").read_text(encoding="utf-8")
+    assert SURUM not in betik, "sürüm .spec içine elle yazılmış"
+    assert "from cekirdek.surum import SURUM" in betik
+
+
+def test_exe_metinleri_kurulum_betigiyle_ayni() -> None:
+    """Uygulama adı ve geliştirici iki betikte de geçer; ayrışmasınlar."""
+    spec = (KOK / "SorumlulukSinavi.spec").read_text(encoding="utf-8")
+    iss = (KOK / "yapim" / "sorumluluk_sinavi.iss").read_text(encoding="utf-8")
+    for spec_adi, iss_adi in (("AD", "Ad"), ("GELISTIRICI", "Gelistirici")):
+        spec_deger = re.search(rf'^{spec_adi} = "(.+)"$', spec, re.M)
+        iss_deger = re.search(rf'^#define {iss_adi}\s+"(.+)"$', iss, re.M)
+        assert spec_deger and iss_deger, (spec_adi, iss_adi)
+        assert spec_deger.group(1) == iss_deger.group(1), (
+            f"{spec_adi}: spec={spec_deger.group(1)!r} iss={iss_deger.group(1)!r}")

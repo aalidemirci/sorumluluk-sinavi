@@ -141,8 +141,9 @@ ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta çözülemez.
 ### Sürüm yükseltmek
 
 Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
-Arayüzdeki hakkında penceresi, `pyproject.toml` ve Inno Setup betiği bu
-değeri oradan okur; başka hiçbir dosyada elle yazmayın.
+Arayüzdeki hakkında penceresi, `pyproject.toml`, PyInstaller betiği (exe'nin
+dosya özelliklerine gömülen sürüm kaynağı) ve Inno Setup betiği bu değeri
+oradan okur; başka hiçbir dosyada elle yazmayın.
 
 Inno Setup betiği `surum.py`'yi Python olarak çalıştıramaz, satırı **metin
 olarak** ayrıştırır. Bu yüzden satırın biçimi (`SURUM = "x.y.z"`, tek satır,
