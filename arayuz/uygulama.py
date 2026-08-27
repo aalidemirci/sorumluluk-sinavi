@@ -472,10 +472,12 @@ class Uygulama:
             ("Ders", "Branş", "İki aşamalı", "Sorumluluk kaydı"),
             (300, 250, 110, 130), 10)
         tablo.tag_configure("eksik", background="#FFE6E6")
-        for ders_id, ad, brans, iki, _yabanci, kayit_sayisi in dersler:
+        for kayit in dersler:
+            ders_id, ad, brans, iki, _yabanci, kayit_sayisi = kayit[:6]
+            esdeger = hizmet.ders_esdeger_branslari(kayit)
+            gosterim = " + ".join((brans, *esdeger)) if brans else "— eşlenmedi —"
             tablo.insert("", END, iid=str(ders_id),
-                         values=(ad, brans or "— eşlenmedi —", "Evet" if iki else "Hayır",
-                                 kayit_sayisi),
+                         values=(ad, gosterim, "Evet" if iki else "Hayır", kayit_sayisi),
                          tags=() if brans else ("eksik",))
 
         havuz = hizmet.brans_havuzu_listele(self.vt)
@@ -504,14 +506,17 @@ class Uygulama:
             if not tablo.selection():
                 return
             ders_id = int(tablo.selection()[0])
-            for kimlik, ad, brans, iki, _yd, _s in dersler:
-                if kimlik == ders_id:
-                    parcalar = [p.strip() for p in str(brans or "").split("/") if p.strip()]
-                    if parcalar and parcalar[0] in branslar:
-                        brans_secimi.set(parcalar[0])
-                    esdeger_secimi.set(parcalar[1] if len(parcalar) > 1 else "—")
-                    iki_asamali.set(bool(iki) if brans else hizmet.iki_asamali_onerisi(ad))
-                    break
+            for kayit in dersler:
+                kimlik, ad, brans, iki = kayit[0], kayit[1], kayit[2], kayit[3]
+                if kimlik != ders_id:
+                    continue
+                # Branş adının kendisinde eğik çizgi olabilir; ad hiç bölünmez.
+                if brans and brans in branslar:
+                    brans_secimi.set(brans)
+                esdeger = hizmet.ders_esdeger_branslari(kayit)
+                esdeger_secimi.set(esdeger[0] if esdeger else "—")
+                iki_asamali.set(bool(iki) if brans else hizmet.iki_asamali_onerisi(ad))
+                break
 
         tablo.bind("<<TreeviewSelect>>", secim_degisti)
 
@@ -706,8 +711,9 @@ class Uygulama:
         except HizmetHatasi:
             return
         from cekirdek.planlayici import PlanlamaSonucu
-        ihlaller = hizmet.plani_dogrula(self.vt, plan)
-        self.plan_sonucu = PlanlamaSonucu(plan, ihlaller, {},
+        sinirlar = bilgi["kisisel_sinirlar"]
+        ihlaller = hizmet.plani_dogrula(self.vt, plan, sinirlar)
+        self.plan_sonucu = PlanlamaSonucu(plan, ihlaller, sinirlar,
                                           len({o.tarih for o in plan.oturumlar}))
         self.aktif_plan_id = plan_id
         self.kaydedilmemis = False

@@ -419,8 +419,18 @@ def dersleri_listele(vt: Veritabani) -> list[tuple]:
         return [tuple(r) for r in b.execute("""
             SELECT d.id,d.ad,COALESCE(d.brans,''),d.iki_asamali_mi,d.yabanci_dil_mi,
                    (SELECT count(*) FROM v_sorumluluk_kaydi s
-                     WHERE s.ders_id=d.id AND s.durum='aktif')
+                     WHERE s.ders_id=d.id AND s.durum='aktif'),
+                   d.esdeger_branslar
             FROM v_ders d ORDER BY d.ad""")]
+
+
+def ders_esdeger_branslari(kayit) -> tuple[str, ...]:
+    """`dersleri_listele` satırındaki JSON eşdeğer branş listesini çözer."""
+    import json
+    try:
+        return tuple(json.loads(kayit[6] or "[]"))
+    except (ValueError, IndexError):
+        return ()
 
 
 def ders_brans_esle(vt: Veritabani, ders_id: int, brans: str, karar: str,
@@ -436,15 +446,20 @@ def ders_brans_esle(vt: Veritabani, ders_id: int, brans: str, karar: str,
                              (esitle(ad),)).fetchone():
                 raise HizmetHatasi(
                     f"'{ad}' branş havuzunda yok. Önce branş havuzuna ekleyin.")
-        tam = " / ".join((brans, *esdeger_branslar))
+        # Ayırıcıyla birleştirilmez: branş adının kendisinde eğik çizgi
+        # bulunabilir ("Kimya / Kimya Teknolojisi" tek branştır).
+        import json
+        ek = json.dumps(list(esdeger_branslar), ensure_ascii=False)
+        okunur = " + ".join((brans, *esdeger_branslar))
         surum = b.execute("SELECT COALESCE(MAX(surum),0)+1 FROM ders_brans WHERE ders_id=?",
                           (ders_id,)).fetchone()[0]
         b.execute(
             "INSERT INTO ders_brans(ders_id,brans,surum,karar_metni,etkin_baslangic)"
             " VALUES(?,?,?,?,?)",
-            (ders_id, tam, surum, str(karar).strip(), date.today().isoformat()))
-        b.execute("UPDATE ders SET brans=? WHERE id=?", (tam, ders_id))
-        vt.denetim_yaz(b, "ders", ders_id, "brans_eslendi", tam)
+            (ders_id, okunur, surum, str(karar).strip(), date.today().isoformat()))
+        b.execute("UPDATE ders SET brans=?,esdeger_branslar=? WHERE id=?",
+                  (brans, ek, ders_id))
+        vt.denetim_yaz(b, "ders", ders_id, "brans_eslendi", okunur)
 
 
 def ders_ozellik_guncelle(vt: Veritabani, ders_id: int, iki_asamali_mi: bool,
@@ -459,16 +474,21 @@ def ders_ozellik_guncelle(vt: Veritabani, ders_id: int, iki_asamali_mi: bool,
 
 def ders_ayarlari(vt: Veritabani) -> dict[str, DersAyari]:
     """Planlayıcının beklediği ders → ayar sözlüğü."""
+    import json
     ayarlar: dict[str, DersAyari] = {}
     with vt.baglan() as b:
-        for ad, brans, iki, yabanci in b.execute(
-                "SELECT ad,COALESCE(brans,''),iki_asamali_mi,yabanci_dil_mi FROM v_ders"):
-            parcalar = [p.strip() for p in str(brans).split("/") if p.strip()]
+        for ad, brans, iki, yabanci, ek in b.execute(
+                "SELECT ad,COALESCE(brans,''),iki_asamali_mi,yabanci_dil_mi,"
+                "esdeger_branslar FROM v_ders"):
+            try:
+                esdeger = tuple(json.loads(ek or "[]"))
+            except ValueError:
+                esdeger = ()
             ayarlar[ad] = DersAyari(
-                brans=parcalar[0] if parcalar else "",
+                brans=str(brans).strip(),
                 iki_asamali_mi=bool(iki),
                 yabanci_dil_mi=bool(yabanci),
-                esdeger_branslar=tuple(parcalar[1:]),
+                esdeger_branslar=esdeger,
             )
     return ayarlar
 
@@ -529,6 +549,28 @@ def plan_baglami(vt: Veritabani, pencere_kodu: str,
     )
 
 
+def brans_eslemelerini_denetle(vt: Veritabani, dersler: set[str]) -> None:
+    """Eşlenen branşların havuzda gerçekten bulunduğunu doğrular.
+
+    Eşleme havuzdaki bir adla tutmuyorsa o derse hiçbir öğretmen atanamaz.
+    Bu sessizce "öğretmen yok" hatasına dönüşmesin diye önden söylenir;
+    eski sürümlerden kalan bozuk eşlemeler de böyle yakalanır.
+    """
+    havuz = {esitle(ad) for _, ad, _ in brans_havuzu_listele(vt)}
+    hatali = []
+    for ders, ayar in ders_ayarlari(vt).items():
+        if ders not in dersler:
+            continue
+        for brans in ayar.alan_branslari:
+            if brans and esitle(brans) not in havuz:
+                hatali.append(f"{ders} → '{brans}'")
+    if hatali:
+        raise HizmetHatasi(
+            "Şu derslerin branş eşlemesi branş havuzundaki hiçbir alanla tutmuyor. "
+            "Ders / Branş ekranından yeniden eşleyin:\n\n"
+            + "\n".join(f"  • {satir}" for satir in sorted(hatali)[:10]))
+
+
 def sinav_birimleri(vt: Veritabani) -> list[SinavBirimi]:
     kayitlar = sorumluluk_kayitlari(vt)
     if not kayitlar:
@@ -537,6 +579,7 @@ def sinav_birimleri(vt: Veritabani) -> list[SinavBirimi]:
     salonlar = salonlari_getir(vt)
     if not salonlar:
         raise HizmetHatasi("Önce en az bir sınav salonu tanımlayın.")
+    brans_eslemelerini_denetle(vt, {k.ders_adi for k in kayitlar})
     return birimleri_olustur(kayitlar, ders_ayarlari(vt), salonlar)
 
 
@@ -587,9 +630,16 @@ def plan_kaydet(vt: Veritabani, sonuc: PlanlamaSonucu) -> int:
         # kesinleşmiş plan korunur.
         b.execute("UPDATE plan SET silindi_mi=1 WHERE pencere_kodu=? AND durum='taslak'"
                   " AND silindi_mi=0", (parametreler.pencere_kodu,))
+        # Yükseltilmiş kişisel sınırlar planın parçasıdır; saklanmazsa
+        # kaydedilen plan yeniden açıldığında varsayılan sınırla doğrulanır ve
+        # kurallara uyan plan SP-11 ihlalleriyle dolu görünür.
+        import json
         plan_id = int(b.execute(
-            "INSERT INTO plan(pencere_kodu,parametreler_json,uretildi_at) VALUES(?,?,?)",
-            (parametreler.pencere_kodu, _parametreleri_yaz(parametreler), simdi())).lastrowid)
+            "INSERT INTO plan(pencere_kodu,parametreler_json,kisisel_sinirlar_json,uretildi_at)"
+            " VALUES(?,?,?,?)",
+            (parametreler.pencere_kodu, _parametreleri_yaz(parametreler),
+             json.dumps(sonuc.yukseltilen_sinirlar, ensure_ascii=False, sort_keys=True),
+             simdi())).lastrowid)
 
         for oturum in plan.oturumlar:
             ders_id = ders_kimlikleri.get(oturum.ders_adi)
@@ -634,8 +684,8 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
     """Kaydedilmiş planı bellek modeline geri okur."""
     with vt.baglan() as b:
         satir = b.execute(
-            "SELECT pencere_kodu,parametreler_json,durum,mudur_onay_no FROM v_plan WHERE id=?",
-            (plan_id,)).fetchone()
+            "SELECT pencere_kodu,parametreler_json,durum,mudur_onay_no,kisisel_sinirlar_json"
+            " FROM v_plan WHERE id=?", (plan_id,)).fetchone()
         if not satir:
             raise HizmetHatasi("Plan bulunamadı.")
         parametreler = _parametreleri_oku(satir[1], satir[0])
@@ -644,7 +694,7 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
         for r in b.execute("""
                 SELECT o.id,o.anahtar,d.ad,o.duzey_kumesi,o.oturum_turu,o.birim_anahtari,
                        o.tarih,o.saat,o.sure,o.hafta_sonu_gerekcesi,o.kilitli_mi,
-                       COALESCE(d.brans,'')
+                       COALESCE(d.brans,''),d.esdeger_branslar
                 FROM v_oturum o JOIN v_ders d ON d.id=o.ders_id
                 WHERE o.plan_id=? ORDER BY o.tarih,o.saat,d.ad""", (plan_id,)):
             ogrenciler = tuple(x[0] for x in b.execute(
@@ -653,15 +703,19 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
                 " WHERE oo.oturum_id=? ORDER BY oo.sira", (r[0],)))
             salonlar = tuple(x[0] for x in b.execute(
                 "SELECT salon_id FROM v_oturum_salon WHERE oturum_id=? ORDER BY sira", (r[0],)))
-            parcalar = [p.strip() for p in str(r[11]).split("/") if p.strip()]
+            import json
+            try:
+                esdeger = tuple(json.loads(r[12] or "[]"))
+            except ValueError:
+                esdeger = ()
             plan.oturumlar.append(Oturum(
                 anahtar=r[1], ders_adi=r[2],
                 duzeyler=tuple(int(x) for x in str(r[3]).split(",") if x),
                 ogrenci_anahtarlari=ogrenciler, oturum_turu=OturumTuru(r[4]),
                 tarih=date.fromisoformat(r[6]), saat=time.fromisoformat(r[7]),
                 sure_dakika=r[8], salon_kimlikleri=salonlar,
-                alan_bransi=parcalar[0] if parcalar else "",
-                esdeger_branslar=tuple(parcalar[1:]),
+                alan_bransi=str(r[11]).strip(),
+                esdeger_branslar=esdeger,
                 birim_anahtari=r[5], hafta_sonu_gerekcesi=r[9], kilitli_mi=bool(r[10])))
             oturum_anahtarlari[r[0]] = r[1]
         for oturum_id, personel_id, rol, gerekce, kilitli in b.execute("""
@@ -671,7 +725,14 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
             plan.gorevlendirmeler.append(Gorevlendirme(
                 oturum_anahtarlari[oturum_id], personel_id, GorevRolu(rol),
                 gerekce or "", bool(kilitli)))
-        return plan, {"plan_id": plan_id, "kesin_mi": int(satir[2] == "kesin")}
+        import json
+        try:
+            kisisel_sinirlar = dict(json.loads(satir[4] or "{}"))
+        except ValueError:
+            kisisel_sinirlar = {}
+        return plan, {"plan_id": plan_id, "kesin_mi": int(satir[2] == "kesin"),
+                      "mudur_onay_no": satir[3] or "",
+                      "kisisel_sinirlar": kisisel_sinirlar}
 
 
 def son_plani_getir(vt: Veritabani, pencere_kodu: str) -> int | None:
@@ -686,8 +747,8 @@ def plan_kesinlestir(vt: Veritabani, plan_id: int, mudur_onay_no: str) -> None:
     """SP-05: plan müdür onayıyla kesinleşir ve oturumlar kilitlenir."""
     if not str(mudur_onay_no).strip():
         raise HizmetHatasi("Planı kesinleştirmek için müdür onay numarası zorunludur (SP-05).")
-    plan, _ = plan_yukle(vt, plan_id)
-    engeller = [i for i in plani_dogrula(vt, plan) if i.engel_mi]
+    plan, bilgi = plan_yukle(vt, plan_id)
+    engeller = [i for i in plani_dogrula(vt, plan, bilgi["kisisel_sinirlar"]) if i.engel_mi]
     if engeller:
         raise HizmetHatasi(
             "Engelli plan kesinleştirilemez:\n" +

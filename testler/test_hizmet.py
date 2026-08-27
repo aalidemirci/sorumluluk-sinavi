@@ -309,3 +309,92 @@ def test_slot_saatleri_dogrulanir() -> None:
         hizmet.slot_saatlerini_coz("09:00, 09:00")
     with pytest.raises(HizmetHatasi, match="SS:DD"):
         hizmet.slot_saatlerini_coz("dokuz")
+
+
+# ------------------------------------- branş adında eğik çizgi (regresyon)
+
+def test_brans_adindaki_egik_cizgi_bolunmez(vt: Veritabani, tmp_path: Path) -> None:
+    """e-Okul branş adlarının kendisinde eğik çizgi bulunabilir:
+    "Kimya / Kimya Teknolojisi" tek branştır. Eşdeğer branşlar bir ayırıcıyla
+    saklanırsa bu ad iki sahte branşa bölünür ve o branştaki öğretmenler
+    görünmez olur."""
+    hizmet.sorumluluk_onayla(vt, hizmet.sorumluluk_onizle(vt, _sorumluluk_csv(tmp_path)).aktarim_id)
+    hizmet.brans_havuzu_ekle(vt, "Kimya / Kimya Teknolojisi")
+    ders_id, ders_adi = hizmet.dersleri_listele(vt)[0][:2]
+    hizmet.ders_brans_esle(vt, ders_id, "Kimya / Kimya Teknolojisi", "Zümre kararı")
+
+    ayar = hizmet.ders_ayarlari(vt)[ders_adi]
+    assert ayar.brans == "Kimya / Kimya Teknolojisi"
+    assert ayar.esdeger_branslar == ()
+    assert ayar.alan_branslari == ("Kimya / Kimya Teknolojisi",)
+
+
+def test_egik_cizgili_brans_ile_plan_uretilir(vt: Veritabani, tmp_path: Path) -> None:
+    """Branş adında eğik çizgi varken de öğretmen arzı doğru sayılmalıdır."""
+    kisiler = [
+        ("Uydurma Müdür", "Müdür", "Kadrolu", "Coğrafya"),
+        ("Uydurma Kimyacı", "Öğretmen", "Kadrolu", "Kimya / Kimya Teknolojisi"),
+        ("Uydurma Kimyacı İki", "Öğretmen", "Kadrolu", "Kimya / Kimya Teknolojisi"),
+        ("Uydurma Tarihçi", "Öğretmen", "Kadrolu", "Tarih"),
+    ]
+    hizmet.ayarlari_kaydet(vt, AYARLAR)
+    hizmet.salon_ekle(vt, "D-01", 30)
+    hizmet.personel_onayla(
+        vt, hizmet.personel_onizle(vt, _personel_xlsx(tmp_path / "kimya", kisiler)).aktarim_id)
+    tek_ders = sorumluluk_csv_yaz(tmp_path / "kimya.csv", {
+        "9/A": [("101", "Uydurma Öğrenci", [(9, "KİMYA")])]})
+    hizmet.sorumluluk_onayla(vt, hizmet.sorumluluk_onizle(vt, tek_ders).aktarim_id)
+    ders_id = hizmet.dersleri_listele(vt)[0][0]
+    hizmet.ders_brans_esle(vt, ders_id, "Kimya / Kimya Teknolojisi", "Zümre kararı")
+
+    sonuc = hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1"))
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+    oturum = sonuc.plan.oturumlar[0]
+    assert oturum.alan_bransi == "Kimya / Kimya Teknolojisi"
+
+
+def test_birlesik_ders_esdeger_brans_ayri_sutunda_saklanir(vt: Veritabani, tmp_path: Path) -> None:
+    hizmet.sorumluluk_onayla(vt, hizmet.sorumluluk_onizle(vt, _sorumluluk_csv(tmp_path)).aktarim_id)
+    for ad in ("Görsel Sanatlar", "Müzik"):
+        hizmet.brans_havuzu_ekle(vt, ad)
+    ders_id, ders_adi = hizmet.dersleri_listele(vt)[0][:2]
+    hizmet.ders_brans_esle(vt, ders_id, "Görsel Sanatlar", "Zümre kararı", ("Müzik",))
+    with vt.baglan() as b:
+        brans, ek = b.execute("SELECT brans,esdeger_branslar FROM v_ders WHERE id=?",
+                              (ders_id,)).fetchone()
+    assert brans == "Görsel Sanatlar"          # asıl alan bozulmadan saklanır
+    assert ek == '["Müzik"]'
+    ayar = hizmet.ders_ayarlari(vt)[ders_adi]
+    assert ayar.alan_branslari == ("Görsel Sanatlar", "Müzik")
+
+
+def test_kisisel_sinirlar_planla_birlikte_saklanir(vt: Veritabani, tmp_path: Path) -> None:
+    """Yükseltilmiş günlük sınırlar saklanmazsa, kaydedilen plan yeniden
+    açıldığında varsayılan sınırla doğrulanır ve kurallara uyan plan SP-11
+    ihlalleriyle dolu görünür."""
+    _kur(vt, tmp_path)
+    sonuc = hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1"))
+    sonuc.yukseltilen_sinirlar = {"101|9/A": 4}      # üretimde yükseltilmiş varsayalım
+    plan_id = hizmet.plan_kaydet(vt, sonuc)
+    _, bilgi = hizmet.plan_yukle(vt, plan_id)
+    assert bilgi["kisisel_sinirlar"] == {"101|9/A": 4}
+
+
+def test_kaydedilen_plan_geri_okununca_ayni_sonucu_verir(vt: Veritabani, tmp_path: Path) -> None:
+    _kur(vt, tmp_path)
+    sonuc = hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1"))
+    plan_id = hizmet.plan_kaydet(vt, sonuc)
+    geri, bilgi = hizmet.plan_yukle(vt, plan_id)
+    uretim = len(engelleri_ayikla(sonuc.ihlaller))
+    okuma = len(engelleri_ayikla(hizmet.plani_dogrula(vt, geri, bilgi["kisisel_sinirlar"])))
+    assert uretim == okuma == 0
+
+
+def test_havuzla_tutmayan_brans_eslemesi_onden_bildirilir(vt: Veritabani, tmp_path: Path) -> None:
+    """Eski sürümden kalan bozuk eşleme sessizce "öğretmen yok" hatasına
+    dönüşmemeli; hangi dersin yeniden eşlenmesi gerektiği söylenmeli."""
+    _kur(vt, tmp_path)
+    with vt.baglan() as b:
+        b.execute("UPDATE ders SET brans='Görsel Sanatlar / Müzik' WHERE ad='MATEMATİK'")
+    with pytest.raises(HizmetHatasi, match="Ders / Branş ekranından yeniden eşleyin"):
+        hizmet.sinav_birimleri(vt)

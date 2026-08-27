@@ -125,14 +125,18 @@ class Veritabani:
         """
         if not self.yol.exists() or not self.yol.stat().st_size:
             return None
-        # İlk kurulumda dosya WAL kipi açıldığı için boş değildir ama içinde
-        # kullanıcı verisi yoktur; anlamsız bir yedek dosyası bırakmayalım.
+        # Yalnız kullanıcı verisi varken yedek alınır. Şemanın kurulmuş
+        # olması yeterli değildir: ilk kurulumda göçler arka arkaya çalışır ve
+        # her biri boş bir veritabanının yedeğini bırakırdı. Denetim izi her
+        # kullanıcı işleminde yazıldığı için "veri var mı" ölçütü odur.
         with self.baglan() as b:
-            tablo_sayisi = b.execute(
+            var = b.execute(
                 "SELECT count(*) FROM sqlite_master WHERE type='table'"
-                " AND name NOT LIKE 'sqlite_%'").fetchone()[0]
-        if not tablo_sayisi:
-            return None
+                " AND name='denetim_izi'").fetchone()[0]
+            if not var:
+                return None
+            if not b.execute("SELECT count(*) FROM denetim_izi").fetchone()[0]:
+                return None
         damga = datetime.now(ISTANBUL).strftime("%Y%m%d_%H%M%S")
         hedef = self.yol.with_suffix(f".db.{etiket}-{damga}.yedek")
         kaynak = sqlite3.connect(self.yol, timeout=MESGUL_ZAMAN_ASIMI_SN)

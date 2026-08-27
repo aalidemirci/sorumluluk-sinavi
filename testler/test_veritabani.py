@@ -16,9 +16,11 @@ def vt(tmp_path: Path) -> Veritabani:
 
 
 def test_goc_uygulanir_ve_yinelenmez(tmp_path: Path) -> None:
+    import veri.veritabani as modul
+    goc_sayisi = len(list((Path(modul.__file__).parent / "gocler").glob("[0-9][0-9][0-9]_*.sql")))
     veritabani = Veritabani(tmp_path / "sorumluluk.db")
-    assert veritabani.gocleri_uygula() == 1
-    assert veritabani.surum() == 1
+    assert veritabani.gocleri_uygula() == goc_sayisi
+    assert veritabani.surum() == goc_sayisi
     assert veritabani.gocleri_uygula() == 0
 
 
@@ -106,8 +108,8 @@ def test_ayni_kisi_bir_oturumda_iki_gorev_alamaz(vt: Veritabani) -> None:
 
 
 def test_ilk_kurulumda_anlamsiz_yedek_birakilmaz(tmp_path: Path) -> None:
-    """Boş veritabanı WAL kipi yüzünden sıfır bayt değildir; yine de içinde
-    kullanıcı verisi olmadığı için yedeklenmemelidir."""
+    """İlk kurulumda göçler arka arkaya çalışır; henüz kullanıcı verisi
+    olmadığı için hiçbiri yedek bırakmamalıdır."""
     veritabani = Veritabani(tmp_path / "sorumluluk.db")
     veritabani.gocleri_uygula()
     assert list(tmp_path.glob("*.yedek")) == []
@@ -118,6 +120,7 @@ def test_veri_varken_goc_oncesi_yedek_alinir(tmp_path: Path) -> None:
     veritabani.gocleri_uygula()
     with veritabani.baglan() as b:
         b.execute("INSERT INTO salon(ad,ad_anahtari,kapasite) VALUES('A-101','a-101',30)")
+        veritabani.denetim_yaz(b, "salon", 1, "eklendi")
     assert veritabani._yedekle("deneme") is not None
     assert len(list(tmp_path.glob("*.yedek"))) == 1
 
