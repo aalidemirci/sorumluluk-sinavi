@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sorumluluk-sinavi"
-version = "0.2.0"
+version = "0.3.0"
 description = "Çevrimdışı sorumluluk sınavı planlama ve görevlendirme uygulaması"
 requires-python = ">=3.11"
 dependencies = [
