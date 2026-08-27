@@ -292,6 +292,20 @@ class Belge:
         self._yazi(roller.add_run("\t".join(rol for rol, _ in girisler)), 9.5, True, LACIVERT)
         self._yazi(adlar.add_run("\t".join(ad or "…………………………" for _, ad in girisler)), 9)
 
+    def makam_satiri(self, metin: str) -> None:
+        """Belgeyi çıkaran makamı sağa yaslı yazar; kişi adı içermez.
+
+        İlan belgelerinde imza bloğu yerine bu kullanılır: çıktı herkese açık
+        bir sayfada yayımlanacağı için imzalayanın adı yazılmaz.
+        """
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Pt
+        paragraf = self.belge.add_paragraph()
+        paragraf.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        paragraf.paragraph_format.space_before = Pt(22)
+        paragraf.paragraph_format.keep_together = True
+        self._yazi(paragraf.add_run(metin), 10, True, LACIVERT)
+
     def uyari(self, metin: str) -> None:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.shared import Pt

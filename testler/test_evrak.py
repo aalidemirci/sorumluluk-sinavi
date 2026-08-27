@@ -333,12 +333,25 @@ def test_komisyon_uyeleri_ayri_satirlarda_yazilir(hazir) -> None:
 
 # ==================================================== KVKK ilan çizelgeleri
 
-def test_ilan_takviminde_ogrenci_ve_gorevli_adi_yok(hazir) -> None:
-    """İlan takviminde ne öğrenci ne de görevli öğretmen adı geçer.
+def test_ilan_belgelerinde_hicbir_kisi_adi_gecmez(hazir) -> None:
+    """İlan çıktıları herkese açık bir sayfada yayımlanır: ne öğrenci, ne
+    görevli öğretmen, ne de imzalayan müdürün adı yazılır. Belgeyi çıkaran
+    makam kişi adı olmadan gösterilir."""
+    vt, plan_id, tmp_path = hazir
+    takvim = tmp_path / "ilan_takvim.docx"
+    cizelge = tmp_path / "ilan_ogrenci.docx"
+    uretici.ilan_sinav_takvimi(vt, plan_id, takvim)
+    uretici.ilan_ogrenci_cizelgesi(vt, plan_id, cizelge)
+    for yol in (takvim, cizelge):
+        metin = _metin(yol)
+        for kisi in hizmet.personelleri_getir(vt, yalniz_aktif=False):
+            assert kisi.ad not in metin, f"{yol.name} içinde {kisi.ad} geçiyor"
+        assert AYARLAR["mudur_adi"] not in metin
+        assert "Okul Müdürlüğü" in metin
+        assert "6698" in metin
 
-    Belgeyi imzalayan okul müdürünün adı bunun dışındadır: imza bloğu
-    belgenin kendisidir, görevlendirme bilgisi değildir.
-    """
+
+def test_ilan_takviminde_ogrenci_verisi_yok(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "ilan_takvim.docx"
     uretici.ilan_sinav_takvimi(vt, plan_id, yol)
@@ -346,9 +359,7 @@ def test_ilan_takviminde_ogrenci_ve_gorevli_adi_yok(hazir) -> None:
     for ogrenci in hizmet.sorumluluk_kayitlari(vt):
         assert ogrenci.ad_soyad not in metin
         assert ogrenci.okul_no not in metin
-    for gorevli in hizmet.gorevli_listesi(vt, plan_id):
-        assert gorevli["ad"] not in metin
-    assert "MATEMATİK" in metin and "6698" in metin
+    assert "MATEMATİK" in metin
 
 
 def test_ilan_ogrenci_cizelgesinde_acik_ad_yazmaz(hazir) -> None:
@@ -358,8 +369,6 @@ def test_ilan_ogrenci_cizelgesinde_acik_ad_yazmaz(hazir) -> None:
     metin = _metin(yol)
     for ogrenci in hizmet.sorumluluk_kayitlari(vt):
         assert ogrenci.ad_soyad not in metin
-    for gorevli in hizmet.gorevli_listesi(vt, plan_id):
-        assert gorevli["ad"] not in metin
     assert "U****** Ö****** B**" in metin      # maskeli ad
     assert "101" in metin                      # okul numarası
     assert "6698" in metin

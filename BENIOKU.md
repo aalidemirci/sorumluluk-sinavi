@@ -58,10 +58,10 @@ artar ve hangi çıktının hangi içerikten geldiği izlenebilir.
 
 Okul web sayfasında yayımlanmak üzere iki çıktı üretilir.
 
-**Sınav takvimi** hiçbir kişisel veri içermez: ne öğrenci ne de görevli öğretmen
-adı geçer, yalnız hangi dersin sınavının ne zaman ve nerede yapılacağı yazar.
-Belgeyi imzalayan okul müdürünün adı bunun dışındadır; imza bloğu belgenin
-kendisidir, görevlendirme bilgisi değildir.
+**Sınav takvimi** hiçbir kişisel veri içermez: ne öğrenci, ne görevli öğretmen,
+ne de imzalayan müdürün adı geçer. Yalnız hangi dersin sınavının ne zaman ve
+nerede yapılacağı yazar. Her iki ilan belgesi de kişi adı yerine "Okul
+Müdürlüğü" makam satırıyla çıkarılır.
 
 **Öğrenci sınav çizelgesi** öğrencinin kendi satırını bulabilmesi için okul
 numarasını gösterir; ad ve soyadı hiçbir seçenekte açık yazılmaz. Gösterim

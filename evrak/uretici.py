@@ -347,7 +347,8 @@ def evrak_teslim_tutanagi(vt: Veritabani, plan_id: int, hedef: Path,
 KVKK_NOTU = (
     "Bu çizelge okul web sayfasında ilan edilmek üzere hazırlanmıştır. 6698 sayılı Kişisel "
     "Verilerin Korunması Kanunu gereği öğrencilerin açık ad ve soyadı, T.C. kimlik numarası "
-    "ve iletişim bilgileri yayımlanmaz."
+    "ve iletişim bilgileri yayımlanmaz. Sınavlarda görevlendirilen öğretmenlerin adları da "
+    "bu çizelgede yer almaz; belge kişi adı taşımaksızın okul müdürlüğünce çıkarılmıştır."
 )
 
 
@@ -387,7 +388,7 @@ def ilan_sinav_takvimi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
     b.dayanak_notu(
         "Sınav tarihleri Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesi uyarınca "
         "belirlenmiştir. " + KVKK_NOTU)
-    b.imza_blogu([], kurum["mudur"])
+    b.makam_satiri("Okul Müdürlüğü")
     return b.kaydet(hedef)
 
 
@@ -425,7 +426,7 @@ def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path,
         f"Çizelgede {len(ogrenciler)} öğrenci yer almaktadır. Bilgilerinde yanlışlık "
         "gördüğünüzü düşünüyorsanız okul müdürlüğüne başvurunuz.", bosluk=6, boyut=9.5)
     b.dayanak_notu(KVKK_NOTU)
-    b.imza_blogu([], kurum["mudur"])
+    b.makam_satiri("Okul Müdürlüğü")
     return b.kaydet(hedef)
 
 # ----------------------------------------------------------------- paket
