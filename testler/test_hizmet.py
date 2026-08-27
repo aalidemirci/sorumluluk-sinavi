@@ -137,12 +137,30 @@ def test_personel_onayi_brans_havuzunu_besler(vt: Veritabani, tmp_path: Path) ->
 
 
 def test_ayni_personel_raporu_iki_kez_onaylanamaz(vt: Veritabani, tmp_path: Path) -> None:
-    ozet = hizmet.personel_onizle(vt, _personel_xlsx(tmp_path))
+    """Yinelenme denetimi dosya özetine bakar; aynı DOSYA iki kez alınamaz.
+
+    Dosya her üretimde yeniden yazılmaz: openpyxl .xlsx içine oluşturma zaman
+    damgası gömdüğü için aynı içerik farklı özet verir. e-Okul'dan yeniden
+    indirilen rapor da yeni bir dosyadır ve alınabilmelidir; denetim yalnız
+    birebir aynı dosyayı engeller.
+    """
+    dosya = _personel_xlsx(tmp_path)
+    ozet = hizmet.personel_onizle(vt, dosya)
     hizmet.personel_onayla(vt, ozet.aktarim_id)
     with pytest.raises(HizmetHatasi, match="daha önce onaylanmıştır"):
-        hizmet.personel_onizle(vt, _personel_xlsx(tmp_path))
+        hizmet.personel_onizle(vt, dosya)
     with pytest.raises(HizmetHatasi, match="zaten onaylanmıştır"):
         hizmet.personel_onayla(vt, ozet.aktarim_id)
+
+
+def test_yeniden_indirilen_rapor_alinabilir(vt: Veritabani, tmp_path: Path) -> None:
+    """Aynı içerikli ama yeniden indirilmiş rapor engellenmemelidir."""
+    import time
+    hizmet.personel_onayla(vt, hizmet.personel_onizle(vt, _personel_xlsx(tmp_path)).aktarim_id)
+    time.sleep(1.1)                       # .xlsx zaman damgası değişsin
+    yeniden = _personel_xlsx(tmp_path / "yeniden")
+    ozet = hizmet.personel_onizle(vt, yeniden)
+    assert ozet.degismedi == len(ORNEK_PERSONEL)      # içerik aynı, fark yok
 
 
 def test_rapordan_dusen_personel_pasife_alinir(vt: Veritabani, tmp_path: Path) -> None:
