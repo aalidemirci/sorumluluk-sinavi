@@ -915,6 +915,18 @@ class Uygulama:
                 row=sira // 2, column=sira % 2, sticky="w", padx=(0, 30), pady=3)
             self.evrak_secimleri[evrak.anahtar] = secim
 
+        ilan = tk.Frame(ana, bg=RENK["kart"])
+        ilan.pack(fill=X, padx=12, pady=(10, 0))
+        ttk.Label(ilan, text="İlan çizelgesinde öğrenci gösterimi",
+                  style="Kart.TLabel").pack(side=LEFT)
+        self.ogrenci_gosterimi = ttk.Combobox(
+            ilan, state="readonly", width=42,
+            values=[ad for _, ad in hizmet.OGRENCI_GOSTERIMI])
+        self.ogrenci_gosterimi.current(0)
+        self.ogrenci_gosterimi.pack(side=LEFT, padx=6)
+        ttk.Label(ilan, text="Açık ad hiçbir seçenekte yayımlanmaz.",
+                  style="Soluk.TLabel").pack(side=LEFT, padx=6)
+
         alt = tk.Frame(ana, bg=RENK["kart"])
         alt.pack(fill=X, padx=12, pady=12)
         ttk.Button(alt, text="Klasör seç ve üret", style="Ana.TButton",
@@ -945,7 +957,9 @@ class Uygulama:
         try:
             self.kok.configure(cursor="watch")
             self.kok.update_idletasks()
-            uretilenler = uretici.evrak_uret(self.vt, plan_id, Path(klasor), secilenler)
+            gosterim = hizmet.OGRENCI_GOSTERIMI[self.ogrenci_gosterimi.current()][0]
+            uretilenler = uretici.evrak_uret(self.vt, plan_id, Path(klasor), secilenler,
+                                             ogrenci_gosterimi=gosterim)
         except (HizmetHatasi, OSError) as hata:
             self._hata("Evrak üretilemedi", hata)
             return

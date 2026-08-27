@@ -23,6 +23,9 @@ ALTBILGI_NOTU = (
 
 ROL_ADLARI = {"komisyon_uyesi": "Komisyon üyesi", "gozcu": "Gözcü"}
 
+GUN_ADLARI = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma",
+              "Cumartesi", "Pazar")
+
 
 @dataclass(frozen=True)
 class EvrakTuru:
@@ -35,7 +38,8 @@ EVRAKLAR = (
     EvrakTuru("01_sinav_programi", "Sınav programı (öğrenci nüshası)", "01_sinav_programi.docx"),
     EvrakTuru("02_sinav_programi_gorevli", "Sınav programı (görevli nüshası)",
               "02_sinav_programi_gorevli.docx"),
-    EvrakTuru("03_gorevlendirme_oluru", "Görevlendirme oluru", "03_gorevlendirme_oluru.docx"),
+    EvrakTuru("03_gorevlendirme_oluru", "Görevlendirme çizelgesi ve tebliğ-tebellüğ",
+              "03_gorevlendirme_cizelgesi.docx"),
     EvrakTuru("04_komisyon_tutanaklari", "Komisyon tutanakları", "04_komisyon_tutanaklari.docx"),
     EvrakTuru("05_yoklama_listeleri", "Yoklama / salon listeleri", "05_yoklama_listeleri.docx"),
     EvrakTuru("06_kagit_sarf_tutanaklari", "Kâğıt sarf tutanakları",
@@ -44,7 +48,15 @@ EVRAKLAR = (
               "07_gorev_sayac_raporu.docx"),
     EvrakTuru("08_evrak_teslim_tutanagi", "Evrak teslim tutanağı",
               "08_evrak_teslim_tutanagi.docx"),
+    EvrakTuru("09_ilan_sinav_takvimi", "İLAN: sınav takvimi (KVKK uyumlu)",
+              "09_ilan_sinav_takvimi.docx"),
+    EvrakTuru("10_ilan_ogrenci_cizelgesi", "İLAN: öğrenci sınav çizelgesi (KVKK uyumlu)",
+              "10_ilan_ogrenci_cizelgesi.docx"),
 )
+
+# Okul web sayfasında yayımlanmak üzere üretilen, kişisel veri barındırmayan
+# ya da maskelenmiş çıktılar.
+ILAN_EVRAKLARI = frozenset({"09_ilan_sinav_takvimi", "10_ilan_ogrenci_cizelgesi"})
 
 
 def _kurum(vt: Veritabani) -> dict[str, str]:
@@ -111,31 +123,71 @@ def sinav_programi(vt: Veritabani, plan_id: int, hedef: Path,
 # ------------------------------------------------------ 03 görevlendirme oluru
 
 def gorevlendirme_oluru(vt: Veritabani, plan_id: int, hedef: Path) -> str:
+    """Komisyon bazlı görevlendirme çizelgesi ve tebliğ-tebellüğ bölümü.
+
+    Her satır bir sınav komisyonudur: sınav, öğrenci sayısı, tarih, saat,
+    salon, komisyon üyeleri ve gözcüler bir arada görünür. Altta görevli her
+    personelin tarih yazıp imzalayacağı tebliğ-tebellüğ tablosu vardır.
+    """
     kurum = _kurum(vt)
-    plan, _ = hizmet.plan_yukle(vt, plan_id)
+    plan, bilgi = hizmet.plan_yukle(vt, plan_id)
     oturumlar = hizmet.plan_oturumlari(vt, plan_id)
-    b = Belge(kurum["ustbilgi"], "Sınav Görevlendirme Oluru",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    b = Belge(kurum["ustbilgi"], "Sınav Görevlendirme Çizelgesi",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu), yatay=True)
+    if bilgi["kesin_mi"]:
+        b.paragraf(f"Müdür onay no: {bilgi['mudur_onay_no']}", kalin=True, boyut=9.5)
     b.paragraf(
         f"{kurum['yil']} öğretim yılı sorumluluk sınavlarında, Ortaöğretim Kurumları "
-        "Yönetmeliği'nin 58 inci maddesinin ikinci fıkrası uyarınca aşağıda adları yazılı "
-        "öğretmenlerin karşılarında gösterilen sınavlarda görevlendirilmeleri hususunu "
+        "Yönetmeliği'nin 58 inci maddesinin ikinci fıkrası uyarınca aşağıdaki komisyonların "
+        "kurulması ve karşılarında adı yazılı öğretmenlerin görevlendirilmeleri hususunu "
         "olurlarınıza arz ederim.", bosluk=12)
 
     satirlar = []
     for oturum in oturumlar:
-        for ad, rol, brans in oturum["gorevliler"]:
-            satirlar.append((ad, brans, ROL_ADLARI.get(rol, rol), oturum["etiket"],
-                             _oturum_saat(oturum), ", ".join(oturum["salonlar"]) or "—"))
-    b.tablo(["Adı Soyadı", "Branşı", "Görevi", "Sınav", "Tarih / Saat", "Salon"],
-            satirlar, [22, 18, 14, 22, 14, 10])
+        komisyon = [ad for ad, rol, _ in oturum["gorevliler"] if rol == "komisyon_uyesi"]
+        gozculer = [ad for ad, rol, _ in oturum["gorevliler"] if rol == "gozcu"]
+        ders = oturum["ders"]
+        if "/" in oturum["duzey"]:
+            ders += f" ({oturum['duzey'].replace('/', '. ve ')}. sınıflar birleştirilmiştir)"
+        else:
+            ders = f"{oturum['duzey']}. sınıf — {ders}"
+        if oturum["tur"] == "uygulama":
+            ders += " (uygulama sınavı)"
+        satirlar.append((
+            ders, oturum["ogrenci_sayisi"], tr_tarih(oturum["tarih"]), oturum["saat"],
+            ", ".join(oturum["salonlar"]) or "—",
+            "\n".join(komisyon) or "atanmadı",
+            "\n".join(gozculer) or "atanmadı",
+        ))
+    b.tablo(["Sınav Yapılacak Ders veya Dersler", "Öğrenci\nSayısı", "Sınav\nTarihi",
+             "Sınav\nSaati", "Sınav Salonu", "Komisyon Üyeleri", "Gözcü / Gözcüler"],
+            satirlar, [26, 7, 9, 7, 13, 19, 19])
 
     b.dayanak_notu(
         "Komisyon iki sınav öğretmeninden oluşur, en az biri dersin alanındandır; her sınav "
-        "salonu için bir gözcü öğretmen görevlendirilir (OKY md.58/2-a, 2-b). Bir sınavda "
-        "aynı kişiye hem komisyon üyeliği hem gözcülük verilmez ve yöneticilere sınav görevi "
-        "için ücret ödenmez (Karar md.12/2-b, 2-c). " + ALTBILGI_NOTU)
+        "salonu için bir gözcü öğretmen görevlendirilir (OKY md.58/2-a, 2-b). Farklı "
+        "sınıflardaki aynı dersin öğrenci sayısı toplamda otuzu aşmıyorsa sınavlar "
+        "birleştirilerek tek komisyonla yapılabilir (md.58/2-c). Bir sınavda aynı kişiye hem "
+        "komisyon üyeliği hem gözcülük verilmez ve yöneticilere sınav görevi için ücret "
+        "ödenmez (Karar md.12/2-b, 2-c). " + ALTBILGI_NOTU)
+
     b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
+
+    # --- tebliğ-tebellüğ ---
+    b.sayfa_sonu()
+    b.yeni_bolum_basligi("Tebliğ - Tebellüğ Belgesi",
+                         _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    b.paragraf(
+        "Yukarıdaki çizelgede gösterilen sınav görevleri tarafıma tebliğ edilmiştir. "
+        "Görev yerimi, tarihini ve saatini okudum, anladım.", bosluk=12)
+    gorevliler = hizmet.gorevli_listesi(vt, plan_id)
+    b.tablo(["S. No", "Adı Soyadı", "Branşı", "Komisyon\nüyeliği", "Gözcülük",
+             "Tebliğ Tarihi", "İmza"],
+            [(sira, g["ad"], g["brans"], g["komisyon"], g["gozcu"], "", "")
+             for sira, g in enumerate(gorevliler, 1)],
+            [6, 24, 18, 9, 8, 14, 21])
+    b.dayanak_notu(
+        "Tebliğ tarihi ve imza görevli tarafından elle doldurulur. " + ALTBILGI_NOTU)
     return b.kaydet(hedef)
 
 
@@ -289,6 +341,93 @@ def evrak_teslim_tutanagi(vt: Veritabani, plan_id: int, hedef: Path,
     return b.kaydet(hedef)
 
 
+
+# ============================================ 09 / 10 ilan çizelgeleri (KVKK)
+
+KVKK_NOTU = (
+    "Bu çizelge okul web sayfasında ilan edilmek üzere hazırlanmıştır. 6698 sayılı Kişisel "
+    "Verilerin Korunması Kanunu gereği öğrencilerin açık ad ve soyadı, T.C. kimlik numarası "
+    "ve iletişim bilgileri yayımlanmaz."
+)
+
+
+def ilan_sinav_takvimi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
+    """Okul web sayfasında ilan edilecek sınav takvimi.
+
+    Hiçbir kişisel veri içermez: ne öğrenci ne görevli adı geçer. Yalnız
+    hangi dersin sınavının ne zaman ve nerede yapılacağı yazar.
+    """
+    kurum = _kurum(vt)
+    plan, bilgi = hizmet.plan_yukle(vt, plan_id)
+    takvim = hizmet.ilan_takvimi(vt, plan_id)
+    b = Belge(kurum["ustbilgi"], "Sorumluluk Sınavı Takvimi",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    if not bilgi["kesin_mi"]:
+        b.uyari("TASLAK — plan müdür onayıyla kesinleşmeden ilan edilmemelidir.")
+    b.paragraf(
+        f"{kurum['yil']} öğretim yılı sorumluluk sınavları aşağıdaki takvime göre "
+        "yapılacaktır. Öğrencilerimizin sınav saatinden en az on beş dakika önce sınav "
+        "salonunda hazır bulunmaları gerekmektedir.", bosluk=12)
+
+    gunler: dict = {}
+    for kayit in takvim:
+        gunler.setdefault(kayit["tarih"], []).append(kayit)
+    satirlar = []
+    for tarih in sorted(gunler):
+        for sira, kayit in enumerate(sorted(gunler[tarih], key=lambda k: k["saat"])):
+            satirlar.append((
+                f"{tr_tarih(tarih)} {GUN_ADLARI[tarih.weekday()]}" if sira == 0 else "",
+                kayit["saat"], kayit["etiket"], f"{kayit['sure']} dk",
+                kayit["salonlar"] or "—"))
+    b.tablo(["Tarih", "Saat", "Ders", "Süre", "Salon"], satirlar, [22, 10, 38, 8, 22])
+
+    b.paragraf(
+        "Sınavla ilgili sorularınız için okul müdürlüğüne başvurabilirsiniz.",
+        bosluk=6, boyut=9.5)
+    b.dayanak_notu(
+        "Sınav tarihleri Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesi uyarınca "
+        "belirlenmiştir. " + KVKK_NOTU)
+    b.imza_blogu([], kurum["mudur"])
+    return b.kaydet(hedef)
+
+
+def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path,
+                           gosterim: str = "no_ve_maskeli_ad") -> str:
+    """Hangi öğrencinin hangi derslerden sınava gireceğini gösteren ilan çizelgesi.
+
+    Öğrenci kendi satırını okul numarasından bulur; açık ad yayımlanmaz.
+    Ad, seçilen biçime göre maskelenir ya da hiç yazılmaz.
+    """
+    kurum = _kurum(vt)
+    plan, bilgi = hizmet.plan_yukle(vt, plan_id)
+    ogrenciler = hizmet.ilan_ogrenci_cizelgesi(vt, plan_id, gosterim)
+    b = Belge(kurum["ustbilgi"], "Öğrenci Sorumluluk Sınavı Çizelgesi",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    if not bilgi["kesin_mi"]:
+        b.uyari("TASLAK — plan müdür onayıyla kesinleşmeden ilan edilmemelidir.")
+    b.paragraf(
+        "Aşağıdaki çizelgede her öğrencinin gireceği sorumluluk sınavları gösterilmiştir. "
+        "Öğrencilerimiz kendi satırlarını okul numaralarından bulabilir; ad ve soyadı "
+        "kişisel verilerin korunması amacıyla maskelenmiştir.", bosluk=12)
+
+    satirlar = []
+    for ogrenci in ogrenciler:
+        for sira, sinav in enumerate(ogrenci["sinavlar"]):
+            satirlar.append((
+                ogrenci["etiket"] if sira == 0 else "",
+                ogrenci["sube"] if sira == 0 else "",
+                sinav["etiket"], tr_tarih(sinav["tarih"]), sinav["saat"],
+                sinav["salonlar"] or "—"))
+    b.tablo(["Öğrenci", "Şube", "Ders", "Tarih", "Saat", "Salon"],
+            satirlar, [22, 8, 30, 12, 8, 20])
+
+    b.paragraf(
+        f"Çizelgede {len(ogrenciler)} öğrenci yer almaktadır. Bilgilerinde yanlışlık "
+        "gördüğünüzü düşünüyorsanız okul müdürlüğüne başvurunuz.", bosluk=6, boyut=9.5)
+    b.dayanak_notu(KVKK_NOTU)
+    b.imza_blogu([], kurum["mudur"])
+    return b.kaydet(hedef)
+
 # ----------------------------------------------------------------- paket
 
 URETICILER = {
@@ -300,11 +439,16 @@ URETICILER = {
     "06_kagit_sarf_tutanaklari": kagit_sarf_tutanaklari,
     "07_gorev_sayac_raporu": gorev_sayac_raporu,
     "08_evrak_teslim_tutanagi": evrak_teslim_tutanagi,
+    "09_ilan_sinav_takvimi": ilan_sinav_takvimi,
 }
+
+# Öğrenci gösterim biçimi yalnız bu evraka geçirilir.
+GOSTERIM_ALAN_URETICILER = {"10_ilan_ogrenci_cizelgesi": ilan_ogrenci_cizelgesi}
 
 
 def evrak_uret(vt: Veritabani, plan_id: int, hedef_klasor: Path,
-               secilenler: list[str] | None = None) -> list[tuple[Path, str]]:
+               secilenler: list[str] | None = None,
+               ogrenci_gosterimi: str = "no_ve_maskeli_ad") -> list[tuple[Path, str]]:
     """Seçilen evrakları üretir; (dosya yolu, SHA-256) listesi döndürür.
 
     Üretilen her belge `belge_surumu` ve `evrak_kaydi` tablolarına işlenir;
@@ -317,10 +461,12 @@ def evrak_uret(vt: Veritabani, plan_id: int, hedef_klasor: Path,
     uretilen: list[tuple[Path, str]] = []
     for anahtar in istenen:
         uretici = URETICILER.get(anahtar)
-        if uretici is None:
+        gosterimli = GOSTERIM_ALAN_URETICILER.get(anahtar)
+        if uretici is None and gosterimli is None:
             raise hizmet.HizmetHatasi(f"Bilinmeyen evrak türü: {anahtar}")
         yol = hedef_klasor / dosya_adlari[anahtar]
-        ozet = uretici(vt, plan_id, yol)
+        ozet = (gosterimli(vt, plan_id, yol, ogrenci_gosterimi) if gosterimli
+                else uretici(vt, plan_id, yol))
         hizmet.evrak_surumu_kaydet(vt, anahtar, str(plan_id), yol, ozet)
         uretilen.append((yol, ozet))
     return uretilen

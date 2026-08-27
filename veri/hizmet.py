@@ -15,7 +15,7 @@ from datetime import date, datetime, time
 from pathlib import Path
 
 from cekirdek.kurallar import DogrulamaBaglami, dogrula_plan
-from cekirdek.metin import esitle, siralama_anahtari
+from cekirdek.metin import esitle, maskele, siralama_anahtari
 from cekirdek.modeller import (
     DersAyari, GorevRolu, Gorevlendirme, Ihlal, IkiAsamaliSayim, Oturum, OturumTuru,
     Personel, Plan, PlanParametreleri, Salon, SorumlulukKaydi,
@@ -1154,3 +1154,106 @@ def evrak_gecmisi(vt: Veritabani, kayit_anahtari: str) -> list[tuple]:
         return [tuple(r) for r in b.execute(
             "SELECT tur,surum,sha256,olusturma_tarihi FROM belge_surumu"
             " WHERE kayit_anahtari=? ORDER BY tur,surum", (kayit_anahtari,))]
+
+
+# ==================================================== ilan (KVKK) sorguları
+
+# Okul web sayfasında ilan edilen çizelgede öğrencinin nasıl gösterileceği.
+OGRENCI_GOSTERIMI = (
+    ("no_ve_maskeli_ad", "Okul numarası + maskeli ad (A**** D*****)"),
+    ("yalniz_no", "Yalnız okul numarası"),
+    ("yalniz_maskeli_ad", "Yalnız maskeli ad"),
+)
+OGRENCI_GOSTERIM_ADLARI = dict(OGRENCI_GOSTERIMI)
+
+
+def ogrenci_etiketi_uret(okul_no: str, ad_soyad: str, gosterim: str) -> str:
+    """İlan çizelgesinde öğrencinin görüneceği biçimi üretir.
+
+    Açık ad hiçbir seçenekte yazılmaz; ilan herkese açık bir sayfada
+    yayımlanacağı için ad yalnız maskeli biçimde geçebilir.
+    """
+    if gosterim not in OGRENCI_GOSTERIM_ADLARI:
+        raise HizmetHatasi("Geçersiz öğrenci gösterim biçimi.")
+    maskeli = maskele(ad_soyad)
+    if gosterim == "yalniz_no":
+        return str(okul_no)
+    if gosterim == "yalniz_maskeli_ad":
+        return maskeli
+    return f"{okul_no} — {maskeli}"
+
+
+def ilan_takvimi(vt: Veritabani, plan_id: int) -> list[dict]:
+    """İlan edilecek sınav takvimi; kişisel veri içermez.
+
+    Ne öğrenci ne de görevli adı geçer; yalnız ders, tarih, saat ve salon.
+    """
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT replace(o.duzey_kumesi,',','/'), d.ad, o.oturum_turu,
+                   o.tarih, o.saat, o.sure,
+                   COALESCE((SELECT group_concat(s.ad, ', ')
+                             FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id
+                             WHERE os.oturum_id=o.id), '')
+            FROM v_oturum o JOIN v_ders d ON d.id=o.ders_id
+            WHERE o.plan_id=? ORDER BY o.tarih, o.saat, d.ad""", (plan_id,)).fetchall()
+    return [{
+        "duzey": r[0], "ders": r[1], "tur": r[2],
+        "tarih": date.fromisoformat(r[3]), "saat": r[4], "sure": r[5],
+        "salonlar": r[6],
+        "etiket": f"{r[0]} {r[1]}" + (" (uygulama)" if r[2] == "uygulama" else ""),
+    } for r in satirlar]
+
+
+def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int,
+                           gosterim: str = "no_ve_maskeli_ad") -> list[dict]:
+    """Öğrenci başına sınav listesi; ad maskelenmiş olarak döner.
+
+    Öğrenci kendi satırını okul numarasından bulur; açık ad yayımlanmaz.
+    """
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT og.okul_no, og.ad_soyad, og.sube,
+                   replace(o.duzey_kumesi,',','/'), d.ad, o.oturum_turu,
+                   o.tarih, o.saat,
+                   COALESCE((SELECT group_concat(s.ad, ', ')
+                             FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id
+                             WHERE os.oturum_id=o.id), '')
+            FROM v_oturum_ogrenci oo
+            JOIN v_ogrenci og ON og.id=oo.ogrenci_id
+            JOIN v_oturum o ON o.id=oo.oturum_id
+            JOIN v_ders d ON d.id=o.ders_id
+            WHERE o.plan_id=? ORDER BY og.okul_no, o.tarih, o.saat""", (plan_id,)).fetchall()
+
+    ogrenciler: dict[str, dict] = {}
+    for r in satirlar:
+        anahtar = f"{r[0]}|{r[2]}"
+        kayit = ogrenciler.setdefault(anahtar, {
+            "okul_no": r[0],
+            "etiket": ogrenci_etiketi_uret(r[0], r[1], gosterim),
+            "sube": r[2],
+            "sinavlar": [],
+        })
+        kayit["sinavlar"].append({
+            "etiket": f"{r[3]} {r[4]}" + (" (uygulama)" if r[5] == "uygulama" else ""),
+            "tarih": date.fromisoformat(r[6]),
+            "saat": r[7],
+            "salonlar": r[8],
+        })
+    return sorted(ogrenciler.values(), key=lambda x: (len(x["okul_no"]), x["okul_no"]))
+
+
+def gorevli_listesi(vt: Veritabani, plan_id: int) -> list[dict]:
+    """Tebliğ-tebellüğ bölümü için görevli personelin tekilleştirilmiş listesi."""
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT p.id, p.ad, COALESCE(p.brans,''), p.unvan,
+                   SUM(CASE WHEN g.rol='komisyon_uyesi' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN g.rol='gozcu' THEN 1 ELSE 0 END)
+            FROM v_gorevlendirme g
+            JOIN v_personel p ON p.id=g.personel_id
+            JOIN v_oturum o ON o.id=g.oturum_id
+            WHERE o.plan_id=? GROUP BY p.id, p.ad, p.brans, p.unvan""", (plan_id,)).fetchall()
+    liste = [{"kimlik": r[0], "ad": r[1], "brans": r[2], "unvan": r[3],
+              "komisyon": r[4], "gozcu": r[5]} for r in satirlar]
+    return sorted(liste, key=lambda x: siralama_anahtari(x["ad"]))

@@ -37,12 +37,14 @@ tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
 |---|---|
 | Sınav programı (öğrenci nüshası) | Tarih, saat, ders, süre, salon |
 | Sınav programı (görevli nüshası) | Yukarıdakiler + komisyon ve gözcüler |
-| Görevlendirme oluru | Kişi × sınav × rol, müdür OLUR bloğuyla |
+| Görevlendirme çizelgesi | Komisyon bazlı: ders(ler), öğrenci sayısı, tarih, saat, salon, komisyon üyeleri, gözcüler + tebliğ-tebellüğ sayfası |
 | Komisyon tutanakları | Oturum başına ayrı sayfa, imza satırları |
 | Yoklama / salon listeleri | Salon başına öğrenci listesi ve imza sütunu |
 | Kâğıt sarf tutanakları | Teslim alınan / kullanılan / iade sayıları |
 | Öğretmen görev sayacı | Komisyon ve gözcülük sayıları, 12/15 durumu |
 | Evrak teslim tutanağı | Teslim-tesellüm çizelgesi ve gecikme uyarısı |
+| **İLAN:** sınav takvimi | Web sayfasında yayımlanmak üzere; kişisel veri içermez |
+| **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden sınava gireceği, ad maskeli |
 
 Her belgenin altında dayanağı yazılıdır. Belgeler EBYS/DYS kayıt numarası ve
 güvenli elektronik imza ibaresi üretmez; okulun kendi kayıtlarından hazırlanmış
@@ -51,6 +53,31 @@ güvenli elektronik imza ibaresi üretmez; okulun kendi kayıtlarından hazırla
 Sürüm takibi belge *içeriğinin* özetine bağlıdır: aynı içerik yeniden
 üretilirse yeni sürüm açılmaz, plan değişip belge farklılaşırsa sürüm numarası
 artar ve hangi çıktının hangi içerikten geldiği izlenebilir.
+
+## İlan çizelgeleri ve KVKK
+
+Okul web sayfasında yayımlanmak üzere iki çıktı üretilir.
+
+**Sınav takvimi** hiçbir kişisel veri içermez: ne öğrenci ne de görevli öğretmen
+adı geçer, yalnız hangi dersin sınavının ne zaman ve nerede yapılacağı yazar.
+Belgeyi imzalayan okul müdürünün adı bunun dışındadır; imza bloğu belgenin
+kendisidir, görevlendirme bilgisi değildir.
+
+**Öğrenci sınav çizelgesi** öğrencinin kendi satırını bulabilmesi için okul
+numarasını gösterir; ad ve soyadı hiçbir seçenekte açık yazılmaz. Gösterim
+biçimi evrak ekranından seçilir:
+
+| Seçenek | Görünüm |
+|---|---|
+| Okul numarası + maskeli ad *(varsayılan)* | `12820 — A**** A** D******` |
+| Yalnız okul numarası | `12820` |
+| Yalnız maskeli ad | `A**** A** D******` |
+
+Maskeleme her sözcüğün ilk harfini bırakıp kalanını yıldızlar. İlk harf Türkçe
+büyütmeden geçer.
+
+Her iki belgede 6698 sayılı Kanuna atıf yapan bir not bulunur ve plan müdür
+onayıyla kesinleşmeden üretilirse belge üzerinde TASLAK uyarısı yazar.
 
 ## Evrak teslim takibi
 

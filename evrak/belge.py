@@ -228,7 +228,13 @@ class Belge:
         for veri in (satirlar or [(bos_metin,) + ("",) * (sutun_sayisi - 1)]):
             hucreler = tablo.add_row().cells
             for hucre, deger in zip(hucreler, list(veri) + [""] * sutun_sayisi):
-                hucre.text = "" if deger is None else str(deger)
+                metin = "" if deger is None else str(deger)
+                # Hücre içindeki satır sonu Word'de kendiliğinden alt satıra
+                # geçmez; her satır ayrı paragraf olmalıdır (ör. komisyon üyeleri).
+                satir_metinleri = metin.split("\n")
+                hucre.text = satir_metinleri[0]
+                for ek in satir_metinleri[1:]:
+                    hucre.add_paragraph(ek)
 
         for satir_no, satir in enumerate(tablo.rows):
             trpr = satir._tr.get_or_add_trPr()

@@ -66,6 +66,14 @@ kesinleştirilemez.
 seçersiniz; belgeler .docx olarak oraya yazılır. Aynı içerik yeniden
 üretilirse sürüm numarası artmaz.
 
+Listedeki **İLAN** başlıklı iki belge okul web sayfasında yayımlanmak içindir.
+Bunları üretmeden önce aynı sekmedeki **öğrenci gösterimi** seçeneğini gözden
+geçirin; öğrencinin açık adı hiçbir seçenekte yayımlanmaz.
+
+**Görevlendirme çizelgesi** komisyon bazlıdır: her satır bir sınav komisyonudur.
+İkinci sayfasında görevli her personelin tarih yazıp imzalayacağı
+tebliğ-tebellüğ tablosu vardır; çizelge yatay A4 olarak üretilir.
+
 **Teslim çizelgesi** sekmesinde her oturum için beklenen evrak listelenir.
 Bir satırı seçip teslim eden ile teslim alan görevliyi ve varsa adedi girerek
 **Seçili evrakı teslim al** düğmesine basın. Teslim eden ile alan aynı kişi

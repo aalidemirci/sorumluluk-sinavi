@@ -87,7 +87,7 @@ def test_secili_evrak_uretilir(hazir) -> None:
     uretilenler = uretici.evrak_uret(vt, plan_id, tmp_path / "evrak",
                                      ["01_sinav_programi", "03_gorevlendirme_oluru"])
     assert [y.name for y, _ in uretilenler] == ["01_sinav_programi.docx",
-                                                "03_gorevlendirme_oluru.docx"]
+                                                "03_gorevlendirme_cizelgesi.docx"]
 
 
 def test_bilinmeyen_evrak_turu_reddedilir(hazir) -> None:
@@ -279,3 +279,128 @@ def test_baslik_turkce_buyutulur(tmp_path: Path) -> None:
     b.kaydet(tmp_path / "baslik.docx")
     metin = _metin(tmp_path / "baslik.docx")
     assert "SINAV YOKLAMA VE SALON LİSTESİ" in metin
+
+
+# ============================================ komisyon bazlı görevlendirme
+
+def test_gorevlendirme_cizelgesi_komisyon_bazlidir(hazir) -> None:
+    """Her satır bir sınav komisyonudur; kişi başına satır açılmaz."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    from docx import Document
+    tablolar = Document(yol).tables
+    basliklar = [h.text for h in tablolar[0].rows[0].cells]
+    assert basliklar == ["Sınav Yapılacak Ders veya Dersler", "Öğrenci\nSayısı",
+                         "Sınav\nTarihi", "Sınav\nSaati", "Sınav Salonu",
+                         "Komisyon Üyeleri", "Gözcü / Gözcüler"]
+    # Başlık dışında satır sayısı oturum sayısına eşit olmalı.
+    assert len(tablolar[0].rows) - 1 == len(hizmet.plan_oturumlari(vt, plan_id))
+
+
+def test_gorevlendirme_cizelgesinde_teblig_tebellug_bolumu_var(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    from docx import Document
+    belge = Document(yol)
+    metin = _metin(yol)
+    assert "TEBLİĞ - TEBELLÜĞ BELGESİ" in metin
+    assert "Tebliğ Tarihi" in metin and "İmza" in metin
+    # Tebliğ tablosunda görevli her personel bir kez yer alır.
+    gorevliler = hizmet.gorevli_listesi(vt, plan_id)
+    assert len(belge.tables[1].rows) - 1 == len(gorevliler)
+
+
+def test_birlestirilmis_dersler_cizelgede_belirtilir(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    metin = _metin(yol)
+    birlesik = [o for o in hizmet.plan_oturumlari(vt, plan_id) if "/" in o["duzey"]]
+    if birlesik:
+        assert "birleştirilmiştir" in metin
+
+
+def test_komisyon_uyeleri_ayri_satirlarda_yazilir(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    from docx import Document
+    hucre = Document(yol).tables[0].rows[1].cells[5]
+    assert len(hucre.paragraphs) == 2          # iki komisyon üyesi, iki paragraf
+
+
+# ==================================================== KVKK ilan çizelgeleri
+
+def test_ilan_takviminde_ogrenci_ve_gorevli_adi_yok(hazir) -> None:
+    """İlan takviminde ne öğrenci ne de görevli öğretmen adı geçer.
+
+    Belgeyi imzalayan okul müdürünün adı bunun dışındadır: imza bloğu
+    belgenin kendisidir, görevlendirme bilgisi değildir.
+    """
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "ilan_takvim.docx"
+    uretici.ilan_sinav_takvimi(vt, plan_id, yol)
+    metin = _metin(yol)
+    for ogrenci in hizmet.sorumluluk_kayitlari(vt):
+        assert ogrenci.ad_soyad not in metin
+        assert ogrenci.okul_no not in metin
+    for gorevli in hizmet.gorevli_listesi(vt, plan_id):
+        assert gorevli["ad"] not in metin
+    assert "MATEMATİK" in metin and "6698" in metin
+
+
+def test_ilan_ogrenci_cizelgesinde_acik_ad_yazmaz(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "ilan_ogrenci.docx"
+    uretici.ilan_ogrenci_cizelgesi(vt, plan_id, yol)
+    metin = _metin(yol)
+    for ogrenci in hizmet.sorumluluk_kayitlari(vt):
+        assert ogrenci.ad_soyad not in metin
+    for gorevli in hizmet.gorevli_listesi(vt, plan_id):
+        assert gorevli["ad"] not in metin
+    assert "U****** Ö****** B**" in metin      # maskeli ad
+    assert "101" in metin                      # okul numarası
+    assert "6698" in metin
+
+
+def test_ilan_cizelgesinde_gosterim_secenegi_uygulanir(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yalniz_no = tmp_path / "no.docx"
+    yalniz_ad = tmp_path / "ad.docx"
+    uretici.ilan_ogrenci_cizelgesi(vt, plan_id, yalniz_no, "yalniz_no")
+    uretici.ilan_ogrenci_cizelgesi(vt, plan_id, yalniz_ad, "yalniz_maskeli_ad")
+    assert "U******" not in _metin(yalniz_no)
+    assert "U******" in _metin(yalniz_ad)
+
+
+def test_gecersiz_gosterim_bicimi_reddedilir(hazir) -> None:
+    vt, plan_id, _ = hazir
+    with pytest.raises(HizmetHatasi, match="Geçersiz öğrenci gösterim"):
+        hizmet.ilan_ogrenci_cizelgesi(vt, plan_id, "acik_ad")
+
+
+def test_ilan_ogrenci_cizelgesi_ogrenci_basina_gruplanir(hazir) -> None:
+    vt, plan_id, _ = hazir
+    cizelge = hizmet.ilan_ogrenci_cizelgesi(vt, plan_id)
+    assert len(cizelge) == 3                   # üç öğrenci
+    ilk = next(o for o in cizelge if o["okul_no"] == "101")
+    assert len(ilk["sinavlar"]) == 2           # matematik + fizik
+
+
+def test_taslak_plan_ilan_belgelerinde_uyari_tasir(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    for uretici_fn, ad in ((uretici.ilan_sinav_takvimi, "takvim"),
+                           (uretici.ilan_ogrenci_cizelgesi, "cizelge")):
+        yol = tmp_path / f"{ad}.docx"
+        uretici_fn(vt, plan_id, yol)
+        assert "TASLAK" in _metin(yol)
+
+
+def test_kesinlesen_planin_ilaninda_uyari_yok(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    hizmet.plan_kesinlestir(vt, plan_id, "2026/144")
+    yol = tmp_path / "takvim.docx"
+    uretici.ilan_sinav_takvimi(vt, plan_id, yol)
+    assert "TASLAK" not in _metin(yol)

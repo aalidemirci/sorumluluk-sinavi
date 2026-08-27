@@ -39,3 +39,18 @@ def esitle(metin: str) -> str:
 def siralama_anahtari(metin: str) -> tuple[int, ...]:
     """Türk alfabesine göre sıralama anahtarı üretir."""
     return tuple(_SIRA.get(harf, 1000 + ord(harf)) for harf in kucult(metin))
+
+
+def maskele(ad: str) -> str:
+    """Adı ve soyadı KVKK'ya uygun biçimde maskeler.
+
+    Her sözcüğün ilk harfi kalır, kalanı yıldızlanır:
+    "Ahmet Ali Demirci" -> "A**** A** D******". İlk harf Türkçe büyütmeden
+    geçer; yerleşik upper() 'i' harfini bozar.
+    """
+    parcalar = []
+    for sozcuk in sadelestir(ad).split(" "):
+        if not sozcuk:
+            continue
+        parcalar.append(buyult(sozcuk[0]) + "*" * (len(sozcuk) - 1))
+    return " ".join(parcalar)
