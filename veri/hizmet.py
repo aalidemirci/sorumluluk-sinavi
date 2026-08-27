@@ -21,7 +21,8 @@ from cekirdek.modeller import (
     Personel, Plan, PlanParametreleri, Salon, SorumlulukKaydi,
 )
 from cekirdek.planlayici import PlanlamaSonucu, plan_uret
-from cekirdek.takvim import gunleri_listele, sinav_pencereleri
+from cekirdek.kurallar import yillik_sayac_asildi_mi
+from cekirdek.takvim import gunleri_listele, is_gunu_ekle, sinav_pencereleri
 from cekirdek.talep import SinavBirimi, YukOzeti, birimleri_olustur, yuk_ozeti
 from .rapor_okuma import (
     PersonelRaporu, SorumlulukRaporu, personel_raporu_oku, sorumluluk_raporu_oku,
@@ -914,3 +915,242 @@ def plani_geri_yukle(plan: Plan, goruntu: list[tuple[str, date, time, tuple[int,
     for oturum in plan.oturumlar:
         if oturum.anahtar in durumlar:
             oturum.tarih, oturum.saat, oturum.salon_kimlikleri = durumlar[oturum.anahtar]
+
+
+# ============================================================ evrak teslimi
+
+EVRAK_TURLERI = (
+    ("sinav_kagitlari", "Sınav kâğıtları"),
+    ("komisyon_tutanagi", "Komisyon tutanağı"),
+    ("yoklama_listesi", "Yoklama / salon listesi"),
+    ("kagit_sarf_tutanagi", "Kâğıt sarf tutanağı"),
+    ("kopya_tutanagi", "Kopya tutanağı"),
+    ("diger", "Diğer"),
+)
+EVRAK_ADLARI = dict(EVRAK_TURLERI)
+
+# TS-01: her oturum için geri dönmesi beklenen evrak. Kopya tutanağı yalnız
+# olay varsa düzenlendiği için beklenenler arasında değildir.
+BEKLENEN_EVRAK = ("sinav_kagitlari", "komisyon_tutanagi", "yoklama_listesi")
+
+# TS-02: sınav tarihinden sonra bu kadar iş günü içinde teslim beklenir.
+TESLIM_SURESI_IS_GUNU = 1
+
+
+@dataclass(frozen=True)
+class TeslimSatiri:
+    oturum_id: int
+    oturum_etiketi: str
+    tarih: date
+    evrak_turu: str
+    adet: int | None = None
+    teslim_at: str = ""
+    teslim_eden: str = ""
+    teslim_alan: str = ""
+    aciklama: str = ""
+
+    @property
+    def evrak_adi(self) -> str:
+        return EVRAK_ADLARI.get(self.evrak_turu, self.evrak_turu)
+
+    @property
+    def teslim_edildi_mi(self) -> bool:
+        return bool(self.teslim_at)
+
+    def son_gun(self, tatiller=frozenset()) -> date:
+        return is_gunu_ekle(self.tarih, TESLIM_SURESI_IS_GUNU, tatiller)
+
+    def gecikti_mi(self, bugun: date | None = None) -> bool:
+        """TS-02: süresi içinde teslim edilmemiş evrak gecikmiş sayılır."""
+        if self.teslim_edildi_mi:
+            return False
+        return (bugun or date.today()) > self.son_gun()
+
+    def durum(self, bugun: date | None = None) -> str:
+        if self.teslim_edildi_mi:
+            return "teslim alındı"
+        return "gecikti" if self.gecikti_mi(bugun) else "bekleniyor"
+
+
+def teslim_cizelgesi(vt: Veritabani, plan_id: int) -> list[TeslimSatiri]:
+    """Plandaki her oturum için beklenen evrakın durumunu döndürür."""
+    with vt.baglan() as b:
+        oturumlar = b.execute("""
+            SELECT o.id, replace(o.duzey_kumesi,',','/')||' '||d.ad||
+                   CASE o.oturum_turu WHEN 'uygulama' THEN ' (uygulama)' ELSE '' END,
+                   o.tarih
+            FROM v_oturum o JOIN v_ders d ON d.id=o.ders_id
+            WHERE o.plan_id=? ORDER BY o.tarih, o.saat, d.ad""", (plan_id,)).fetchall()
+        kayitli = {}
+        for r in b.execute("""
+                SELECT t.oturum_id, t.evrak_turu, t.adet, COALESCE(t.teslim_at,''),
+                       COALESCE(eden.ad,''), COALESCE(alan.ad,''), t.aciklama
+                FROM v_evrak_teslim t
+                JOIN v_oturum o ON o.id=t.oturum_id
+                LEFT JOIN v_personel eden ON eden.id=t.teslim_eden_personel_id
+                LEFT JOIN v_personel alan ON alan.id=t.teslim_alan_personel_id
+                WHERE o.plan_id=?""", (plan_id,)):
+            kayitli[(r[0], r[1])] = r
+
+    cizelge: list[TeslimSatiri] = []
+    for oturum_id, etiket, tarih_metin in oturumlar:
+        tarih = date.fromisoformat(tarih_metin)
+        turler = list(BEKLENEN_EVRAK)
+        turler += [tur for (oid, tur) in sorted(kayitli)
+                   if oid == oturum_id and tur not in turler]
+        for tur in turler:
+            kayit = kayitli.get((oturum_id, tur))
+            cizelge.append(TeslimSatiri(
+                oturum_id=oturum_id, oturum_etiketi=etiket, tarih=tarih, evrak_turu=tur,
+                adet=kayit[2] if kayit else None,
+                teslim_at=kayit[3] if kayit else "",
+                teslim_eden=kayit[4] if kayit else "",
+                teslim_alan=kayit[5] if kayit else "",
+                aciklama=kayit[6] if kayit else ""))
+    return cizelge
+
+
+def teslim_kaydet(vt: Veritabani, oturum_id: int, evrak_turu: str,
+                  teslim_eden_personel_id: int, teslim_alan_personel_id: int,
+                  adet: int | None = None, aciklama: str = "",
+                  teslim_tarihi: date | None = None) -> None:
+    """Evrakın teslim alındığını kaydeder."""
+    if evrak_turu not in EVRAK_ADLARI:
+        raise HizmetHatasi("Geçersiz evrak türü.")
+    if not teslim_eden_personel_id or not teslim_alan_personel_id:
+        raise HizmetHatasi("Teslim eden ve teslim alan görevli seçilmelidir.")
+    if teslim_eden_personel_id == teslim_alan_personel_id:
+        raise HizmetHatasi("Evrakı teslim eden ile teslim alan aynı kişi olamaz (TS-03).")
+    if adet is not None and adet < 0:
+        raise HizmetHatasi("Adet negatif olamaz.")
+    zaman = (teslim_tarihi or date.today()).isoformat()
+    with vt.baglan() as b:
+        if not b.execute("SELECT 1 FROM v_oturum WHERE id=?", (oturum_id,)).fetchone():
+            raise HizmetHatasi("Oturum bulunamadı.")
+        b.execute(
+            "INSERT INTO evrak_teslim(oturum_id,evrak_turu,adet,teslim_eden_personel_id,"
+            "teslim_alan_personel_id,teslim_at,aciklama) VALUES(?,?,?,?,?,?,?)"
+            " ON CONFLICT(oturum_id,evrak_turu) DO UPDATE SET"
+            " adet=excluded.adet,teslim_eden_personel_id=excluded.teslim_eden_personel_id,"
+            " teslim_alan_personel_id=excluded.teslim_alan_personel_id,"
+            " teslim_at=excluded.teslim_at,aciklama=excluded.aciklama,silindi_mi=0",
+            (oturum_id, evrak_turu, adet, teslim_eden_personel_id,
+             teslim_alan_personel_id, zaman, aciklama.strip()))
+        vt.denetim_yaz(b, "evrak_teslim", oturum_id, "teslim_alindi", evrak_turu)
+
+
+def teslim_geri_al(vt: Veritabani, oturum_id: int, evrak_turu: str) -> None:
+    with vt.baglan() as b:
+        b.execute("UPDATE evrak_teslim SET silindi_mi=1 WHERE oturum_id=? AND evrak_turu=?",
+                  (oturum_id, evrak_turu))
+        vt.denetim_yaz(b, "evrak_teslim", oturum_id, "teslim_geri_alindi", evrak_turu)
+
+
+def teslim_ozeti(vt: Veritabani, plan_id: int, bugun: date | None = None) -> dict[str, int]:
+    cizelge = teslim_cizelgesi(vt, plan_id)
+    return {
+        "toplam": len(cizelge),
+        "teslim": sum(1 for s in cizelge if s.teslim_edildi_mi),
+        "gecikti": sum(1 for s in cizelge if s.gecikti_mi(bugun)),
+        "bekliyor": sum(1 for s in cizelge
+                        if not s.teslim_edildi_mi and not s.gecikti_mi(bugun)),
+    }
+
+
+# ==================================================== evrak veri sorguları
+
+def plan_oturumlari(vt: Veritabani, plan_id: int) -> list[dict]:
+    """Evrak üretimi için oturum listesi; görevliler ve salonlar dâhil."""
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT o.id, replace(o.duzey_kumesi,',','/'), d.ad, o.oturum_turu,
+                   o.tarih, o.saat, o.sure, COALESCE(d.brans,'')
+            FROM v_oturum o JOIN v_ders d ON d.id=o.ders_id
+            WHERE o.plan_id=? ORDER BY o.tarih, o.saat, d.ad""", (plan_id,)).fetchall()
+        sonuc = []
+        for r in satirlar:
+            salonlar = [x[0] for x in b.execute(
+                "SELECT s.ad FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id"
+                " WHERE os.oturum_id=? ORDER BY os.sira", (r[0],))]
+            gorevliler = [(x[0], x[1], x[2]) for x in b.execute(
+                "SELECT p.ad, g.rol, COALESCE(p.brans,'') FROM v_gorevlendirme g"
+                " JOIN v_personel p ON p.id=g.personel_id"
+                " WHERE g.oturum_id=? ORDER BY g.rol DESC, p.ad", (r[0],))]
+            ogrenci_sayisi = b.execute(
+                "SELECT count(*) FROM v_oturum_ogrenci WHERE oturum_id=?",
+                (r[0],)).fetchone()[0]
+            sonuc.append({
+                "id": r[0], "duzey": r[1], "ders": r[2], "tur": r[3],
+                "tarih": date.fromisoformat(r[4]), "saat": r[5], "sure": r[6],
+                "brans": r[7], "salonlar": salonlar, "gorevliler": gorevliler,
+                "ogrenci_sayisi": ogrenci_sayisi,
+                "etiket": f"{r[1]} {r[2]}" + (" (uygulama)" if r[3] == "uygulama" else ""),
+            })
+        return sonuc
+
+
+def oturum_ogrencileri(vt: Veritabani, oturum_id: int) -> list[dict]:
+    with vt.baglan() as b:
+        return [{"sira": r[0], "okul_no": r[1], "ad_soyad": r[2], "sube": r[3],
+                 "salon": r[4] or ""}
+                for r in b.execute("""
+                    SELECT oo.sira, og.okul_no, og.ad_soyad, og.sube, s.ad
+                    FROM v_oturum_ogrenci oo
+                    JOIN v_ogrenci og ON og.id=oo.ogrenci_id
+                    LEFT JOIN v_salon s ON s.id=oo.salon_id
+                    WHERE oo.oturum_id=? ORDER BY oo.sira""", (oturum_id,))]
+
+
+def gorev_sayaclari(vt: Veritabani) -> list[dict]:
+    """EK-05: kişi başına komisyon üyeliği ve gözcülük sayısı."""
+    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    with vt.baglan() as b:
+        satirlar = b.execute(
+            "SELECT ad, brans, unvan, komisyon_sayisi, gozcu_sayisi FROM v_gorev_sayaci"
+            " WHERE komisyon_sayisi > 0 OR gozcu_sayisi > 0 ORDER BY ad").fetchall()
+    return [{
+        "ad": r[0], "brans": r[1], "unvan": r[2], "komisyon": r[3], "gozcu": r[4],
+        "asildi_mi": yillik_sayac_asildi_mi(ogretim_yili, r[3], r[4]),
+        "ucretlendirilebilir": not Personel(0, "", "", r[2]).yonetici_mi,
+    } for r in satirlar]
+
+
+def evrak_surumu_kaydet(vt: Veritabani, tur: str, kayit_anahtari: str,
+                        dosya_yolu: Path, sha256: str) -> int:
+    """Üretilen belgenin sürümünü ve dosya kaydını işler.
+
+    Aynı içerik yeniden üretilirse yeni sürüm açılmaz. Onaylanmış bir belge
+    sonradan değişirse yeni sürüm açılır ve değişiklik föyü metni saklanır;
+    böylece hangi çıktının hangi içerikten geldiği denetlenebilir.
+    """
+    with vt.baglan() as b:
+        onceki = b.execute(
+            "SELECT id,surum,sha256,onaylandi_mi FROM belge_surumu"
+            " WHERE tur=? AND kayit_anahtari=? ORDER BY surum DESC LIMIT 1",
+            (tur, kayit_anahtari)).fetchone()
+        if onceki and onceki[2] == sha256:
+            surum_id = int(onceki[0])
+        else:
+            surum = int(onceki[1]) + 1 if onceki else 1
+            foy = (f"Onaylanmış belge değişti — önceki SHA-256: {onceki[2]}, "
+                   f"yeni SHA-256: {sha256}") if onceki and onceki[3] else None
+            surum_id = int(b.execute(
+                "INSERT INTO belge_surumu(tur,kayit_anahtari,surum,sha256,kaynak_sha256,"
+                "onceki_surum_id,degisiklik_foyu,olusturma_tarihi)"
+                " VALUES(?,?,?,?,?,?,?,?)",
+                (tur, kayit_anahtari, surum, sha256, sha256,
+                 onceki[0] if onceki else None, foy, simdi())).lastrowid)
+        b.execute(
+            "INSERT INTO evrak_kaydi(tur,kayit_anahtari,dosya_yolu,belge_surumu_id,uretildi_at)"
+            " VALUES(?,?,?,?,?)",
+            (tur, kayit_anahtari, str(dosya_yolu), surum_id, simdi()))
+        vt.denetim_yaz(b, "evrak_kaydi", surum_id, "uretildi", tur)
+        return surum_id
+
+
+def evrak_gecmisi(vt: Veritabani, kayit_anahtari: str) -> list[tuple]:
+    """Bir plan için üretilmiş belgelerin sürüm geçmişi."""
+    with vt.baglan() as b:
+        return [tuple(r) for r in b.execute(
+            "SELECT tur,surum,sha256,olusturma_tarihi FROM belge_surumu"
+            " WHERE kayit_anahtari=? ORDER BY tur,surum", (kayit_anahtari,))]

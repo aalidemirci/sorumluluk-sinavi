@@ -18,6 +18,8 @@ tarafından elle yapılır.
    komisyon ve gözcüleri görevlendirir.
 5. Planı sürükle-bırakla düzenletir, çakışmaları gösterir, müdür onayıyla
    kesinleştirir.
+6. Sınav evrakını .docx olarak üretir ve sınav sonrası komisyondan geri
+   alınan evrakı izler.
 
 ## Ne yapmaz
 
@@ -25,6 +27,38 @@ Sınav sonrası işlemler kapsam dışıdır: sonuç ve puan girişi, itiraz, te
 ek sınav, diploma tarihi ve disiplin işlemleri **e-Okul'da** yürütülür. Ek ders
 ücreti hesaplanmaz; uygulama yalnız Karar md.12/2-a'daki 12 komisyon / 15
 gözcülük sınırı için görev sayacı tutar, tutar hesabı MYS'de yapılır.
+
+## Üretilen evrak
+
+Belgeler şablon dosyasından değil koddan üretilir; sayfa düzeni tek yerde
+tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
+
+| Belge | İçerik |
+|---|---|
+| Sınav programı (öğrenci nüshası) | Tarih, saat, ders, süre, salon |
+| Sınav programı (görevli nüshası) | Yukarıdakiler + komisyon ve gözcüler |
+| Görevlendirme oluru | Kişi × sınav × rol, müdür OLUR bloğuyla |
+| Komisyon tutanakları | Oturum başına ayrı sayfa, imza satırları |
+| Yoklama / salon listeleri | Salon başına öğrenci listesi ve imza sütunu |
+| Kâğıt sarf tutanakları | Teslim alınan / kullanılan / iade sayıları |
+| Öğretmen görev sayacı | Komisyon ve gözcülük sayıları, 12/15 durumu |
+| Evrak teslim tutanağı | Teslim-tesellüm çizelgesi ve gecikme uyarısı |
+
+Her belgenin altında dayanağı yazılıdır. Belgeler EBYS/DYS kayıt numarası ve
+güvenli elektronik imza ibaresi üretmez; okulun kendi kayıtlarından hazırlanmış
+çıktılardır.
+
+Sürüm takibi belge *içeriğinin* özetine bağlıdır: aynı içerik yeniden
+üretilirse yeni sürüm açılmaz, plan değişip belge farklılaşırsa sürüm numarası
+artar ve hangi çıktının hangi içerikten geldiği izlenebilir.
+
+## Evrak teslim takibi
+
+Sınav sonrası komisyondan geri alınması beklenen evrak — sınav kâğıtları,
+komisyon tutanağı ve yoklama listesi — oturum başına izlenir. Teslim süresi
+sınav tarihini izleyen ilk iş günüdür; süresinde gelmeyen evrak çizelgede
+kırmızı görünür. Evrakı teslim eden komisyon üyesi ile teslim alan görevlinin
+aynı kişi olması engellenir (TS-03).
 
 ## Planlama motoru
 

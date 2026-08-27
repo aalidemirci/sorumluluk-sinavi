@@ -42,6 +42,8 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
    öğretmeni olmayan bir branş gerekiyorsa branş havuzuna elle ekleyin.
 6. **Sınav Planı** — parametreleri seçin, isterseniz önce **Yükü çözümle** ile
    gün seçeneklerinin sonucunu görün, sonra **Planı üret**.
+7. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
+   sonra geri alınan evrakı teslim çizelgesine işleyin.
 
 ## Plan ekranı
 
@@ -57,6 +59,18 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
 Alt paneldeki liste kural ihlallerini gösterir: kırmızı satırlar engel,
 sarı satırlar uyarıdır. Engelli plan taslak olarak kaydedilebilir ama
 kesinleştirilemez.
+
+## Evrak ve teslim ekranı
+
+**Evrak üretimi** sekmesinde üretmek istediğiniz belgeleri işaretleyip klasör
+seçersiniz; belgeler .docx olarak oraya yazılır. Aynı içerik yeniden
+üretilirse sürüm numarası artmaz.
+
+**Teslim çizelgesi** sekmesinde her oturum için beklenen evrak listelenir.
+Bir satırı seçip teslim eden ile teslim alan görevliyi ve varsa adedi girerek
+**Seçili evrakı teslim al** düğmesine basın. Teslim eden ile alan aynı kişi
+olamaz. Yeşil satır teslim alınmış, kırmızı satır süresinde gelmemiş evrakı
+gösterir; teslim süresi sınav tarihini izleyen ilk iş günüdür.
 
 ## Yedekleme
 

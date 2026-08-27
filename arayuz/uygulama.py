@@ -24,6 +24,7 @@ from veri import hizmet
 from veri.hizmet import HizmetHatasi
 from veri.rapor_okuma import RaporHatasi
 from veri.veritabani import Veritabani
+from evrak import uretici
 from .takvim import SurukleBirakTakvim
 
 
@@ -40,6 +41,7 @@ ADIMLAR = (
     ("04", "e-Okul Sorumluluk", "OOK12001R010 sorumluluk raporu"),
     ("05", "Ders / Branş", "Alan eşleştirme ve iki aşamalı dersler"),
     ("06", "Sınav Planı", "Plan üretme, düzenleme ve kesinleştirme"),
+    ("07", "Evrak ve Teslim", "Belge üretimi ve sınav evrakının teslim takibi"),
 )
 
 AYAR_ALANLARI = (
@@ -188,7 +190,8 @@ class Uygulama:
                   background=RENK["zemin"], foreground=RENK["soluk"],
                   font=("Segoe UI", 9)).pack(anchor="w", pady=(1, 12))
         (self._sayfa_kurum, self._sayfa_personel, self._sayfa_salon,
-         self._sayfa_sorumluluk, self._sayfa_ders, self._sayfa_plan)[sira]()
+         self._sayfa_sorumluluk, self._sayfa_ders, self._sayfa_plan,
+         self._sayfa_evrak)[sira]()
 
     # --------------------------------------------------------- yardımcılar
 
@@ -851,3 +854,196 @@ class Uygulama:
             "Plan kesinleşti",
             "Plan müdür onayıyla kesinleşti ve oturumlar kilitlendi.")
         self._sayfa_goster(5)
+
+    # ==================================================== 07 evrak ve teslim
+
+    def _sayfa_evrak(self) -> None:
+        try:
+            pencereler = hizmet.pencereleri_getir(self.vt)
+        except HizmetHatasi as hata:
+            kart = self._kart("Evrak ve teslim")
+            ttk.Label(kart, text=str(hata), style="Kart.TLabel",
+                      foreground=RENK["engel"]).pack(anchor="w", padx=15, pady=20)
+            return
+
+        kart = self._kart()
+        ust = tk.Frame(kart, bg=RENK["kart"])
+        ust.pack(fill=X, padx=15, pady=(12, 4))
+        ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
+        self.evrak_pencere = ttk.Combobox(ust, state="readonly", width=10,
+                                          values=list(pencereler))
+        self.evrak_pencere.current(0)
+        self.evrak_pencere.pack(side=LEFT, padx=6)
+        self.evrak_durum = ttk.Label(ust, text="", style="Soluk.TLabel")
+        self.evrak_durum.pack(side=LEFT, padx=12)
+
+        defter = ttk.Notebook(kart)
+        defter.pack(fill=BOTH, expand=True, padx=15, pady=(4, 12))
+        uretim = tk.Frame(defter, bg=RENK["kart"])
+        teslim = tk.Frame(defter, bg=RENK["kart"])
+        defter.add(uretim, text="Evrak üretimi")
+        defter.add(teslim, text="Teslim çizelgesi")
+        self._evrak_uretim_sekmesi(uretim)
+        self._evrak_teslim_sekmesi(teslim)
+        self.evrak_pencere.bind("<<ComboboxSelected>>", lambda _e: self._sayfa_goster(6))
+        self._evrak_plani_bul()
+
+    def _evrak_plani_bul(self) -> int | None:
+        plan_id = hizmet.son_plani_getir(self.vt, self.evrak_pencere.get())
+        if plan_id is None:
+            self.evrak_durum.configure(
+                text="Bu pencerede kayıtlı plan yok. Önce Sınav Planı adımında planı kaydedin.",
+                foreground=RENK["engel"])
+        else:
+            ozet = hizmet.teslim_ozeti(self.vt, plan_id)
+            self.evrak_durum.configure(
+                text=f"Plan #{plan_id}  •  {ozet['teslim']}/{ozet['toplam']} evrak teslim alındı"
+                     + (f"  •  {ozet['gecikti']} gecikmiş" if ozet["gecikti"] else ""),
+                foreground=RENK["engel"] if ozet["gecikti"] else RENK["soluk"])
+        return plan_id
+
+    def _evrak_uretim_sekmesi(self, ana: tk.Frame) -> None:
+        ttk.Label(ana, text="Üretilecek evrakı seçin. Belgeler .docx olarak, "
+                            "seçtiğiniz klasöre yazılır.",
+                  style="Soluk.TLabel").pack(anchor="w", padx=12, pady=(10, 6))
+        self.evrak_secimleri = {}
+        kutu = tk.Frame(ana, bg=RENK["kart"])
+        kutu.pack(fill=X, padx=12)
+        for sira, evrak in enumerate(uretici.EVRAKLAR):
+            secim = tk.BooleanVar(value=True)
+            ttk.Checkbutton(kutu, text=evrak.ad, variable=secim).grid(
+                row=sira // 2, column=sira % 2, sticky="w", padx=(0, 30), pady=3)
+            self.evrak_secimleri[evrak.anahtar] = secim
+
+        alt = tk.Frame(ana, bg=RENK["kart"])
+        alt.pack(fill=X, padx=12, pady=12)
+        ttk.Button(alt, text="Klasör seç ve üret", style="Ana.TButton",
+                   command=self._evrak_uret).pack(side=LEFT)
+        ttk.Button(alt, text="Tümünü seç", style="Ikincil.TButton",
+                   command=lambda: [s.set(True) for s in self.evrak_secimleri.values()]
+                   ).pack(side=LEFT, padx=6)
+        ttk.Button(alt, text="Seçimi kaldır", style="Ikincil.TButton",
+                   command=lambda: [s.set(False) for s in self.evrak_secimleri.values()]
+                   ).pack(side=LEFT)
+
+        self.evrak_sonuc = self._tablo(ana, ("dosya", "ozet"),
+                                       ("Üretilen dosya", "İçerik özeti (SHA-256)"),
+                                       (360, 300), 8)
+
+    def _evrak_uret(self) -> None:
+        plan_id = self._evrak_plani_bul()
+        if plan_id is None:
+            messagebox.showwarning("Plan yok", "Önce Sınav Planı adımında planı kaydedin.")
+            return
+        secilenler = [a for a, s in self.evrak_secimleri.items() if s.get()]
+        if not secilenler:
+            messagebox.showwarning("Seçim yok", "En az bir evrak türü seçin.")
+            return
+        klasor = filedialog.askdirectory(title="Evrakın yazılacağı klasör")
+        if not klasor:
+            return
+        try:
+            self.kok.configure(cursor="watch")
+            self.kok.update_idletasks()
+            uretilenler = uretici.evrak_uret(self.vt, plan_id, Path(klasor), secilenler)
+        except (HizmetHatasi, OSError) as hata:
+            self._hata("Evrak üretilemedi", hata)
+            return
+        finally:
+            self.kok.configure(cursor="")
+        self.evrak_sonuc.delete(*self.evrak_sonuc.get_children())
+        for yol, ozet in uretilenler:
+            self.evrak_sonuc.insert("", END, values=(yol.name, ozet[:32] + "…"))
+        messagebox.showinfo("Evrak üretildi",
+                            f"{len(uretilenler)} belge şu klasöre yazıldı:\n{klasor}")
+
+    def _evrak_teslim_sekmesi(self, ana: tk.Frame) -> None:
+        ttk.Label(ana, text="Sınav sonrası komisyondan geri alınan evrak burada izlenir. "
+                            "Teslim süresi sınav tarihini izleyen ilk iş günüdür.",
+                  style="Soluk.TLabel").pack(anchor="w", padx=12, pady=(10, 4))
+        self.teslim_tablosu = self._tablo(
+            ana, ("sinav", "tarih", "evrak", "adet", "eden", "alan", "durum"),
+            ("Sınav", "Tarih", "Evrak", "Adet", "Teslim eden", "Teslim alan", "Durum"),
+            (200, 80, 150, 55, 140, 140, 100), 11)
+        self.teslim_tablosu.tag_configure("gecikti", background="#FFE6E6")
+        self.teslim_tablosu.tag_configure("teslim alındı", background="#E8F6EF")
+
+        form = tk.Frame(ana, bg=RENK["kart"])
+        form.pack(fill=X, padx=12, pady=(0, 6))
+        personel = [p for p in hizmet.personelleri_getir(self.vt)]
+        secenekler = [f"{p.kimlik} | {p.ad}" for p in personel]
+        ttk.Label(form, text="Teslim eden", style="Kart.TLabel").pack(side=LEFT)
+        self.teslim_eden = ttk.Combobox(form, state="readonly", width=26, values=secenekler)
+        self.teslim_eden.pack(side=LEFT, padx=5)
+        ttk.Label(form, text="Teslim alan", style="Kart.TLabel").pack(side=LEFT)
+        self.teslim_alan = ttk.Combobox(form, state="readonly", width=26, values=secenekler)
+        self.teslim_alan.pack(side=LEFT, padx=5)
+        ttk.Label(form, text="Adet", style="Kart.TLabel").pack(side=LEFT)
+        self.teslim_adet = ttk.Entry(form, width=6)
+        self.teslim_adet.pack(side=LEFT, padx=5)
+
+        alt = tk.Frame(ana, bg=RENK["kart"])
+        alt.pack(fill=X, padx=12, pady=(0, 12))
+        ttk.Label(alt, text="Açıklama", style="Kart.TLabel").pack(side=LEFT)
+        self.teslim_aciklama = ttk.Entry(alt, width=44)
+        self.teslim_aciklama.pack(side=LEFT, padx=5)
+        ttk.Button(alt, text="Seçili evrakı teslim al", style="Ana.TButton",
+                   command=self._teslim_kaydet).pack(side=LEFT, padx=8)
+        ttk.Button(alt, text="Teslimi geri al", style="Ikincil.TButton",
+                   command=self._teslim_geri_al).pack(side=LEFT)
+        self._teslim_tazele()
+
+    def _teslim_tazele(self) -> None:
+        plan_id = self._evrak_plani_bul()
+        self.teslim_tablosu.delete(*self.teslim_tablosu.get_children())
+        self.teslim_satirlari = []
+        if plan_id is None:
+            return
+        self.teslim_satirlari = hizmet.teslim_cizelgesi(self.vt, plan_id)
+        for sira, satir in enumerate(self.teslim_satirlari):
+            durum = satir.durum()
+            self.teslim_tablosu.insert(
+                "", END, iid=str(sira),
+                values=(satir.oturum_etiketi, satir.tarih.strftime("%d.%m.%Y"),
+                        satir.evrak_adi, "" if satir.adet is None else satir.adet,
+                        satir.teslim_eden, satir.teslim_alan, durum),
+                tags=(durum,))
+
+    def _secili_teslim(self):
+        if not self.teslim_tablosu.selection():
+            messagebox.showwarning("Seçim yok", "Çizelgeden bir evrak satırı seçin.")
+            return None
+        return self.teslim_satirlari[int(self.teslim_tablosu.selection()[0])]
+
+    def _teslim_kaydet(self) -> None:
+        satir = self._secili_teslim()
+        if satir is None:
+            return
+        try:
+            if not self.teslim_eden.get() or not self.teslim_alan.get():
+                raise HizmetHatasi("Teslim eden ve teslim alan görevliyi seçin.")
+            adet_metni = self.teslim_adet.get().strip()
+            hizmet.teslim_kaydet(
+                self.vt, satir.oturum_id, satir.evrak_turu,
+                int(self.teslim_eden.get().split(" | ")[0]),
+                int(self.teslim_alan.get().split(" | ")[0]),
+                int(adet_metni) if adet_metni else None,
+                self.teslim_aciklama.get())
+        except (HizmetHatasi, ValueError) as hata:
+            self._hata("Teslim kaydedilemedi", hata)
+            return
+        self._teslim_tazele()
+
+    def _teslim_geri_al(self) -> None:
+        satir = self._secili_teslim()
+        if satir is None:
+            return
+        if not satir.teslim_edildi_mi:
+            messagebox.showinfo("Kayıt yok", "Bu evrak için teslim kaydı bulunmuyor.")
+            return
+        try:
+            hizmet.teslim_geri_al(self.vt, satir.oturum_id, satir.evrak_turu)
+        except HizmetHatasi as hata:
+            self._hata("Teslim geri alınamadı", hata)
+            return
+        self._teslim_tazele()
