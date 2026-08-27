@@ -120,3 +120,37 @@ def test_veri_varken_goc_oncesi_yedek_alinir(tmp_path: Path) -> None:
         b.execute("INSERT INTO salon(ad,ad_anahtari,kapasite) VALUES('A-101','a-101',30)")
     assert veritabani._yedekle("deneme") is not None
     assert len(list(tmp_path.glob("*.yedek"))) == 1
+
+
+def test_baska_uygulamanin_veritabani_reddedilir(tmp_path: Path) -> None:
+    """Önceki sürümün veritabanı aynı klasörde durabilir. Göç sayacı uyuştuğu
+    için şema kurulu sanılırsa uygulama sonradan 'no such table' ile çöker."""
+    from veri.veritabani import VeritabaniUyumsuz
+    yabanci = tmp_path / "sorumluluk.db"
+    b = sqlite3.connect(yabanci)
+    b.execute("CREATE TABLE uygulama_ayari(anahtar TEXT, deger TEXT)")
+    b.execute("PRAGMA user_version=6")
+    b.commit()
+    b.close()
+
+    veritabani = Veritabani(yabanci)
+    with pytest.raises(VeritabaniUyumsuz, match="bu uygulamaya ait değil"):
+        veritabani.gocleri_uygula()
+    # Yabancı dosyaya dokunulmamış olmalı.
+    b = sqlite3.connect(yabanci)
+    try:
+        assert b.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert b.execute(
+            "SELECT count(*) FROM sqlite_master WHERE name='uygulama_ayari'").fetchone()[0] == 1
+    finally:
+        b.close()
+
+
+def test_kendi_veritabanimiz_imzalanir(tmp_path: Path) -> None:
+    from veri.veritabani import UYGULAMA_KIMLIGI
+    veritabani = Veritabani(tmp_path / "sorumluluk.db")
+    veritabani.gocleri_uygula()
+    with veritabani.baglan() as b:
+        assert int(b.execute("PRAGMA application_id").fetchone()[0]) == UYGULAMA_KIMLIGI
+    # İkinci açılışta uyum denetimi sorun çıkarmamalı.
+    assert veritabani.gocleri_uygula() == 0

@@ -12,12 +12,22 @@ from zoneinfo import ZoneInfo
 
 ISTANBUL = ZoneInfo("Europe/Istanbul")
 
+# SQLite başlığındaki application_id alanına yazılan imza. Bir veritabanı
+# dosyasının bu uygulamaya ait olup olmadığı bununla anlaşılır; başka bir
+# uygulamanın (ör. önceki sürümün) dosyası yanlışlıkla açılıp göç sayacı
+# uyuştuğu için "şema kurulu" sanılmaz.
+UYGULAMA_KIMLIGI = 0x534F5250  # "SORP"
+
 # Başka bir işlem yazarken kilit beklemesi; süresiz asılı kalmayı önler.
 MESGUL_ZAMAN_ASIMI_SN = 15.0
 
 
 def simdi() -> str:
     return datetime.now(ISTANBUL).isoformat(timespec="seconds")
+
+
+class VeritabaniUyumsuz(RuntimeError):
+    """Dosya bu uygulamaya ait değil ya da şeması tanınmıyor."""
 
 
 class Veritabani:
@@ -50,9 +60,36 @@ class Veritabani:
         with self.baglan() as b:
             return int(b.execute("PRAGMA user_version").fetchone()[0])
 
+    def _kimlik_ve_tablo_sayisi(self) -> tuple[int, int]:
+        with self.baglan() as b:
+            kimlik = int(b.execute("PRAGMA application_id").fetchone()[0])
+            tablo = int(b.execute(
+                "SELECT count(*) FROM sqlite_master WHERE type='table'"
+                " AND name NOT LIKE 'sqlite_%'").fetchone()[0])
+        return kimlik, tablo
+
+    def uyumu_denetle(self) -> None:
+        """Dosya başka bir uygulamaya aitse anlaşılır bir hata verir.
+
+        Önceki sürümlerin veritabanı aynı klasörde durabilir. Göç sayacı
+        uyuştuğu için şema kurulu sanılırsa uygulama sonradan "no such table"
+        ile çöker; bunun yerine burada durdurup ne yapılacağını söyleriz.
+        """
+        if not self.yol.exists() or not self.yol.stat().st_size:
+            return
+        kimlik, tablo_sayisi = self._kimlik_ve_tablo_sayisi()
+        if tablo_sayisi and kimlik != UYGULAMA_KIMLIGI:
+            raise VeritabaniUyumsuz(
+                f"{self.yol} dosyası bu uygulamaya ait değil.\n\n"
+                "Aynı klasörde başka bir sürümün veritabanı bulunuyor olabilir. "
+                "Dosyayı başka bir yere taşıyın ya da uygulamayı "
+                "SORUMLULUK_VERI_KLASORU ortam değişkeniyle farklı bir klasöre "
+                "yönlendirin. Mevcut dosya silinmedi.")
+
     def gocleri_uygula(self, goc_klasoru: Path | None = None) -> int:
         """Bekleyen göçleri sırayla uygular ve uygulanan göç sayısını döndürür."""
         klasor = goc_klasoru or Path(__file__).with_name("gocler")
+        self.uyumu_denetle()
         mevcut = self.surum()
         uygulanan = 0
         for dosya in sorted(klasor.glob("[0-9][0-9][0-9]_*.sql")):
@@ -65,7 +102,11 @@ class Veritabani:
             try:
                 # executescript kendi COMMIT'ini attığı için göç ve sürüm
                 # damgası tek betikte, açık BEGIN/COMMIT ile uygulanır.
-                baglanti.executescript(f"BEGIN;\n{sql}\nPRAGMA user_version={hedef};\nCOMMIT;")
+                baglanti.executescript(
+                    f"BEGIN;\n{sql}\n"
+                    f"PRAGMA user_version={hedef};\n"
+                    f"PRAGMA application_id={UYGULAMA_KIMLIGI};\n"
+                    "COMMIT;")
             except Exception:
                 baglanti.rollback()
                 raise

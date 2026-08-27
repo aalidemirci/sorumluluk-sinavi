@@ -55,13 +55,19 @@ AYAR_ALANLARI = (
 
 
 def veri_klasoru() -> Path:
+    """Veritabanının bulunduğu klasör.
+
+    Alt klasör adı bilinçli olarak "plan": önceki sürümün veritabanı
+    `…/SorumlulukSinavi/veri` altındadır ve şeması bununla uyuşmaz. Ayrı
+    klasör, eski dosyaya hiç dokunmadan yan yana durmayı sağlar.
+    """
     ozel = os.environ.get("SORUMLULUK_VERI_KLASORU")
     if ozel:
         return Path(ozel)
     if os.name == "nt":
         taban = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-        return taban / "SorumlulukSinavi" / "veri"
-    return Path.home() / ".local" / "share" / "sorumluluk-sinavi"
+        return taban / "SorumlulukSinavi" / "plan"
+    return Path.home() / ".local" / "share" / "sorumluluk-sinavi" / "plan"
 
 
 class Uygulama:
