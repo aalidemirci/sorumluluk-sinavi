@@ -1,33 +1,107 @@
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 .venv/
+venv/
 
+# ---------------------------------------------------------------------------
 # Yapım çıktıları
+# ---------------------------------------------------------------------------
 /build/
 /dist/
 /dist-kurulum/
 
-# Yerel veritabanı ve günlükler.
+# ---------------------------------------------------------------------------
+# Gizli anahtarlar
+# ---------------------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Yerel veritabanı ve günlükler
+#
 # DİKKAT: burada "veri/" YAZMAYIN — o, uygulamanın kaynak paketidir.
-# Çalışma zamanı verisi %LOCALAPPDATA% / ~/.local/share altındadır, depoda değildir.
+# Çalışma zamanı verisi %LOCALAPPDATA%\SorumlulukSinavi\plan altındadır,
+# depoda değildir. Buradaki kurallar, biri veritabanını yanlışlıkla depoya
+# kopyalarsa diye ikinci savunma hattıdır.
+# ---------------------------------------------------------------------------
 *.db
 *.db-wal
 *.db-shm
 *.db.goc-oncesi-*
+*.yedek
 *.log
 
-# Gerçek kişi verisi içerebilecek dosyalar (KVKK).
-# Testlerin anonim örnekleri testler/veri/ altında ve beyaz listede.
+# ---------------------------------------------------------------------------
+# KVKK: gerçek kişi verisi taşıyabilecek dosyalar
+#
+# Öğrenci, veli ve personel verisi hiçbir koşulda depoya girmez. Kural
+# biçim bazlıdır: e-Okul raporları, üretilen evrak, dışa aktarımlar, yedekler
+# ve ekran görüntüleri baştan yoksayılır. Gerçekten izlenmesi gereken birkaç
+# dosya aşağıda tek tek beyaz listeye alınmıştır.
+# ---------------------------------------------------------------------------
 *.xls
 *.xlsx
+*.xlsm
 *.csv
+*.tsv
+*.doc
 *.docx
+*.odt
+*.ods
+*.ppt
+*.pptx
+*.pdf
+*.rtf
+*.zip
+*.rar
+*.7z
+*.json
+
+# Ekran görüntüsü ve fotoğraf: içinde ad, numara, not görünebilir.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+
+# Kuruma özel şablonlar; içeriği kurumun kendi verisidir.
+/sablonlar/ozel/
+
+# Gerçek veriyle denemek için yerel çalışma alanı. Depoya asla girmez.
+/yerel/
+
+# ---------------------------------------------------------------------------
+# Beyaz liste — yukarıdaki geniş kuralların istisnaları
+#
+# Yeni bir istisna eklerken: dosyanın gerçek kişi verisi içermediğinden emin
+# olun ve testler/test_gizlilik.py listesini de güncelleyin.
+# ---------------------------------------------------------------------------
+# Uygulama simgesi ve evrak logosu koddan üretilir ama pakete girmesi gerekir.
+!varliklar/
+!varliklar/**
+# Testlerin anonim e-Okul rapor örnekleri (uydurma ad ve numaralar).
+!testler/veri/
 !testler/veri/*.xlsx
 !testler/veri/*.csv
+# Fabrika çıkışı boş belge şablonları.
+!sablonlar/fabrika/
 !sablonlar/fabrika/*.docx
 
-# Logo koddan uretilir ama pakete girmesi gerekir; depoda tutulur.
-!varliklar/*
+# ---------------------------------------------------------------------------
+# Düzenleyici ve işletim sistemi
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
