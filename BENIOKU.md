@@ -239,3 +239,14 @@ python -m venv .venv
 .venv/Scripts/python -m pytest
 .venv/Scripts/python sorumluluk_sinavi.py
 ```
+
+Kurulum ve paketleme KURULUM.md'de anlatılır.
+
+### Proje belgeleri
+
+| Dosya | İçerik |
+|---|---|
+| `CLAUDE.md` | Projede çalışırken uyulacak kurallar, değişmezler, katman düzeni |
+| `CHANGELOG.md` | Sürüm sürüm değişiklik günlüğü |
+| `PLAN.md` | Açık işler, takvime bağlı zorunluluklar, kapsam dışı konular |
+| `kararlar/` | Mimari karar kayıtları: neyin neden öyle olduğu |
