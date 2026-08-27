@@ -29,13 +29,23 @@ BOLUMLER = [
     (
         "Bu program ne yapar, ne yapmaz",
         [
-            "Program, e-Okul'dan aldığınız iki raporu okuyup sorumluluk sınavlarının "
-            "takvimini kurar, komisyon ve gözcüleri görevlendirir, evrakı üretir ve sınav "
-            "sonrası geri alınan evrakı izler.",
-            "Sınav sonrası işlemler kapsam dışıdır: sonuç ve puan girişi, itiraz, telafi, "
-            "ek sınav, diploma tarihi ve disiplin işlemleri e-Okul'da yürütülür. Ek ders "
-            "ücreti tutarı hesaplanmaz; yalnız görev sayacı tutulur, tahakkuk yetkili "
-            "sistemde yapılır.",
+            "Program şunları yapar:",
+            "• e-Okul OOK01001R1 personel ve OOK12001R010 sorumluluk raporlarını okur,",
+            "• sınav takvimini kurar; oturumları güne, saate ve salona yerleştirir,",
+            "• komisyon üyelerini ve gözcüleri görevlendirir, yükü öğretmenler arasında "
+            "üç dönem boyunca dengeler,",
+            "• sınav programı, görevlendirme çizelgesi, görev sayacı raporu ve web "
+            "sayfasında yayımlanacak iki ilan çizelgesi üretir,",
+            "• sınav sonrası komisyondan geri alınan evrakın teslim alınıp alınmadığını "
+            "izler.",
+            "Program şunları YAPMAZ; bunlar e-Okul'da ve okul müdürlüğünce yürütülür:",
+            "• sınav sonucu ve puan girişi, sorumluluğun kalkması,",
+            "• sonuç itirazı, telafi sınavı, tek ders ek sınavı,",
+            "• diploma tarihi hesabı, disiplin ve kopya işlemleri,",
+            "• ek ders ücreti tutarının hesaplanması ve tahakkuku. Program yalnız görev "
+            "sayacı tutar; tutar hesabı yetkili sistemde yapılır.",
+            "• komisyon tutanağı, yoklama/salon listesi ve kâğıt sarf tutanağı üretimi — "
+            "bunlar e-Okul'dan alınır.",
             "Program hiçbir ağ isteği yapmaz. e-Okul, MEBBİS ya da başka bir sisteme "
             "bağlanmaz, kullanıcı adı veya şifre istemez. Yalnız sizin dışa aktardığınız "
             "dosyaları okur.",
@@ -110,18 +120,25 @@ BOLUMLER = [
         ],
     ),
     (
-        "Diğer hükümler",
+        "Program dışında kalan hükümler",
         [
-            "Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı "
+            "Aşağıdaki hükümler sorumluluk sınavlarıyla ilgilidir ama programın işlemediği "
+            "konulardır; burada başvuru kolaylığı için yer alır. Bu işleri e-Okul'da ya da "
+            "okul müdürlüğü kayıtlarında yürütürsünüz.",
+            "• Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı "
             "yapıldığı hâlde okula veya sınavlara katılımları sağlanamayan öğrenciler, "
             "sınav tarihinden 5 iş günü öncesine kadar yazılı talepte bulunmaları hâlinde "
-            "plana dâhil edilir. (OKY md.58/2-d)",
-            "Bir dersin sorumluluğu, o dersin sorumluluk sınavından en az 50 puan alınması "
-            "hâlinde kalkar. Bu işlem e-Okul'da yapılır. (OKY md.58/4)",
-            "Sorumluluk sınavlarına girenler için diploma tarihi, sınavların bitimini takip "
-            "eden ilk iş günüdür. (OKY md.43/2-b)",
-            "Okulda yapılan sınavlar, cevaplarını öğrencilerin oluşturduğu yazılı yoklama "
+            "plana dâhil edilir. Programın bu talepler için bir kaydı yoktur; talebi alan "
+            "öğrenciyi e-Okul listesine dâhil edip raporu yeniden aktarırsınız. "
+            "(OKY md.58/2-d)",
+            "• Bir dersin sorumluluğu, o dersin sorumluluk sınavından en az 50 puan "
+            "alınması hâlinde kalkar. (OKY md.58/4)",
+            "• Sorumluluk sınavlarına girenler için diploma tarihi, sınavların bitimini "
+            "takip eden ilk iş günüdür. (OKY md.43/2-b)",
+            "• Okulda yapılan sınavlar, cevaplarını öğrencilerin oluşturduğu yazılı yoklama "
             "biçimindedir. (ÖDY md.5/1-g)",
+            "• Kaynaştırma/bütünleştirme yoluyla eğitim gören öğrencinin başarısı BEP'teki "
+            "amaçlara göre değerlendirilir. (ÖDY md.5/1-n)",
         ],
     ),
     E_OKUL_INDIRME,
@@ -143,8 +160,9 @@ BOLUMLER = [
             "• 06 Sınav Planı — parametreleri seçin, isterseniz önce 'Yükü çözümle' ile "
             "sonucu görün, sonra planı üretin. Sürükle-bırakla düzeltip kaydedin, müdür "
             "onayıyla kesinleştirin.",
-            "• 07 Evrak ve Teslim — belgeleri üretin; sınavlardan sonra geri alınan evrakı "
-            "çizelgeye işleyin.",
+            "• 07 Evrak ve Teslim — altı belgeyi üretin; sınavlardan sonra komisyondan "
+            "geri alınan evrakı çizelgeye işleyin.",
+            "• 08 Yardım, 09 Lisans — bu sayfa ve program bilgisi.",
         ],
     ),
     (

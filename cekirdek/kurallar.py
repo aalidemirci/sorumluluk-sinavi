@@ -36,9 +36,6 @@ SALON_OGRENCI_UST_SINIRI = 30
 # OKY md.58/2-a: iki sınav öğretmeni (en az biri alan öğretmeni).
 KOMISYON_UYE_SAYISI = 2
 
-# OKY md.58/2-d: yazılı talep sınavdan en az 5 iş günü önce verilmelidir.
-TALEP_ONCE_IS_GUNU = 5
-
 # Karar md.12/2-a: bir öğretim yılında bir kişiye 12'den fazla komisyon
 # üyeliği ve 15'ten fazla gözcülük için ücret ödenmez.
 YILLIK_KOMISYON_SINIRI = 12
@@ -93,23 +90,20 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
     _k("SP-06", "İki aşamalı dersler", "OKY md.58/2-e (Ek:RG-22/2/2025-32821)", Ciddiyet.ENGEL,
        "Türk dili ve edebiyatı ile yabancı dil derslerinin sorumluluk sınavları yazılı ve "
        "uygulamalı olarak iki aşamada yapılır. Komisyonların aynı üyelerden oluşturulması esastır."),
-    _k("SP-07", "Yazılı talep süresi", "OKY md.58/2-d (Ek:RG-8/9/2023-32303)", Ciddiyet.UYARI,
-       "Mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı yapılan öğrenciler, "
-       "sınav tarihinden 5 iş günü öncesine kadar yazılı talepte bulunurlarsa plana dâhil edilir."),
     _k("SP-10", "Sınav süresi", "ÖDY md.5/1-l", Ciddiyet.ENGEL,
        "Zorunlu hâller dışında yazılı sınav süresi bir ders saatini aşamaz."),
     _k("SP-11", "Günlük sınav sayısı", "ÖDY md.5/1-k", Ciddiyet.UYARI,
        "Bir günde yapılacak yazılı ve uygulamalı sınavların sayısının ikiyi geçmemesi esastır; "
        "zorunlu hâllerde bir sınav daha yapılabilir. Uygulama, sınırı öğrenci başına uygular."),
-    _k("SP-12", "Yazılı yoklama biçimi", "ÖDY md.5/1-g", Ciddiyet.BILGI,
-       "Okulda yapılan sınavlar, cevaplarını öğrencilerin oluşturduğu yazılı yoklama biçimindedir."),
-    _k("SP-14", "BEP değerlendirme notu", "ÖDY md.5/1-n", Ciddiyet.UYARI,
-       "Kaynaştırma/bütünleştirme yoluyla eğitim gören öğrencinin başarısı BEP'teki amaçlara "
-       "göre değerlendirilir; süre ve okuyucu kuralı bu programdan türetilmez."),
-
     # --- EK: görev sayacı (parasal hesap yok) -----------------------------
     _k("EK-03", "Aynı sınavda çifte rol yok", "Karar md.12/2-b", Ciddiyet.ENGEL,
        "Bir sınavda aynı kişiye hem komisyon üyeliği hem gözcülük verilemez."),
+
+    # --- Davranışı belgeleyen kurallar (ihlal üretmez) ---------------------
+    # Bunlar denetim değil, programın verdiği kararın dayanağıdır. SG-05 kayıt
+    # kaynağını ayrı tutar (sorumluluk_kaydi.kaynak), SG-06 tavan aşımını hata
+    # saymaz (içe aktarma tavan denetlemez), EK-04 yönetici görevini ücretsiz
+    # işaretler (gorevlendirme.ucretlendirilebilir_mi).
     _k("EK-04", "Yönetici görevi ücretsizdir", "Karar md.12/2-c", Ciddiyet.BILGI,
        "Yöneticiler görevlendirilebilir fakat sınav görevi için ücret ödenmez. Bu program "
        "tutar hesaplamaz; yalnız görevi ücretsiz olarak işaretler."),

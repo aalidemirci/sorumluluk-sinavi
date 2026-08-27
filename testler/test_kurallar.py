@@ -32,8 +32,7 @@ def test_her_kuralin_dayanagi_ve_ciddiyeti_vardir() -> None:
 def test_kural_kimlikleri_beklenen_kumedir() -> None:
     assert set(KURALLAR) == {
         "SG-05", "SG-06",
-        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-07",
-        "SP-10", "SP-11", "SP-12", "SP-14",
+        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-10", "SP-11",
         "EK-03", "EK-04", "EK-05",
         "TS-01", "TS-02", "TS-03",
     }
@@ -347,3 +346,30 @@ def test_ihlaller_once_engel_sonra_uyari_siralanir() -> None:
 
 def test_kurallar_bos_planda_ihlal_uretmez() -> None:
     assert dogrula_plan(plan([]), baglam()) == []
+
+
+def test_her_kural_ya_denetlenir_ya_bilgidir() -> None:
+    """Kayıtlı ama hiçbir şey yapmayan kural bırakılmaz.
+
+    Bir kural ya doğrulayıcıda ihlal üretir, ya servis katmanında uygulanır,
+    ya da açıkça BİLGİ düzeyindedir (programın verdiği kararı belgeler).
+    Bu üçünden birine girmeyen kural, yapılmayan bir denetimi yapılıyor gibi
+    gösterir; eski sürümde 41 kuralın çoğu böyleydi.
+    """
+    import ast
+    import pathlib
+
+    kaynak = pathlib.Path("cekirdek/kurallar.py").read_text(encoding="utf-8")
+    ureten = {
+        dugum.args[0].value
+        for dugum in ast.walk(ast.parse(kaynak))
+        if isinstance(dugum, ast.Call)
+        and getattr(dugum.func, "id", "") == "ihlal"
+        and dugum.args and isinstance(dugum.args[0], ast.Constant)
+    }
+    servis = pathlib.Path("veri/hizmet.py").read_text(encoding="utf-8")
+    uygulanan = {k for k in KURALLAR if k in servis}
+    bilgi = {k for k, t in KURALLAR.items() if t.ciddiyet is Ciddiyet.BILGI}
+
+    acikta = sorted(set(KURALLAR) - ureten - uygulanan - bilgi)
+    assert not acikta, f"Bu kurallar hiçbir şey denetlemiyor: {acikta}"

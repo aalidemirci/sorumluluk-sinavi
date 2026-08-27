@@ -152,11 +152,8 @@ geçer.
 | SP-04 düzey birleştirme (30 sınırı) | OKY md.58/2-c |
 | SP-05 hafta sonu ve müdür onayı | OKY md.58/2-ç |
 | SP-06 iki aşamalı dersler | OKY md.58/2-e |
-| SP-07 yazılı talep süresi | OKY md.58/2-d |
 | SP-10 sınav süresi | ÖDY md.5/1-l |
 | SP-11 günlük sınav sayısı | ÖDY md.5/1-k |
-| SP-12 yazılı yoklama biçimi | ÖDY md.5/1-g |
-| SP-14 BEP değerlendirme notu | ÖDY md.5/1-n |
 | EK-03 aynı sınavda çifte rol yok | Karar md.12/2-b |
 | EK-04 yönetici görevi ücretsizdir | Karar md.12/2-c |
 | EK-05 yıllık görev sayacı | Karar md.12/2-a |
