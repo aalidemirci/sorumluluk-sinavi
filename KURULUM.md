@@ -2,7 +2,8 @@
 
 ## Kurulum (Windows)
 
-`dist-kurulum/SorumlulukSinavi-Kurulum-0.3.0.exe` dosyasını çalıştırın.
+`dist-kurulum/` klasöründeki `SorumlulukSinavi-Kurulum-<sürüm>.exe`
+dosyasını çalıştırın.
 
 - Kurulum **kullanıcı başınadır**: yönetici hakkı istemez, Program Files'a
   yazmaz. Varsayılan yer `%LOCALAPPDATA%\SorumlulukSinavi\uygulama`.
@@ -136,3 +137,14 @@ Gerçek veriyi e-posta, kişisel bulut veya Git deposuna koymayın.
 
 Pakete `veri/gocler/*.sql` ve `tzdata` girmek zorundadır: ilki şemayı kurar,
 ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta çözülemez.
+
+### Sürüm yükseltmek
+
+Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
+Arayüzdeki hakkında penceresi, `pyproject.toml` ve Inno Setup betiği bu
+değeri oradan okur; başka hiçbir dosyada elle yazmayın.
+
+Inno Setup betiği `surum.py`'yi Python olarak çalıştıramaz, satırı **metin
+olarak** ayrıştırır. Bu yüzden satırın biçimi (`SURUM = "x.y.z"`, tek satır,
+çift tırnak, sonunda yorum yok) sözleşmenin parçasıdır ve
+`testler/test_surum.py` tarafından korunur.

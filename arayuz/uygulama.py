@@ -21,6 +21,7 @@ from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 from cekirdek.kaynak import varlik_yolu
 from cekirdek.modeller import IkiAsamaliSayim, PlanParametreleri
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
+from cekirdek.surum import SURUM
 from cekirdek.takvim import pencere_adi
 from veri import hizmet
 from veri.hizmet import HizmetHatasi
@@ -60,9 +61,6 @@ AYAR_ALANLARI = (
     ("ikinci_donem_baslangic", "2. dönem başlangıcı (YYYY-AA-GG)"),
     ("ikinci_donem_bitis", "2. dönem bitişi (YYYY-AA-GG)"),
 )
-
-
-SURUM = "0.3.0"
 
 
 def veri_klasoru() -> Path:

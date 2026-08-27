@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sorumluluk-sinavi"
-version = "0.3.0"
+# Sürüm tek yerde: cekirdek/surum.py
+dynamic = ["version"]
 description = "Çevrimdışı sorumluluk sınavı planlama ve görevlendirme uygulaması"
 requires-python = ">=3.11"
 dependencies = [
@@ -21,6 +22,9 @@ build-windows = ["pyinstaller>=6,<7"]
 
 [project.scripts]
 sorumluluk-sinavi = "sorumluluk_sinavi:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "cekirdek.surum.SURUM"}
 
 [tool.setuptools]
 py-modules = ["sorumluluk_sinavi"]

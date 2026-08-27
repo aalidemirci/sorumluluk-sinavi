@@ -10,7 +10,26 @@
 ;   python -m PyInstaller SorumlulukSinavi.spec --noconfirm
 
 #define Ad          "Sorumluluk Sınavı"
-#define Surum       "0.3.0"
+
+; Sürüm tek kaynaktan okunur: cekirdek/surum.py içindeki
+;   SURUM = "x.y.z"
+; satırı ayrıştırılır. Burada elle sürüm yazmayın.
+#define SurumDosyasi AddBackslash(SourcePath) + "..\cekirdek\surum.py"
+#define public Surum ""
+#define hSurum FileOpen(SurumDosyasi)
+#sub SurumSatiriOku
+  #define satir Trim(FileRead(hSurum))
+  ; ISPP'de #sub icindeki #define yereldir; "public" olmadan disari cikmaz.
+  #if Pos('SURUM = "', satir) == 1
+    #define public Surum Copy(satir, 10, Len(satir) - 10)
+  #endif
+#endsub
+#for {0; !FileEof(hSurum); 0} SurumSatiriOku
+#expr FileClose(hSurum)
+#if Surum == ""
+  #error cekirdek/surum.py icinden SURUM okunamadi
+#endif
+
 #define Gelistirici "Ahmet Ali DEMİRCİ"
 #define ExeAdi      "SorumlulukSinavi.exe"
 #define Kaynak      "..\dist\SorumlulukSinavi"
