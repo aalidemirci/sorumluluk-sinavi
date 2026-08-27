@@ -36,15 +36,16 @@ tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır:
 | Belge | İçerik |
 |---|---|
 | Sınav programı (öğrenci nüshası) | Tarih, saat, ders, süre, salon |
-| Sınav programı (görevli nüshası) | Yukarıdakiler + komisyon ve gözcüler |
+| Sınav programı (görevli nüshası) | + komisyon ve gözcüler |
 | Görevlendirme çizelgesi | Komisyon bazlı: ders(ler), öğrenci sayısı, tarih, saat, salon, komisyon üyeleri, gözcüler + tebliğ-tebellüğ sayfası |
-| Komisyon tutanakları | Oturum başına ayrı sayfa, imza satırları |
-| Yoklama / salon listeleri | Salon başına öğrenci listesi ve imza sütunu |
-| Kâğıt sarf tutanakları | Teslim alınan / kullanılan / iade sayıları |
-| Öğretmen görev sayacı | Komisyon ve gözcülük sayıları, 12/15 durumu |
+| Öğretmen görev sayacı | Üç dönemin dökümü, komisyon/gözcülük sayıları, 12/15 durumu |
 | Evrak teslim tutanağı | Teslim-tesellüm çizelgesi ve gecikme uyarısı |
 | **İLAN:** sınav takvimi | Web sayfasında yayımlanmak üzere; kişisel veri içermez |
 | **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden sınava gireceği, ad maskeli |
+
+Komisyon tutanağı, yoklama/salon listesi ve kâğıt sarf tutanağı bu setten
+çıkarılmıştır: bunlar e-Okul'dan alınır, burada ikinci bir kaynak yaratmak
+yersizdir.
 
 Her belgenin altında dayanağı yazılıdır. Belgeler EBYS/DYS kayıt numarası ve
 güvenli elektronik imza ibaresi üretmez; okulun kendi kayıtlarından hazırlanmış
@@ -86,6 +87,27 @@ komisyon tutanağı ve yoklama listesi — oturum başına izlenir. Teslim süre
 sınav tarihini izleyen ilk iş günüdür; süresinde gelmeyen evrak çizelgede
 kırmızı görünür. Evrakı teslim eden komisyon üyesi ile teslim alan görevlinin
 aynı kişi olması engellenir (TS-03).
+
+## Öğretmen listesi
+
+Liste e-Okul OOK01001R1 raporundan kurulur. Rapora henüz yansımamış bir kişiyi
+**elle ekleyebilir**, ayrılan ya da görev alamayacak bir kişiyi **pasife
+alabilirsiniz**. Pasif personel yeni görevlendirmeye girmez; geçmiş görevleri
+ve sayaçları olduğu gibi kalır.
+
+Görevi bulunan kişi listeden silinemez — silinirse üretilmiş evrak ile
+veritabanı çelişir. Böyle bir kişi pasife alınır.
+
+## Görev dengesi ve üç dönem
+
+Bir öğretim yılında üç sınav dönemi vardır (P1, P2, P3). Görev sayaçları
+dönemler arasında taşınır: ikinci dönem planlanırken birinci dönemde çok görev
+almış öğretmen geri plana düşer. Görev sayacı raporu her dönemin dökümünü ayrı
+sütunda gösterir.
+
+Dengeleme branş arzının izin verdiği ölçüde çalışır. Bir branşta az öğretmen
+varken o branşın çok sınavı olursa yük kaçınılmaz olarak birikir; rapor bunu
+görünür kılar ve İlçe MEM'den öğretmen istenmesi gerekip gerekmediğini gösterir.
 
 ## Planlama motoru
 
@@ -157,6 +179,37 @@ Veritabanını e-posta, kişisel bulut veya herkese açık depoya koymayın.
   Ayrıştırıcı sessizce yanlış okumaz, anlaşılır hata verir.
 - Personel raporunda kurum sicil numarası sütunu yoksa aynı adlı iki öğretmen
   ayırt edilemez; bu durumda içe aktarma hata vererek durur.
+
+## Yardım sayfası
+
+Uygulamanın son adımı yardım sayfasıdır: sorumluluk sınavlarına ilişkin mevzuat
+hükümleri (dayanak maddeleriyle), adım adım kullanım, planlama motorunun çalışma
+mantığı ve e-Okul raporlarının doğru biçimde nasıl indirileceği burada yazılıdır.
+
+## e-Okul raporlarını indirme
+
+Rapor tarayıcıda bir görüntüleyicide açılır. Biçimlendirilmiş Excel çıktısı
+birleşik hücreler ve tekrarlanan başlıklar içerdiği için okunamaz. Doğru yol:
+
+1. Raporu **HTML5 görüntüleyici** ile açın.
+2. Dışa aktarma menüsünden **Excel** biçimini seçin.
+3. **SADECE VERİ** seçeneğini işaretleyin.
+4. İnen dosyayı açıp kaydetmeden programa yükleyin.
+
+Bu uyarı ilgili içe aktarma ekranlarının üstünde de yazılıdır. Dosya yanlış
+biçimdeyse program sessizce yanlış okumaz; hangi başlığı bulamadığını söyleyerek
+durur.
+
+## Logo
+
+Logo `araclar/logo_uret.py` betiğiyle koddan üretilir ve `varliklar/` altına
+yazılır. Uygulama penceresinde, kenar çubuğunda, evrak antetinde ve Windows
+uygulama simgesinde görünür. Renk ya da biçim değişirse betik yeniden
+çalıştırılır; depoda elle güncellenen bir ikili dosya yoktur.
+
+```bash
+python araclar/logo_uret.py
+```
 
 ## Geliştirme
 

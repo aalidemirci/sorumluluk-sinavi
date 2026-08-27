@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 
+from cekirdek.kaynak import varlik_yolu
 from cekirdek.modeller import IkiAsamaliSayim, PlanParametreleri
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
 from veri import hizmet
@@ -25,6 +26,7 @@ from veri.hizmet import HizmetHatasi
 from veri.rapor_okuma import RaporHatasi
 from veri.veritabani import Veritabani
 from evrak import uretici
+from . import yardim_metni
 from .takvim import SurukleBirakTakvim
 
 
@@ -42,6 +44,7 @@ ADIMLAR = (
     ("05", "Ders / Branş", "Alan eşleştirme ve iki aşamalı dersler"),
     ("06", "Sınav Planı", "Plan üretme, düzenleme ve kesinleştirme"),
     ("07", "Evrak ve Teslim", "Belge üretimi ve sınav evrakının teslim takibi"),
+    ("08", "Yardım", "Mevzuat hükümleri, kullanım ve çalışma mantığı"),
 )
 
 AYAR_ALANLARI = (
@@ -79,6 +82,7 @@ class Uygulama:
         self.kok.geometry("1380x860")
         self.kok.minsize(1100, 700)
         self.kok.configure(bg=RENK["zemin"])
+        self._simgeyi_uygula()
 
         klasor = veri_klasoru()
         klasor.mkdir(parents=True, exist_ok=True)
@@ -101,6 +105,20 @@ class Uygulama:
         self._stil()
         self._kabuk()
         self._sayfa_goster(0)
+
+    def _simgeyi_uygula(self) -> None:
+        """Pencere simgesini logodan ayarlar; logo yoksa sessizce geçilir."""
+        try:
+            ico = varlik_yolu("logo.ico")
+            if ico is not None and os.name == "nt":
+                self.kok.iconbitmap(default=str(ico))
+                return
+            png = varlik_yolu("logo.png")
+            if png is not None:
+                self._simge = tk.PhotoImage(file=str(png))
+                self.kok.iconphoto(True, self._simge)
+        except tk.TclError:
+            pass
 
     def calistir(self) -> None:
         self.kok.protocol("WM_DELETE_WINDOW", self._kapat)
@@ -151,8 +169,17 @@ class Uygulama:
         marka = tk.Frame(sol, bg=RENK["kenar"], height=78)
         marka.pack(fill=X)
         marka.pack_propagate(False)
-        tk.Label(marka, text="S", font=("Segoe UI Semibold", 19), fg="white",
-                 bg=RENK["vurgu"], width=2).pack(side=LEFT, padx=(15, 9), pady=15)
+        png = varlik_yolu("logo.png")
+        if png is not None:
+            try:
+                self._marka_simgesi = tk.PhotoImage(file=str(png)).subsample(12, 12)
+                tk.Label(marka, image=self._marka_simgesi, bg=RENK["kenar"]).pack(
+                    side=LEFT, padx=(14, 9), pady=12)
+            except tk.TclError:
+                png = None
+        if png is None:
+            tk.Label(marka, text="S", font=("Segoe UI Semibold", 19), fg="white",
+                     bg=RENK["vurgu"], width=2).pack(side=LEFT, padx=(15, 9), pady=15)
         tk.Label(marka, text="SORUMLULUK\nSINAVI", justify=LEFT,
                  font=("Segoe UI Semibold", 10), fg="#EFF8FC",
                  bg=RENK["kenar"]).pack(side=LEFT)
@@ -191,7 +218,7 @@ class Uygulama:
                   font=("Segoe UI", 9)).pack(anchor="w", pady=(1, 12))
         (self._sayfa_kurum, self._sayfa_personel, self._sayfa_salon,
          self._sayfa_sorumluluk, self._sayfa_ders, self._sayfa_plan,
-         self._sayfa_evrak)[sira]()
+         self._sayfa_evrak, self._sayfa_yardim)[sira]()
 
     # --------------------------------------------------------- yardımcılar
 
@@ -277,10 +304,11 @@ class Uygulama:
     # =================================================== 02 öğretmen listesi
 
     def _sayfa_personel(self) -> None:
-        kart = self._kart(
-            "e-Okul personel listesi",
-            "OOK01001R1 raporunu seçin. Önizleme onaylanmadan hiçbir kayıt değişmez. "
-            "Branş havuzu bu rapordan beslenir.")
+        kart = self._kart("e-Okul personel listesi")
+        self._rapor_ipucu(
+            kart, "OOK01001R1 — Kurum Personel Listesi",
+            "Öğretmen listesi bu rapordan kurulur; branş havuzu da buradan beslenir. "
+            "Önizleme onaylanmadan hiçbir kayıt değişmez.")
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=8)
         ttk.Button(ust, text="Rapor seç ve önizle", style="Ana.TButton",
@@ -291,14 +319,94 @@ class Uygulama:
         self.personel_durum.pack(side=LEFT, padx=10)
 
         self.personel_tablosu = self._tablo(
-            kart, ("ad", "unvan", "kadro", "brans", "eylem"),
-            ("Adı Soyadı", "Görevi", "Kadro", "Branşı", "Değişiklik"),
-            (240, 190, 130, 210, 120))
-        for etiket, renk in (("eklenecek", "#E8F6EF"), ("guncellenecek", "#FFF3DC")):
+            kart, ("ad", "unvan", "kadro", "brans", "durum", "gorev"),
+            ("Adı Soyadı", "Görevi", "Kadro", "Branşı", "Durum", "Görev"),
+            (215, 165, 115, 185, 115, 55), 10)
+        for etiket, renk in (("eklenecek", "#E8F6EF"), ("guncellenecek", "#FFF3DC"),
+                             ("pasif", "#EEF1F3")):
             self.personel_tablosu.tag_configure(etiket, background=renk)
-        for kisi in hizmet.personelleri_getir(self.vt):
+        self._personel_listesini_doldur()
+        self._personel_yonetim_bolumu(kart)
+
+    def _personel_listesini_doldur(self) -> None:
+        self.personel_tablosu.delete(*self.personel_tablosu.get_children())
+        self.personel_kayitlari = hizmet.personel_ayrintili_liste(self.vt)
+        for kisi in self.personel_kayitlari:
+            durum = "aktif" if kisi["aktif_mi"] else "pasif"
             self.personel_tablosu.insert(
-                "", END, values=(kisi.ad, kisi.unvan, "", kisi.brans, "kayıtlı"))
+                "", END, iid=str(kisi["kimlik"]),
+                values=(kisi["ad"], kisi["unvan"], kisi["kadro"], kisi["brans"],
+                        f"{durum} - {kisi['kaynak']}", kisi["gorev_sayisi"]),
+                tags=() if kisi["aktif_mi"] else ("pasif",))
+
+    def _personel_yonetim_bolumu(self, kart: tk.Frame) -> None:
+        islem = tk.Frame(kart, bg=RENK["kart"])
+        islem.pack(fill=X, padx=15, pady=(0, 6))
+        ttk.Button(islem, text="Pasife al / Etkinleştir", style="Ikincil.TButton",
+                   command=self._personel_durum_degistir).pack(side=LEFT)
+        ttk.Button(islem, text="Listeden sil", style="Ikincil.TButton",
+                   command=self._personel_sil).pack(side=LEFT, padx=6)
+        ttk.Label(islem, text="Görevi olan kişi silinemez; pasife alınır.",
+                  style="Soluk.TLabel").pack(side=LEFT, padx=8)
+
+        ekle = tk.Frame(kart, bg=RENK["kart"])
+        ekle.pack(fill=X, padx=15, pady=(0, 12))
+        ttk.Label(ekle, text="Elle ekle -  Ad Soyad", style="Kart.TLabel").pack(side=LEFT)
+        self.yeni_ad = ttk.Entry(ekle, width=24)
+        self.yeni_ad.pack(side=LEFT, padx=4)
+        ttk.Label(ekle, text="Branş", style="Kart.TLabel").pack(side=LEFT)
+        branslar = [ad for _, ad, _ in hizmet.brans_havuzu_listele(self.vt)]
+        self.yeni_brans = ttk.Combobox(ekle, width=22, values=branslar)
+        self.yeni_brans.pack(side=LEFT, padx=4)
+        ttk.Label(ekle, text="Görevi", style="Kart.TLabel").pack(side=LEFT)
+        self.yeni_unvan = ttk.Combobox(
+            ekle, width=17, values=("Öğretmen", "Müdür Yardımcısı", "Müdür Başyardımcısı"))
+        self.yeni_unvan.current(0)
+        self.yeni_unvan.pack(side=LEFT, padx=4)
+        ttk.Button(ekle, text="Ekle", style="Ana.TButton",
+                   command=self._personel_elle_ekle).pack(side=LEFT, padx=6)
+
+    def _secili_personel(self):
+        if not self.personel_tablosu.selection():
+            messagebox.showwarning("Seçim yok", "Listeden bir personel seçin.")
+            return None
+        kimlik = int(self.personel_tablosu.selection()[0])
+        return next((k for k in self.personel_kayitlari if k["kimlik"] == kimlik), None)
+
+    def _personel_durum_degistir(self) -> None:
+        kisi = self._secili_personel()
+        if kisi is None:
+            return
+        try:
+            hizmet.personel_durumu_degistir(self.vt, kisi["kimlik"], not kisi["aktif_mi"])
+        except HizmetHatasi as hata:
+            self._hata("Durum değiştirilemedi", hata)
+            return
+        self._personel_listesini_doldur()
+
+    def _personel_sil(self) -> None:
+        kisi = self._secili_personel()
+        if kisi is None:
+            return
+        if not messagebox.askyesno(
+                "Personeli sil",
+                f"{kisi['ad']} listeden silinecek. Devam edilsin mi?", icon="warning"):
+            return
+        try:
+            hizmet.personel_sil(self.vt, kisi["kimlik"])
+        except HizmetHatasi as hata:
+            self._hata("Silinemedi", hata)
+            return
+        self._personel_listesini_doldur()
+
+    def _personel_elle_ekle(self) -> None:
+        try:
+            hizmet.personel_ekle(self.vt, self.yeni_ad.get(), self.yeni_brans.get(),
+                                 self.yeni_unvan.get())
+        except HizmetHatasi as hata:
+            self._hata("Personel eklenemedi", hata)
+            return
+        self._sayfa_goster(1)
 
     def _personel_sec(self) -> None:
         yol = filedialog.askopenfilename(
@@ -395,10 +503,12 @@ class Uygulama:
     # ================================================= 04 e-Okul sorumluluk
 
     def _sayfa_sorumluluk(self) -> None:
-        kart = self._kart(
-            "e-Okul sorumluluk kayıtları",
-            "OOK12001R010 raporunu seçin. Rapor okulun tamamını kapsıyorsa, dosyada "
-            "bulunmayan aktif kayıtlar pasife alınır.")
+        kart = self._kart("e-Okul sorumluluk kayıtları")
+        self._rapor_ipucu(
+            kart, "OOK12001R010 — Sorumluluk Sınavına Girecek Öğrenci Listesi",
+            "Hangi öğrencinin hangi derslerden sorumlu olduğu bu rapordan okunur. "
+            "Rapor okulun tamamını kapsıyorsa, dosyada bulunmayan aktif kayıtlar "
+            "pasife alınır.")
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=8)
         ttk.Button(ust, text="Rapor seç ve önizle", style="Ana.TButton",
@@ -1061,3 +1171,52 @@ class Uygulama:
             self._hata("Teslim geri alınamadı", hata)
             return
         self._teslim_tazele()
+
+    # ============================================================ 08 yardım
+
+    def _sayfa_yardim(self) -> None:
+        kart = self._kart()
+        sarmal = tk.Frame(kart, bg=RENK["kart"])
+        sarmal.pack(fill=BOTH, expand=True, padx=15, pady=12)
+        metin = tk.Text(sarmal, wrap="word", font=("Segoe UI", 10), bd=0,
+                        bg=RENK["kart"], fg=RENK["yazi"], padx=14, pady=10,
+                        spacing1=2, spacing3=4, cursor="arrow")
+        kaydirma = ttk.Scrollbar(sarmal, orient="vertical", command=metin.yview)
+        metin.configure(yscrollcommand=kaydirma.set)
+        metin.pack(side=LEFT, fill=BOTH, expand=True)
+        kaydirma.pack(side=RIGHT, fill=Y)
+
+        metin.tag_configure("baslik", font=("Segoe UI Semibold", 13),
+                            foreground=RENK["kenar"], spacing1=14, spacing3=6)
+        metin.tag_configure("paragraf", spacing3=6, lmargin1=2, lmargin2=2)
+        metin.tag_configure("madde", spacing3=3, lmargin1=16, lmargin2=30)
+        metin.tag_configure("giris", font=("Segoe UI", 10), foreground=RENK["soluk"],
+                            spacing3=10)
+
+        metin.insert(END, "Sorumluluk sınavlarına ilişkin mevzuat hükümleri, programın "
+                          "kullanımı ve çalışma mantığı.\n", "giris")
+        for baslik, paragraflar in yardim_metni.BOLUMLER:
+            metin.insert(END, f"\n{baslik}\n", "baslik")
+            for paragraf in paragraflar:
+                if paragraf.startswith("•"):
+                    metin.insert(END, f"{paragraf}\n", "madde")
+                else:
+                    metin.insert(END, f"{paragraf}\n", "paragraf")
+        metin.configure(state="disabled")
+
+    def _rapor_ipucu(self, ana: tk.Frame, rapor_kodu: str, aciklama: str) -> None:
+        """İçe aktarma ekranlarında hangi raporun nasıl indirileceğini anlatır."""
+        kutu = tk.Frame(ana, bg="#EEF4FA", highlightthickness=1,
+                        highlightbackground=RENK["cizgi"])
+        kutu.pack(fill=X, padx=15, pady=(4, 8))
+        tk.Label(kutu, text=f"e-Okul raporu:  {rapor_kodu}", bg="#EEF4FA",
+                 fg=RENK["kenar"], font=("Segoe UI Semibold", 10),
+                 anchor="w").pack(fill=X, padx=12, pady=(8, 0))
+        tk.Label(kutu, text=aciklama, bg="#EEF4FA", fg=RENK["yazi"],
+                 font=("Segoe UI", 9), anchor="w", justify=LEFT,
+                 wraplength=980).pack(fill=X, padx=12, pady=(2, 2))
+        tk.Label(kutu,
+                 text="Raporu HTML5 görüntüleyicide açın → dışa aktarmadan Excel'i seçin → "
+                      "SADECE VERİ seçeneğini işaretleyin. Biçimlendirilmiş çıktı okunamaz.",
+                 bg="#EEF4FA", fg=RENK["engel"], font=("Segoe UI Semibold", 9),
+                 anchor="w", justify=LEFT, wraplength=980).pack(fill=X, padx=12, pady=(0, 9))

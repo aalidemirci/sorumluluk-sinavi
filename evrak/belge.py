@@ -14,6 +14,7 @@ import hashlib
 from datetime import date
 from pathlib import Path
 
+from cekirdek.kaynak import varlik_yolu
 from cekirdek.metin import buyult
 
 
@@ -116,14 +117,16 @@ class Belge:
 
     def _ustbilgi(self, kurum_adi: str) -> None:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.shared import Pt
+        from docx.shared import Mm, Pt
         paragraf = self.belge.sections[0].header.paragraphs[0]
-        paragraf.text = kurum_adi
         paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraf.paragraph_format.space_after = Pt(2)
+        logo = varlik_yolu("logo_evrak.png")
+        if logo is not None:
+            paragraf.add_run().add_picture(str(logo), height=Mm(6))
+            self._yazi(paragraf.add_run("  "), 8.5)
+        self._yazi(paragraf.add_run(kurum_adi), 8.5, True, SOLUK)
         self._kenarlik(paragraf, "bottom", CIZGI, "4")
-        for run in paragraf.runs:
-            self._yazi(run, 8.5, True, SOLUK)
 
     def _altbilgi(self) -> None:
         from docx.enum.text import WD_ALIGN_PARAGRAPH

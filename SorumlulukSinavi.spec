@@ -10,13 +10,15 @@ Pakete mutlaka girmesi gerekenler:
 from PyInstaller.utils.hooks import collect_data_files
 
 
-gocler = [(str(yol), "veri/gocler") for yol in __import__("pathlib").Path("veri/gocler").glob("*.sql")]
+pathlib = __import__("pathlib")
+gocler = [(str(yol), "veri/gocler") for yol in pathlib.Path("veri/gocler").glob("*.sql")]
+varliklar = [(str(yol), "varliklar") for yol in pathlib.Path("varliklar").glob("*.*")]
 
 analiz = Analysis(
     ["sorumluluk_sinavi.py"],
     pathex=["."],
     binaries=[],
-    datas=gocler + collect_data_files("tzdata"),
+    datas=gocler + varliklar + collect_data_files("tzdata"),
     hiddenimports=[
         "tzdata",
         "openpyxl",
@@ -56,6 +58,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon="varliklar/logo.ico",
 )
 
 coll = COLLECT(

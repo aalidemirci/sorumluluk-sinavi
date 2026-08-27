@@ -26,9 +26,11 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
 
 1. **Kurum Ayarları** — okul bilgileri ve üç dönem tarihi. Sınav pencereleri
    (P1/P2/P3) bu tarihlerden hesaplanır ve ekranın altında gösterilir.
-2. **Öğretmen Listesi** — e-Okul'dan `OOK01001R1` raporunu `.xls`/`.xlsx`
-   olarak dışa aktarın. Önce **önizleme** açılır; onaylamadan hiçbir kayıt
-   değişmez. Branş havuzu bu rapordan kurulur.
+2. **Öğretmen Listesi** — e-Okul'dan `OOK01001R1` raporunu alın (aşağıdaki
+   indirme yönergesine uyun). Önce **önizleme** açılır; onaylamadan hiçbir
+   kayıt değişmez. Branş havuzu bu rapordan kurulur. Rapora yansımamış bir
+   kişiyi elle ekleyebilir, ayrılan kişiyi pasife alabilirsiniz; görevi olan
+   kişi silinemez.
 3. **Salonlar** — sınav salonlarını ve kapasitelerini girin. Salon sayısı,
    aynı saatte kaç sınav yapılabileceğini belirler.
 4. **e-Okul Sorumluluk** — `OOK12001R010` raporunu seçin. Rapor okulun
@@ -44,6 +46,26 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
    gün seçeneklerinin sonucunu görün, sonra **Planı üret**.
 7. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
    sonra geri alınan evrakı teslim çizelgesine işleyin.
+8. **Yardım** — mevzuat hükümleri, kullanım ve çalışma mantığı bu sayfadadır.
+
+## e-Okul raporlarını indirme
+
+Raporu doğrudan "Excel'e aktar" ile indirmeyin: biçimlendirilmiş çıktı birleşik
+hücreler ve tekrarlanan başlıklar içerir, program bunu okuyamaz.
+
+1. Raporu e-Okul'da açın, görüntüleyici seçeneklerinden **HTML5 görüntüleyiciyi**
+   seçin.
+2. Görüntüleyicinin dışa aktarma menüsünden **Excel** biçimini seçin.
+3. Açılan seçeneklerde **SADECE VERİ** (yalnızca veri / data only) seçeneğini
+   işaretleyin.
+4. İnen `.xls` ya da `.xlsx` dosyasını açıp kaydetmeden programa yükleyin.
+
+Aynı yönerge ilgili ekranların üstünde ve Yardım sayfasında da yazılıdır.
+
+| Ekran | Rapor |
+|---|---|
+| 02 Öğretmen Listesi | `OOK01001R1` — Kurum Personel Listesi |
+| 04 e-Okul Sorumluluk | `OOK12001R010` — Sorumluluk Sınavına Girecek Öğrenci Listesi |
 
 ## Plan ekranı
 

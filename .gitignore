@@ -28,3 +28,6 @@ __pycache__/
 !testler/veri/*.xlsx
 !testler/veri/*.csv
 !sablonlar/fabrika/*.docx
+
+# Logo koddan uretilir ama pakete girmesi gerekir; depoda tutulur.
+!varliklar/*

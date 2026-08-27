@@ -346,8 +346,23 @@ def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara, ozet: YukOzeti,
 
 @dataclass
 class _GorevSayaci:
+    """Kişi başına görev sayacı.
+
+    Aynı öğretim yılının önceki dönemlerinde alınmış görevler başlangıç
+    değeri olarak verilebilir; böylece yük tek dönemde değil yıl boyunca
+    dengelenir.
+    """
+
     komisyon: dict[int, int] = field(default_factory=lambda: defaultdict(int))
     gozcu: dict[int, int] = field(default_factory=lambda: defaultdict(int))
+
+    @classmethod
+    def baslangicla(cls, sayaclar: dict[int, tuple[int, int]] | None) -> "_GorevSayaci":
+        sayac = cls()
+        for kimlik, (komisyon, gozcu) in (sayaclar or {}).items():
+            sayac.komisyon[kimlik] = komisyon
+            sayac.gozcu[kimlik] = gozcu
+        return sayac
 
     def toplam(self, kimlik: int) -> int:
         return self.komisyon[kimlik] + self.gozcu[kimlik]
@@ -480,6 +495,7 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
               gunler: list[date], personel: list[Personel], salonlar: list[Salon],
               pencere: tuple[date, date], ogretim_yili: str = "",
               ogrenci_adlari: dict[str, str] | None = None,
+              baslangic_sayaclari: dict[int, tuple[int, int]] | None = None,
               gozcu_farkli_brans: bool = True,
               dugum_butcesi: int = ARAMA_DUGUM_BUTCESI,
               sure_butcesi: float = ARAMA_SURE_BUTCESI_SN) -> PlanlamaSonucu:
@@ -558,7 +574,7 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
 
     plan = Plan(parametreler)
     notlar: list[str] = []
-    sayac = _GorevSayaci()
+    sayac = _GorevSayaci.baslangicla(baslangic_sayaclari)
     salon_sirasi = sorted(salonlar, key=lambda s: (-s.kapasite, s.kimlik))
 
     # Slot slot ilerlenir; her slotta salonlar ve görevliler paylaştırılır.

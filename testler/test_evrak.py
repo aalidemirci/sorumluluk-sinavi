@@ -85,7 +85,7 @@ def test_tum_evraklar_uretilir(hazir) -> None:
 def test_secili_evrak_uretilir(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     uretilenler = uretici.evrak_uret(vt, plan_id, tmp_path / "evrak",
-                                     ["01_sinav_programi", "03_gorevlendirme_oluru"])
+                                     ["01_sinav_programi", "03_gorevlendirme_cizelgesi"])
     assert [y.name for y, _ in uretilenler] == ["01_sinav_programi.docx",
                                                 "03_gorevlendirme_cizelgesi.docx"]
 
@@ -129,20 +129,11 @@ def test_gorevli_nushasi_gorevlileri_icerir(hazir) -> None:
 def test_gorevlendirme_oluru_dayanagi_tasir(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "olur.docx"
-    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
     metin = _metin(yol)
     assert "md.58/2-a" in metin
     assert "Karar md.12/2-b" in metin
     assert AYARLAR["mudur_adi"] in metin
-
-
-def test_yoklama_listesi_ogrencileri_icerir(hazir) -> None:
-    vt, plan_id, tmp_path = hazir
-    yol = tmp_path / "yoklama.docx"
-    uretici.yoklama_listeleri(vt, plan_id, yol)
-    metin = _metin(yol)
-    assert "Uydurma Öğrenci Bir" in metin
-    assert "İmza" in metin
 
 
 def test_gorev_sayac_raporu_ucret_hesaplamaz(hazir) -> None:
@@ -287,7 +278,7 @@ def test_gorevlendirme_cizelgesi_komisyon_bazlidir(hazir) -> None:
     """Her satır bir sınav komisyonudur; kişi başına satır açılmaz."""
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "cizelge.docx"
-    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
     from docx import Document
     tablolar = Document(yol).tables
     basliklar = [h.text for h in tablolar[0].rows[0].cells]
@@ -301,7 +292,7 @@ def test_gorevlendirme_cizelgesi_komisyon_bazlidir(hazir) -> None:
 def test_gorevlendirme_cizelgesinde_teblig_tebellug_bolumu_var(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "cizelge.docx"
-    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
     from docx import Document
     belge = Document(yol)
     metin = _metin(yol)
@@ -315,7 +306,7 @@ def test_gorevlendirme_cizelgesinde_teblig_tebellug_bolumu_var(hazir) -> None:
 def test_birlestirilmis_dersler_cizelgede_belirtilir(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "cizelge.docx"
-    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
     metin = _metin(yol)
     birlesik = [o for o in hizmet.plan_oturumlari(vt, plan_id) if "/" in o["duzey"]]
     if birlesik:
@@ -325,7 +316,7 @@ def test_birlestirilmis_dersler_cizelgede_belirtilir(hazir) -> None:
 def test_komisyon_uyeleri_ayri_satirlarda_yazilir(hazir) -> None:
     vt, plan_id, tmp_path = hazir
     yol = tmp_path / "cizelge.docx"
-    uretici.gorevlendirme_oluru(vt, plan_id, yol)
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
     from docx import Document
     hucre = Document(yol).tables[0].rows[1].cells[5]
     assert len(hucre.paragraphs) == 2          # iki komisyon üyesi, iki paragraf

@@ -598,6 +598,8 @@ def plan_hazirla(vt: Veritabani, parametreler: PlanParametreleri) -> PlanlamaSon
     pencere = pencereleri_getir(vt)[parametreler.pencere_kodu]
     gunler = gunleri_listele(pencere[0], pencere[1], parametreler.hafta_sonu_kullan)
     ayar = ayarlari_getir(vt)
+    # Aynı öğretim yılının diğer dönemlerindeki görevler sayaçlara başlangıç
+    # değeri olur; böylece yük üç dönem boyunca dengelenir.
     return plan_uret(
         birimler=sinav_birimleri(vt),
         parametreler=parametreler,
@@ -607,6 +609,7 @@ def plan_hazirla(vt: Veritabani, parametreler: PlanParametreleri) -> PlanlamaSon
         pencere=pencere,
         ogretim_yili=ayar.get("ogretim_yili", ""),
         ogrenci_adlari=ogrenci_etiketleri(vt),
+        baslangic_sayaclari=onceki_gorev_sayaclari(vt),
     )
 
 
@@ -635,12 +638,14 @@ def plan_kaydet(vt: Veritabani, sonuc: PlanlamaSonucu) -> int:
         # kaydedilen plan yeniden açıldığında varsayılan sınırla doğrulanır ve
         # kurallara uyan plan SP-11 ihlalleriyle dolu görünür.
         import json
+        ogretim_yili = b.execute(
+            "SELECT deger FROM kurum_ayari WHERE anahtar='ogretim_yili'").fetchone()
         plan_id = int(b.execute(
-            "INSERT INTO plan(pencere_kodu,parametreler_json,kisisel_sinirlar_json,uretildi_at)"
-            " VALUES(?,?,?,?)",
+            "INSERT INTO plan(pencere_kodu,parametreler_json,kisisel_sinirlar_json,"
+            "ogretim_yili,uretildi_at) VALUES(?,?,?,?,?)",
             (parametreler.pencere_kodu, _parametreleri_yaz(parametreler),
              json.dumps(sonuc.yukseltilen_sinirlar, ensure_ascii=False, sort_keys=True),
-             simdi())).lastrowid)
+             ogretim_yili[0] if ogretim_yili else "", simdi())).lastrowid)
 
         for oturum in plan.oturumlar:
             ders_id = ders_kimlikleri.get(oturum.ders_adi)
@@ -1102,17 +1107,8 @@ def oturum_ogrencileri(vt: Veritabani, oturum_id: int) -> list[dict]:
 
 
 def gorev_sayaclari(vt: Veritabani) -> list[dict]:
-    """EK-05: kişi başına komisyon üyeliği ve gözcülük sayısı."""
-    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
-    with vt.baglan() as b:
-        satirlar = b.execute(
-            "SELECT ad, brans, unvan, komisyon_sayisi, gozcu_sayisi FROM v_gorev_sayaci"
-            " WHERE komisyon_sayisi > 0 OR gozcu_sayisi > 0 ORDER BY ad").fetchall()
-    return [{
-        "ad": r[0], "brans": r[1], "unvan": r[2], "komisyon": r[3], "gozcu": r[4],
-        "asildi_mi": yillik_sayac_asildi_mi(ogretim_yili, r[3], r[4]),
-        "ucretlendirilebilir": not Personel(0, "", "", r[2]).yonetici_mi,
-    } for r in satirlar]
+    """EK-05 raporu için kişi başına görev sayacı; dönem dökümü dâhil."""
+    return gorev_havuzu_ozeti(vt)
 
 
 def evrak_surumu_kaydet(vt: Veritabani, tur: str, kayit_anahtari: str,
@@ -1257,3 +1253,148 @@ def gorevli_listesi(vt: Veritabani, plan_id: int) -> list[dict]:
     liste = [{"kimlik": r[0], "ad": r[1], "brans": r[2], "unvan": r[3],
               "komisyon": r[4], "gozcu": r[5]} for r in satirlar]
     return sorted(liste, key=lambda x: siralama_anahtari(x["ad"]))
+
+
+# ================================================== personel elle yönetimi
+
+def personel_ekle(vt: Veritabani, ad: str, brans: str, unvan: str,
+                  personel_tipi: str = "kadrolu", kadro_durumu: str = "") -> int:
+    """Rapor dışından elle personel ekler.
+
+    e-Okul raporu asıl kaynaktır; bu yol, rapora henüz yansımamış görevlendirme
+    ve ücretli öğretmen gibi durumlar içindir. Eklenen kişinin branşı da branş
+    havuzuna girer.
+    """
+    ad = " ".join(str(ad).split())
+    brans = " ".join(str(brans).split())
+    unvan = " ".join(str(unvan).split())
+    if not (ad and brans and unvan):
+        raise HizmetHatasi("Ad, branş ve görev alanları zorunludur.")
+    if personel_tipi not in {"kadrolu", "sozlesmeli", "ucretli", "yonetici", "diger"}:
+        raise HizmetHatasi("Geçersiz personel tipi.")
+    zaman = simdi()
+    with vt.baglan() as b:
+        mevcut = b.execute("SELECT id,silindi_mi FROM personel WHERE ad_anahtari=?",
+                           (esitle(ad),)).fetchone()
+        if mevcut and not mevcut[1]:
+            raise HizmetHatasi(f"'{ad}' zaten kayıtlı. Aynı adlı ikinci kişi ayırt edilemez.")
+        if mevcut:
+            b.execute("UPDATE personel SET ad=?,brans=?,unvan=?,personel_tipi=?,"
+                      "kadro_durumu=?,aktif_mi=1,silindi_mi=0 WHERE id=?",
+                      (ad, brans, unvan, personel_tipi, kadro_durumu, mevcut[0]))
+            kimlik = int(mevcut[0])
+        else:
+            kimlik = int(b.execute(
+                "INSERT INTO personel(ad,ad_anahtari,brans,unvan,personel_tipi,kadro_durumu)"
+                " VALUES(?,?,?,?,?,?)",
+                (ad, esitle(ad), brans, unvan, personel_tipi, kadro_durumu)).lastrowid)
+        b.execute(
+            "INSERT INTO brans_havuzu(ad,ad_anahtari,kaynak,olusturuldu_at,guncellendi_at)"
+            " VALUES(?,?,'manuel_ilce_mem',?,?) ON CONFLICT(ad_anahtari) DO UPDATE SET"
+            " aktif_mi=1,guncellendi_at=excluded.guncellendi_at",
+            (brans, esitle(brans), zaman, zaman))
+        vt.denetim_yaz(b, "personel", kimlik, "elle_eklendi")
+        return kimlik
+
+
+def personel_durumu_degistir(vt: Veritabani, personel_id: int, aktif_mi: bool) -> None:
+    """Personeli pasife alır ya da yeniden etkinleştirir.
+
+    Pasif personel yeni görevlendirmeye alınmaz; geçmiş görevleri ve sayaçları
+    olduğu gibi kalır.
+    """
+    with vt.baglan() as b:
+        if not b.execute("SELECT 1 FROM v_personel WHERE id=?", (personel_id,)).fetchone():
+            raise HizmetHatasi("Personel bulunamadı.")
+        b.execute("UPDATE personel SET aktif_mi=? WHERE id=?", (int(aktif_mi), personel_id))
+        vt.denetim_yaz(b, "personel", personel_id,
+                       "etkinlestirildi" if aktif_mi else "pasife_alindi")
+
+
+def personel_sil(vt: Veritabani, personel_id: int) -> None:
+    """Personeli listeden çıkarır.
+
+    Görevlendirmesi bulunan kişi silinemez: silinirse üretilmiş evrak ile
+    veritabanı çelişir. Böyle bir kişi pasife alınmalıdır.
+    """
+    with vt.baglan() as b:
+        satir = b.execute("SELECT ad FROM v_personel WHERE id=?", (personel_id,)).fetchone()
+        if not satir:
+            raise HizmetHatasi("Personel bulunamadı.")
+        gorev = b.execute("SELECT count(*) FROM v_gorevlendirme WHERE personel_id=?",
+                          (personel_id,)).fetchone()[0]
+        if gorev:
+            raise HizmetHatasi(
+                f"{satir[0]} için {gorev} sınav görevi kayıtlı; silinemez. "
+                "Yeni görev almaması için pasife alın.")
+        b.execute("UPDATE personel SET silindi_mi=1,aktif_mi=0 WHERE id=?", (personel_id,))
+        vt.denetim_yaz(b, "personel", personel_id, "silindi")
+
+
+def personel_ayrintili_liste(vt: Veritabani) -> list[dict]:
+    """Öğretmen ekranı için görev sayaçlarıyla birlikte personel listesi."""
+    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT p.id, p.ad, p.unvan, p.brans, p.kadro_durumu, p.aktif_mi,
+                   p.kaynak_aktarim_id,
+                   COALESCE((SELECT SUM(gs.komisyon_sayisi + gs.gozcu_sayisi)
+                             FROM v_gorev_sayaci gs
+                             WHERE gs.personel_id = p.id AND gs.ogretim_yili = ?), 0)
+            FROM v_personel p ORDER BY p.aktif_mi DESC, p.ad""", (ogretim_yili,)).fetchall()
+    return [{"kimlik": r[0], "ad": r[1], "unvan": r[2], "brans": r[3],
+             "kadro": r[4], "aktif_mi": bool(r[5]),
+             "kaynak": "e-Okul raporu" if r[6] else "elle eklendi",
+             "gorev_sayisi": r[7]} for r in satirlar]
+
+
+# ============================================ dönemler arası görev havuzu
+
+def onceki_gorev_sayaclari(vt: Veritabani, haric_plan_id: int | None = None
+                           ) -> dict[int, tuple[int, int]]:
+    """Aynı öğretim yılının diğer dönemlerindeki görev sayaçları.
+
+    Bir öğretim yılında üç sınav dönemi vardır. P2 planlanırken P1'de görev
+    almış öğretmenin yükü hesaba katılmazsa aynı kişiler üst üste
+    görevlendirilir. Planlayıcı sayaçlara buradan gelen değerlerle başlar.
+    """
+    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    if not ogretim_yili:
+        return {}
+    kosul = "" if haric_plan_id is None else " AND pl.id <> ?"
+    olcutler = [ogretim_yili] + ([] if haric_plan_id is None else [haric_plan_id])
+    with vt.baglan() as b:
+        satirlar = b.execute(f"""
+            SELECT g.personel_id,
+                   SUM(CASE WHEN g.rol='komisyon_uyesi' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN g.rol='gozcu' THEN 1 ELSE 0 END)
+            FROM v_gorevlendirme g
+            JOIN v_oturum o ON o.id = g.oturum_id
+            JOIN v_plan pl ON pl.id = o.plan_id
+            WHERE pl.ogretim_yili = ?{kosul}
+            GROUP BY g.personel_id""", olcutler).fetchall()
+    return {r[0]: (r[1], r[2]) for r in satirlar}
+
+
+def gorev_havuzu_ozeti(vt: Veritabani) -> list[dict]:
+    """Öğretim yılı boyunca kişi başına dönem dönem görev dağılımı."""
+    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT personel_id, ad, brans, unvan, pencere_kodu,
+                   komisyon_sayisi, gozcu_sayisi
+            FROM v_gorev_sayaci WHERE ogretim_yili = ?""", (ogretim_yili,)).fetchall()
+    kisiler: dict[int, dict] = {}
+    for kimlik, ad, brans, unvan, pencere, komisyon, gozcu in satirlar:
+        kayit = kisiler.setdefault(kimlik, {
+            "kimlik": kimlik, "ad": ad, "brans": brans, "unvan": unvan,
+            "pencereler": {}, "komisyon": 0, "gozcu": 0})
+        kayit["pencereler"][pencere] = (komisyon, gozcu)
+        kayit["komisyon"] += komisyon
+        kayit["gozcu"] += gozcu
+    for kayit in kisiler.values():
+        kayit["toplam"] = kayit["komisyon"] + kayit["gozcu"]
+        kayit["asildi_mi"] = yillik_sayac_asildi_mi(
+            ogretim_yili, kayit["komisyon"], kayit["gozcu"])
+        kayit["ucretlendirilebilir"] = not Personel(0, "", "", kayit["unvan"]).yonetici_mi
+    return sorted(kisiler.values(), key=lambda x: siralama_anahtari(x["ad"]))
