@@ -1,14 +1,31 @@
-# Kurulum ve deneme
+# Kurulum ve kullanım
 
-## Deneme sürümü (Windows)
+## Kurulum (Windows)
 
-`dist/SorumlulukSinavi/SorumlulukSinavi.exe` dosyasını çift tıklayın. Kurulum
-gerekmez, yönetici hakkı istemez, Python kurulu olmasına gerek yoktur.
+`dist-kurulum/SorumlulukSinavi-Kurulum-0.3.0.exe` dosyasını çalıştırın.
 
-Klasörün tamamını taşıyın — `SorumlulukSinavi.exe` yanındaki `_internal`
-klasörü olmadan çalışmaz.
+- Kurulum **kullanıcı başınadır**: yönetici hakkı istemez, Program Files'a
+  yazmaz. Varsayılan yer `%LOCALAPPDATA%\SorumlulukSinavi\uygulama`.
+- Başlat menüsüne kısayol eklenir; masaüstü kısayolu isteğe bağlıdır.
+- Python kurulu olmasına gerek yoktur.
+- Yeni sürüm eskisinin üzerine kurulur ve **veritabanınıza dokunmaz.**
+- Kaldırma Başlat menüsünden ya da Ayarlar → Uygulamalar üzerinden yapılır;
+  kaldırma da veritabanını silmez.
 
-İlk açılışta veritabanı `%LOCALAPPDATA%\SorumlulukSinavi\veri\sorumluluk.db`
+Kurulum dosyasını yeniden üretmek için Inno Setup 6 gerekir
+(`winget install JRSoftware.InnoSetup`):
+
+```bash
+python -m PyInstaller SorumlulukSinavi.spec --noconfirm
+iscc yapim/sorumluluk_sinavi.iss
+```
+
+## Kurulumsuz deneme
+
+`dist/SorumlulukSinavi/SorumlulukSinavi.exe` doğrudan çalıştırılabilir.
+Klasörün tamamını taşıyın — `_internal` olmadan çalışmaz.
+
+İlk açılışta veritabanı `%LOCALAPPDATA%\SorumlulukSinavi\plan\sorumluluk.db`
 altında kendiliğinden oluşur.
 
 ### Denemeyi ayrı bir klasörde yapmak
