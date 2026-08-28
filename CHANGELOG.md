@@ -30,6 +30,11 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+## [0.5.0] — 29.08.2026
+
+Windows tarafında işleyiş değişmedi; bu sürüm uygulamayı **Pardus'a** taşır
+ve testleri geliştirme makinesinden çıkarıp GitHub'a alır.
+
 ### Eklendi
 - **Pardus paketi.** Pardus 23 ve üzeri için `.deb` paketi üretiliyor
   (`yapim/deb_paketi.py`). Paket bütünleşiktir: Python, kitaplıklar ve Tcl/Tk

@@ -26,7 +26,7 @@ iscc yapim/sorumluluk_sinavi.iss
 `sorumluluk-sinavi_<sürüm>_amd64.deb` dosyasını indirin ve kurun:
 
 ```bash
-sudo apt install ./sorumluluk-sinavi_0.4.0_amd64.deb
+sudo apt install ./sorumluluk-sinavi_0.5.0_amd64.deb
 ```
 
 - Pardus 23 ve üzeri (Debian 12 tabanlı her dağıtım) desteklenir. Paket
@@ -48,7 +48,7 @@ sudo apt install ./sorumluluk-sinavi_0.4.0_amd64.deb
 dosyasını yanına koyup:
 
 ```bash
-sha256sum -c SHA256SUMS-0.4.0-pardus.txt
+sha256sum -c SHA256SUMS-0.5.0-pardus.txt
 ```
 
 ## Kurulu makineleri güncelleme
@@ -67,7 +67,7 @@ klasörde çalıştırın.
 Soru sormadan kurulması için:
 
 ```powershell
-.\SorumlulukSinavi-Kurulum-0.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+.\SorumlulukSinavi-Kurulum-0.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 ```
 
 Kurulu sürümü doğrulamak için:
