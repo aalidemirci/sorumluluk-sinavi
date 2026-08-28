@@ -9,12 +9,12 @@ Son gözden geçirme: 28.08.2026 (sürüm 0.4.0).
 
 ## Şimdi
 
-- [ ] **Kurulu 0.3.0 paketlerini güncelle.** 0.3.0 numarasıyla iki farklı
-      paket derlendi (aradaki farkta başvuru kapısı var), yani o numara
-      hangi içeriği taşıdığını söylemiyor. Kurulu olduğu her yer 0.4.0 ile
-      güncellensin. Yapım klasöründeki kopya 28.08.2026'da silindi.
-- [ ] **Etiketleri uzağa gönder.** `v0.4.0` yerelde atıldı; `git push --tags`
-      henüz yapılmadı.
+- [ ] **Okuldaki makineleri 0.4.0'a güncelle.** 0.3.0 numarasıyla iki farklı
+      paket derlendi (aradaki farkta başvuru kapısı var), yani o numara hangi
+      içeriği taşıdığını söylemiyor; kurulu olduğu her yere 0.4.0 gitmeli.
+      Yordam KURULUM.md → "Kurulu makineleri güncelleme" başlığında.
+      28.08.2026: geliştirme makinesi güncellendi, yapım klasöründeki eski
+      kopya silindi. Okul makineleri bekliyor.
 
 ## Takvime bağlı
 

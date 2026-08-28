@@ -21,6 +21,48 @@ python -m PyInstaller SorumlulukSinavi.spec --noconfirm
 iscc yapim/sorumluluk_sinavi.iss
 ```
 
+## Kurulu makineleri güncelleme
+
+Yeni sürüm eskisinin üzerine kurulur; önce kaldırmaya gerek yoktur.
+Veritabanı kurulum klasöründe değil ayrı bir yerde durduğu için güncelleme
+**veriye dokunmaz**: ilk açılışta gereken şema göçü uygulanır, öncesinde de
+otomatik yedek alınır.
+
+Kurulum dosyasını hedef makineye götürüp çalıştırmak yeterlidir. Yönetici
+hakkı gerekmez.
+
+Aşağıdaki iki komut **PowerShell** içindir; kurulum dosyasının bulunduğu
+klasörde çalıştırın.
+
+Soru sormadan kurulması için:
+
+```powershell
+.\SorumlulukSinavi-Kurulum-0.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+```
+
+Kurulu sürümü doğrulamak için:
+
+```powershell
+(Get-Item "$env:LOCALAPPDATA\SorumlulukSinavi\uygulama\SorumlulukSinavi.exe").VersionInfo.FileVersion
+```
+
+Bilinmesi gerekenler:
+
+- **Kurulum kullanıcı başınadır.** Bir bilgisayarı birden çok kişi kendi
+  Windows hesabıyla kullanıyorsa her hesapta ayrı kurulum gerekir; her
+  hesabın verisi de ayrıdır.
+- **Sürüm numarası 0.4.0'dan itibaren güvenilirdir.** 0.3.0 numarasıyla iki
+  farklı paket derlendi; o numarayı taşıyan bir kurulum gördüğünüzde hangi
+  içerik olduğunu ayırt etmeye uğraşmayın, üzerine 0.4.0 kurun. 0.4.0'dan
+  sonra sürüm exe'nin dosya özelliklerinde de yazılıdır.
+- **Hayalet kayıt.** Kurulum klasörü, kaldırma yapılmadan elle silinmişse
+  Ayarlar → Uygulamalar listesinde kaldırılamayan bir kayıt kalır
+  (`unins000.exe` bulunamaz). Üzerine yeni sürüm kurmak bu kaydı düzeltir;
+  ayrıca bir şey yapmanız gerekmez.
+- **Kaldırma veritabanını silmez.** Veri `%LOCALAPPDATA%\SorumlulukSinavi\plan`
+  altında kalır. Makineyi tamamen temizlemek istiyorsanız o klasörü elle
+  silin — öncesinde aşağıdaki Yedekleme bölümünü okuyun.
+
 ## Kurulumsuz deneme
 
 `dist/SorumlulukSinavi/SorumlulukSinavi.exe` doğrudan çalıştırılabilir.
