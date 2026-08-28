@@ -4,23 +4,43 @@ Logo koddan çizilir; depoda yalnız bu betik durur, üretilen dosyalar
 `varliklar/` altına yazılır. Böylece boyut ya da renk değiştiğinde ikili
 dosyayı elle güncellemek gerekmez.
 
-Biçim: lacivert yuvarlak köşeli kare zemin, üzerinde takvim ızgarası ve
-onay işareti — planlanmış ve onaylanmış sınav takvimini anlatır.
+Biçim: bordo yuvarlak köşeli kare zemin, üzerinde takvim ızgarası ve onay
+işareti — planlanmış ve onaylanmış sınav takvimini anlatır.
 
-    python araclar/logo_uret.py
+Renkler arayuz/palet.py'den gelir; logo ile arayüz aynı paleti kullanır.
+Palet değişirse bu betiği yeniden çalıştırmak yeterlidir.
+
+Pillow gerekir:
+
+    .venv/Scripts/pip install -e .[araclar]
+    .venv/Scripts/python araclar/logo_uret.py
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-LACIVERT = (23, 54, 93)
-CAMGOBEGI = (0, 142, 146)
-BEYAZ = (255, 255, 255)
-ACIK = (232, 238, 245)
+from arayuz.palet import RENK  # noqa: E402
+
+
+def _rgb(anahtar: str) -> tuple[int, int, int]:
+    h = RENK[anahtar].lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+ZEMIN = _rgb("kenar")      # bordo dış kare
+GOVDE = _rgb("kart")       # takvim gövdesi
+SERIT = _rgb("vurgu")      # başlık şeridi: sıcak kum
+IZGARA = _rgb("chip")      # gün hücreleri
+HALKA = _rgb("kart")       # takvim halkaları
+# Onay işareti bilinçli olarak ZEMIN'den farklı: dış kareyle aynı olsaydı
+# küçük boyutlarda gövdeden kopmuş gibi dururdu.
+ONAY = _rgb("bag")
 
 VARLIK_KLASORU = Path(__file__).resolve().parents[1] / "varliklar"
 BOYUTLAR = (16, 24, 32, 48, 64, 128, 256)
@@ -35,25 +55,25 @@ def logo_ciz(kenar: int = 512) -> Image.Image:
 
     # Zemin
     yaricap = int(boy * 0.22)
-    cizim.rounded_rectangle([0, 0, boy - 1, boy - 1], radius=yaricap, fill=LACIVERT)
+    cizim.rounded_rectangle([0, 0, boy - 1, boy - 1], radius=yaricap, fill=ZEMIN)
 
     # Takvim gövdesi
     sol, ust = int(boy * 0.18), int(boy * 0.24)
     sag, alt = boy - sol, boy - int(boy * 0.18)
-    cizim.rounded_rectangle([sol, ust, sag, alt], radius=int(boy * 0.05), fill=BEYAZ)
+    cizim.rounded_rectangle([sol, ust, sag, alt], radius=int(boy * 0.05), fill=GOVDE)
 
     # Takvim başlık şeridi ve halkaları
     serit_alt = ust + int((alt - ust) * 0.22)
     cizim.rounded_rectangle([sol, ust, sag, serit_alt], radius=int(boy * 0.05),
-                            fill=CAMGOBEGI)
-    cizim.rectangle([sol, serit_alt - int(boy * 0.04), sag, serit_alt], fill=CAMGOBEGI)
+                            fill=SERIT)
+    cizim.rectangle([sol, serit_alt - int(boy * 0.04), sag, serit_alt], fill=SERIT)
     halka_r = int(boy * 0.022)
     for oran in (0.32, 0.68):
         merkez_x = sol + int((sag - sol) * oran)
         cizim.rounded_rectangle(
             [merkez_x - halka_r, ust - int(boy * 0.05),
              merkez_x + halka_r, ust + int(boy * 0.03)],
-            radius=halka_r, fill=ACIK)
+            radius=halka_r, fill=HALKA)
 
     # Gün ızgarası
     izgara_ust = serit_alt + int(boy * 0.05)
@@ -67,18 +87,18 @@ def logo_ciz(kenar: int = 512) -> Image.Image:
                 continue  # onay işaretine yer bırak
             cizim.rounded_rectangle(
                 [x, y, x + hucre - bosluk, y + hucre - bosluk],
-                radius=int(hucre * 0.18), fill=ACIK)
+                radius=int(hucre * 0.18), fill=IZGARA)
 
     # Onay işareti
     kalinlik = int(boy * 0.055)
     p1 = (sol + int((sag - sol) * 0.52), izgara_ust + int(hucre * 1.05))
     p2 = (sol + int((sag - sol) * 0.64), izgara_ust + int(hucre * 1.42))
     p3 = (sol + int((sag - sol) * 0.92), izgara_ust + int(hucre * 0.55))
-    cizim.line([p1, p2, p3], fill=CAMGOBEGI, width=kalinlik, joint="curve")
+    cizim.line([p1, p2, p3], fill=ONAY, width=kalinlik, joint="curve")
     for nokta in (p1, p3):
         cizim.ellipse([nokta[0] - kalinlik // 2, nokta[1] - kalinlik // 2,
                        nokta[0] + kalinlik // 2, nokta[1] + kalinlik // 2],
-                      fill=CAMGOBEGI)
+                      fill=ONAY)
 
     return gorsel.resize((kenar, kenar), Image.LANCZOS)
 

@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8,<9"]
 build-windows = ["pyinstaller>=6,<7"]
+araclar = ["pillow>=10,<12"]
 
 [project.scripts]
 sorumluluk-sinavi = "sorumluluk_sinavi:main"
