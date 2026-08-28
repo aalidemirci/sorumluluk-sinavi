@@ -76,8 +76,17 @@ def veri_klasoru() -> Path:
 
 
 class Uygulama:
-    def __init__(self) -> None:
-        self.kok = tk.Tk()
+    def __init__(self, kok: tk.Tk | tk.Toplevel | None = None) -> None:
+        """Uygulama penceresi; `kok` verilmezse kendi Tk kökünü kurar.
+
+        Kökün dışarıdan verilebilmesi testler içindir. Her `tk.Tk()` çağrısı
+        Tcl'in kırk küsur `.tcl` kitaplık dosyasını sıfırdan okur; testler on
+        pencere kurup yıktığı için bu okumalardan biri (virüs taraması, aynı
+        dosyaları paylaşan başka bir süreç) rastgele takılıp
+        "couldn't read file …" hatası verebiliyordu. Testler tek bir Tk kökü
+        açıp her teste bir `Toplevel` vererek bu okumayı bire indirir.
+        """
+        self.kok = tk.Tk() if kok is None else kok
         self.kok.title("Sorumluluk Sınavı • Planlama ve Görevlendirme")
         self.kok.geometry("1380x860")
         self.kok.minsize(1100, 700)

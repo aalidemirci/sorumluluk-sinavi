@@ -30,6 +30,12 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+### Düzeltildi
+- Arayüz testleri kararsızdı: ekran olduğu hâlde her koşuda rastgele bir test
+  "Tkinter ekranı yok" diyerek atlanıyordu. Fikstür artık oturum başına tek
+  bir Tk kökü kurup her teste bir `Toplevel` veriyor; atlama da yalnızca
+  gerçekten ekransız ortamda yapılıyor, başka her Tk hatası testi kırıyor.
+
 ## [0.4.0] — 28.08.2026
 
 ### Değiştirildi (paket aynı numarayla yeniden yayımlandı)
