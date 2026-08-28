@@ -30,6 +30,20 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+### Eklendi
+- **Pardus paketi.** Pardus 23 ve üzeri için `.deb` paketi üretiliyor
+  (`yapim/deb_paketi.py`). Paket bütünleşiktir: Python, kitaplıklar ve Tcl/Tk
+  içindedir, kurulum internet istemez. Gerekçe:
+  [kararlar/0009](kararlar/0009-pardus-paketi-pyinstaller-ile.md).
+- **GitHub Actions.** Testler artık her itmede Windows (Python 3.11, 3.12) ve
+  Debian 12 kabında da koşuyor; Pardus paketi orada üretilip kuruluyor ve
+  açılıp açılmadığı deneniyor. Sürüm etiketi itildiğinde paket yayıma
+  kendiliğinden ekleniyor.
+
+### Değiştirildi
+- `SorumlulukSinavi.spec` iki platformu birden üretiyor: Windows'a özgü sürüm
+  kaynağı ve `.ico` simge koşula bağlandı, ikinci bir spec dosyası tutulmadı.
+
 ### Düzeltildi
 - Arayüz testleri kararsızdı: ekran olduğu hâlde her koşuda rastgele bir test
   "Tkinter ekranı yok" diyerek atlanıyordu. Fikstür artık oturum başına tek

@@ -22,7 +22,8 @@ import pytest
 KOK = Path(__file__).resolve().parents[1]
 
 # İzlenmesine izin verilen uzantılar. Burada olmayan her şey reddedilir.
-IZINLI_UZANTILAR = {".py", ".sql", ".toml", ".md", ".spec", ".iss", ".gitignore"}
+# .yml: GitHub Actions iş akışları (.github/workflows).
+IZINLI_UZANTILAR = {".py", ".sql", ".toml", ".md", ".spec", ".iss", ".gitignore", ".yml"}
 
 # Uzantısı olmayan ya da kuralı aşan tek tek dosyalar.
 IZINLI_DOSYALAR = {"LICENSE", "NOTICE", ".gitignore"}

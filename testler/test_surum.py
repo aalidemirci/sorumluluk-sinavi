@@ -52,6 +52,13 @@ def test_pyinstaller_betigi_surumu_elle_yazmaz() -> None:
     assert "from cekirdek.surum import SURUM" in betik
 
 
+def test_deb_betigi_surumu_elle_yazmaz() -> None:
+    """Pardus paketinin adı ve control dosyası da aynı kaynaktan gelir."""
+    betik = (KOK / "yapim" / "deb_paketi.py").read_text(encoding="utf-8")
+    assert SURUM not in betik, "sürüm deb_paketi.py içine elle yazılmış"
+    assert "from cekirdek.surum import SURUM" in betik
+
+
 def test_exe_metinleri_kurulum_betigiyle_ayni() -> None:
     """Uygulama adı ve geliştirici iki betikte de geçer; ayrışmasınlar."""
     spec = (KOK / "SorumlulukSinavi.spec").read_text(encoding="utf-8")

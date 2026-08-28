@@ -21,3 +21,4 @@ Durum, Bağlam, Karar, Gerekçe, Sonuçlar.
 | [0006](0006-basvuru-kapisi-pencereye-bagli.md) | Başvuru kapısı oturuma değil pencereye bağlı | Kabul |
 | [0007](0007-surum-tek-kaynakta.md) | Sürüm tek kaynakta tutulur | Kabul |
 | [0008](0008-kurulum-kullanici-basina.md) | Kurulum kullanıcı başınadır | Kabul |
+| [0009](0009-pardus-paketi-pyinstaller-ile.md) | Pardus paketi bütünleşiktir | Kabul |

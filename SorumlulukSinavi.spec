@@ -8,20 +8,30 @@ Pakete mutlaka girmesi gerekenler:
 
 Exe'ye Windows sürüm kaynağı gömülür; dosya özelliklerinin "Ayrıntılar"
 sekmesi ve kurulum/kaldırma kayıtları bunu okur.
+
+Aynı betik Pardus paketi için de kullanılır (bkz. yapim/deb_paketi.py).
+Windows'a özgü iki parça — sürüm kaynağı ve .ico simgesi — orada yoktur:
+``PyInstaller.utils.win32.versioninfo`` Linux'ta içe aktarılamaz, ``icon``
+ise .ico beklediği için Linux yapımını kırar. İkisi de WINDOWS koşuluna
+bağlandı; tek betik iki platformu da üretir.
 """
 
 import sys
 
 from PyInstaller.utils.hooks import collect_data_files
-from PyInstaller.utils.win32.versioninfo import (
-    FixedFileInfo,
-    StringFileInfo,
-    StringStruct,
-    StringTable,
-    VarFileInfo,
-    VarStruct,
-    VSVersionInfo,
-)
+
+WINDOWS = sys.platform == "win32"
+
+if WINDOWS:
+    from PyInstaller.utils.win32.versioninfo import (
+        FixedFileInfo,
+        StringFileInfo,
+        StringStruct,
+        StringTable,
+        VarFileInfo,
+        VarStruct,
+        VSVersionInfo,
+    )
 
 
 pathlib = __import__("pathlib")
@@ -57,7 +67,7 @@ surum_kaynagi = VSVersionInfo(
         ])]),
         VarFileInfo([VarStruct("Translation", [0x041F, 1200])]),
     ],
-)
+) if WINDOWS else None
 gocler = [(str(yol), "veri/gocler") for yol in pathlib.Path("veri/gocler").glob("*.sql")]
 varliklar = [(str(yol), "varliklar") for yol in pathlib.Path("varliklar").glob("*.*")]
 # Lisans sayfası bu dosyalara atıf yapar; pakette bulunmaları gerekir.
@@ -107,7 +117,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="varliklar/logo.ico",
+    icon="varliklar/logo.ico" if WINDOWS else None,
     version=surum_kaynagi,
 )
 

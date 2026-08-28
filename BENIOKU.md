@@ -8,6 +8,9 @@ sisteme bağlanmaz, kullanıcı adı ya da şifre istemez. Yalnız sizin dışa
 aktardığınız dosyaları okur; ürettiği planın e-Okul'a girişi kullanıcı
 tarafından elle yapılır.
 
+Windows ve Pardus için ayrı paketler yayımlanır (`.exe` ve `.deb`); ikisinde
+de Python kurulu olması gerekmez. Kurulum yordamı KURULUM.md'dedir.
+
 ## Ne yapar
 
 1. e-Okul **OOK01001R1** personel raporunu içe aktarır; branş havuzu bu
@@ -172,8 +175,8 @@ farklı seçilmesi, müdür ve rehber öğretmene sınav görevi verilmemesi.
 
 ## Veri ve gizlilik
 
-Veritabanı Windows'ta `%LOCALAPPDATA%\SorumlulukSinavi\veri`, Linux'ta
-`~/.local/share/sorumluluk-sinavi` altındadır. T.C. kimlik numarası okunmaz ve
+Veritabanı Windows'ta `%LOCALAPPDATA%\SorumlulukSinavi\plan`, Pardus/Linux'ta
+`~/.local/share/sorumluluk-sinavi/plan` altındadır. T.C. kimlik numarası okunmaz ve
 saklanmaz. Denetim izi yalnız tablo adı, kayıt kimliği ve işlem türü tutar;
 öğrenci adı veya numarası yazılmaz. Günlük dosyası kişisel veri içermez.
 
@@ -241,6 +244,10 @@ python -m venv .venv
 ```
 
 Kurulum ve paketleme KURULUM.md'de anlatılır.
+
+Testler GitHub Actions'ta da koşar: her itmede Windows (Python 3.11 ve 3.12)
+ve Pardus 23'ün tabanı olan Debian 12 kabı denenir, Pardus paketi de orada
+üretilip kurularak açılıp açılmadığına bakılır.
 
 ### Proje belgeleri
 

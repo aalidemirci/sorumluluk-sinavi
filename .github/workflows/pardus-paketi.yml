@@ -1,0 +1,97 @@
+# Pardus (.deb) paketini üretir ve sürüm etiketlerinde yayıma ekler.
+#
+# Neden kap: glibc ileriye uyumludur, geriye değil. Ubuntu 24.04 koşucusunda
+# (glibc 2.39) derlenen ikili Pardus 23'te (glibc 2.36) açılmaz. Bu yüzden
+# yapım debian:12 kabında yapılır; çıkan paket Debian 12 ve üzerinde çalışır.
+# Gerekçenin tamamı: kararlar/0009-pardus-paketi-pyinstaller-ile.md
+#
+# main'e her itmede de koşar: paketleme yolunun bozulduğunu yayım gününde
+# değil, bozulduğu gün öğrenmek gerekir.
+
+name: Pardus paketi
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  paket:
+    name: .deb üret (Debian 12)
+    runs-on: ubuntu-latest
+    container: debian:12
+    steps:
+      # libpython3.11: Debian'ın python3 paketi paylaşımlı kitaplığı
+      # (libpython3.11.so.1.0) taşımaz, PyInstaller onsuz derleyemez.
+      # xauth: xvfb-run onsuz "xauth command not found" der.
+      - name: Kap bağımlılıkları
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates python3 python3-venv python3-tk libpython3.11 \
+            dpkg-dev binutils xvfb xauth tzdata
+
+      - uses: actions/checkout@v4
+
+      - name: Sanal ortam
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -e . pyinstaller
+
+      - name: Paketi üret
+        run: .venv/bin/python yapim/deb_paketi.py
+
+      - name: Paket içeriğini göster
+        run: |
+          dpkg-deb --info dist-kurulum/*.deb
+          dpkg-deb --contents dist-kurulum/*.deb | grep -v '/opt/sorumluluk-sinavi/_internal/'
+
+      # Kurulum denemesi bağımlılıkların gerçekten çözüldüğünü gösterir;
+      # eksik bir Depends satırı ancak burada ortaya çıkar.
+      - name: Kur ve aç
+        run: |
+          apt-get install -y ./dist-kurulum/*.deb
+          test -x /usr/bin/sorumluluk-sinavi
+          test -f /usr/share/applications/sorumluluk-sinavi.desktop
+          # Uygulama penceresi açıp beklediği için normal çıkışı yoktur:
+          # 124 (timeout) beklenen sonuçtur, başka her kod açılış hatasıdır.
+          set +e
+          SORUMLULUK_VERI_KLASORU=/tmp/ss-deneme \
+            timeout 30 xvfb-run -a /usr/bin/sorumluluk-sinavi
+          durum=$?
+          set -e
+          test "$durum" -eq 124 || { echo "uygulama açılamadı (çıkış $durum)"; exit 1; }
+          test -f /tmp/ss-deneme/sorumluluk.db
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pardus-deb
+          path: dist-kurulum/*
+          retention-days: 30
+
+  yayim:
+    name: Sürüm yayımına ekle
+    needs: paket
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pardus-deb
+          path: paket
+
+      # Yayım Windows paketleriyle elle açılır; buradaki iş yalnızca Pardus
+      # dosyalarını o yayıma eklemektir. --clobber yeniden derlemede aynı adı
+      # üzerine yazar.
+      - name: Yayıma yükle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+                 --title "$GITHUB_REF_NAME" --notes "Pardus paketi eklendi."
+          gh release upload "$GITHUB_REF_NAME" paket/* --repo "$GITHUB_REPOSITORY" --clobber

@@ -21,6 +21,36 @@ python -m PyInstaller SorumlulukSinavi.spec --noconfirm
 iscc yapim/sorumluluk_sinavi.iss
 ```
 
+## Kurulum (Pardus)
+
+`sorumluluk-sinavi_<sürüm>_amd64.deb` dosyasını indirin ve kurun:
+
+```bash
+sudo apt install ./sorumluluk-sinavi_0.4.0_amd64.deb
+```
+
+- Pardus 23 ve üzeri (Debian 12 tabanlı her dağıtım) desteklenir. Paket
+  Debian 12 kabında derlenir; daha yeni bir dağıtımda da çalışır, daha
+  eskisinde çalışmaz.
+- **Python kurulu olmasına gerek yoktur**; yorumlayıcı ve bütün kitaplıklar
+  paketin içindedir. Kurulum internet istemez: paketin beklediği dört
+  kitaplık (`libx11-6`, `libxext6`, `libxft2`, `libfontconfig1`) her
+  masaüstü kurulumunda zaten yüklüdür.
+- Uygulama menüde **Ofis** ve **Eğitim** altında görünür; uçbirimden
+  `sorumluluk-sinavi` komutuyla da açılır.
+- Veritabanı `~/.local/share/sorumluluk-sinavi/plan` altındadır. Veri
+  **kullanıcı başınadır**; paketi kaldırmak veriye dokunmaz.
+- Yeni sürüm eskisinin üzerine kurulur:
+  `sudo apt install ./sorumluluk-sinavi_<yeni sürüm>_amd64.deb`.
+- Kaldırmak için: `sudo apt remove sorumluluk-sinavi`.
+
+İndirilen dosyayı doğrulamak için yayımdaki `SHA256SUMS-<sürüm>-pardus.txt`
+dosyasını yanına koyup:
+
+```bash
+sha256sum -c SHA256SUMS-0.4.0-pardus.txt
+```
+
 ## Kurulu makineleri güncelleme
 
 Yeni sürüm eskisinin üzerine kurulur; önce kaldırmaya gerek yoktur.
@@ -180,6 +210,31 @@ Gerçek veriyi e-posta, kişisel bulut veya Git deposuna koymayın.
 Pakete `veri/gocler/*.sql` ve `tzdata` girmek zorundadır: ilki şemayı kurar,
 ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta çözülemez.
 
+### Pardus paketini üretmek
+
+Paket, GitHub Actions'ta `debian:12` kabında kendiliğinden üretilir
+(`.github/workflows/pardus-paketi.yml`); elle üretmek gerekirse aynı kap
+kullanılır. Ubuntu ya da başka bir dağıtımda derlemeyin: **glibc ileriye
+uyumludur, geriye değil** — daha yeni bir tabanda derlenen ikili Pardus
+23'te açılmaz. Gerekçenin tamamı
+[kararlar/0009](kararlar/0009-pardus-paketi-pyinstaller-ile.md).
+
+Docker kurulu bir makinede, depo kökünde:
+
+```bash
+docker run --rm -v "$PWD:/kaynak" -w /kaynak debian:12 bash -c "apt-get update && apt-get install -y --no-install-recommends python3-venv python3-tk libpython3.11 dpkg-dev && python3 -m venv /tmp/o && /tmp/o/bin/pip install -e . pyinstaller && /tmp/o/bin/python yapim/deb_paketi.py"
+```
+
+Çıktı `dist-kurulum/` altına düşer: `.deb` dosyası ve SHA-256 özeti.
+
+### Testler GitHub'da da koşar
+
+`.github/workflows/testler.yml` her itmede ve her birleştirme isteğinde
+takımı üç ortamda koşturur: Windows'ta Python 3.11 ve 3.12, bir de Pardus
+23'ün tabanı olan Debian 12 kabında (arayüz testleri için `xvfb` ile).
+Bu makinedeki `pytest` bunun yerini tutmaz — özellikle Linux ayağı burada
+hiç denenmiyor.
+
 ### Sürüm yükseltmek
 
 Sıra: `SURUM` güncellenir → CHANGELOG'da başlık açılır → testler koşar →
@@ -187,8 +242,12 @@ paketler derlenir → commit → `git tag -a vX.Y.Z`.
 
 Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
 Arayüzdeki hakkında penceresi, `pyproject.toml`, PyInstaller betiği (exe'nin
-dosya özelliklerine gömülen sürüm kaynağı) ve Inno Setup betiği bu değeri
-oradan okur; başka hiçbir dosyada elle yazmayın.
+dosya özelliklerine gömülen sürüm kaynağı), Inno Setup betiği ve Pardus
+paketi betiği (`.deb` dosyasının adı ile `DEBIAN/control` içindeki `Version`)
+bu değeri oradan okur; başka hiçbir dosyada elle yazmayın.
+
+`vX.Y.Z` etiketi itildiğinde Pardus paketi GitHub Actions'ta üretilip yayıma
+kendiliğinden eklenir; Windows paketleri elle yüklenir.
 
 Inno Setup betiği `surum.py`'yi Python olarak çalıştıramaz, satırı **metin
 olarak** ayrıştırır. Bu yüzden satırın biçimi (`SURUM = "x.y.z"`, tek satır,

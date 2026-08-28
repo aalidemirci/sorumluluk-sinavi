@@ -34,7 +34,7 @@ veri/       şema göçleri, servis katmanı, e-Okul rapor ayrıştırma
 evrak/      .docx üretimi; belge düzeni koddan gelir, şablondan değil
 arayuz/     Tkinter masaüstü arayüzü
 testler/    pytest; her kural olumsuz senaryosuyla birlikte test edilir
-yapim/      Inno Setup kurulum betiği
+yapim/      paketleme: Inno Setup betiği (Windows), deb_paketi.py (Pardus)
 araclar/    tek seferlik yardımcı betikler (logo üretimi gibi)
 ```
 
@@ -110,6 +110,14 @@ iscc yapim/sorumluluk_sinavi.iss
 Kurulum dosyası Inno Setup 6 ister (`winget install JRSoftware.InnoSetup`);
 `iscc` PATH'te olmayabilir, `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`
 altındadır.
+
+Pardus paketi bu makinede üretilmez: `debian:12` kabında derlenir (yordam
+KURULUM.md → "Pardus paketini üretmek"), GitHub Actions da aynı kabı kullanır.
+Ubuntu koşucusunda derlemeyin — glibc geriye uyumlu değildir.
+
+Testler GitHub Actions'ta da koşar (`.github/workflows/testler.yml`): Windows
+3.11/3.12 ve Debian 12. Linux ayağı yalnız orada denendiği için `arayuz/` ya
+da paketleme tarafında değişiklik yapınca iş akışının sonucuna bakın.
 
 Türkçe karakterli commit mesajlarını PowerShell'den geçirirken `git commit -F`
 kullanın.
