@@ -32,7 +32,7 @@ jobs:
             git ca-certificates python3 python3-venv python3-tk libpython3.11 \
             dpkg-dev binutils xvfb xauth tzdata
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Sanal ortam
         run: |
@@ -65,7 +65,7 @@ jobs:
           test "$durum" -eq 124 || { echo "uygulama açılamadı (çıkış $durum)"; exit 1; }
           test -f /tmp/ss-deneme/sorumluluk.db
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pardus-deb
           path: dist-kurulum/*
@@ -79,7 +79,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: pardus-deb
           path: paket
