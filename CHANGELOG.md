@@ -8,18 +8,22 @@ Sürüm numarası `cekirdek/surum.py` içindedir; yeni sürüm çıkarırken ön
 oradaki `SURUM` güncellenir, sonra buraya başlık açılır, sonra paket
 derlenir.
 
-> **Not.** Bu günlük geriye dönük, git geçmişinden yazıldı. Depoda sürüm
-> etiketi (`git tag`) yok. `pyproject.toml` ilk commit'ten beri 0.2.0
-> diyordu ama o numarayla hiçbir paket dağıtılmadı; dağıtılan ilk paket
-> 27.08.2026 tarihli 0.3.0'dır. Bu yüzden 0.3.0 öncesi tek başlık altında
-> toplandı.
+> **Not.** Bu günlük geriye dönük, git geçmişinden yazıldı. Etiketlenen ilk
+> sürüm `v0.4.0`'dır; öncesi etiketsiz dağıtıldı. `pyproject.toml` ilk
+> commit'ten beri 0.2.0 diyordu ama o numarayla hiçbir paket dağıtılmadı;
+> dağıtılan ilk paket 27.08.2026 tarihli 0.3.0'dır. Bu yüzden 0.3.0 öncesi
+> tek başlık altında toplandı.
 
-> **Dikkat.** Aşağıda "Yayımlanmamış" altındaki işler 0.3.0 numarasıyla
-> derlendi; yani 27.08.2026'da dağıtılan 0.3.0 paketi ile bugün yeniden
-> derlenen 0.3.0 paketi **aynı değil**. Bir sonraki dağıtımdan önce sürüm
-> numarası yükseltilmelidir.
+> **Dikkat.** 0.4.0 altındaki işler bir ara 0.3.0 numarasıyla da derlendi.
+> Yani 0.3.0 etiketli iki farklı paket bulunabilir: 27.08.2026 tarihli asıl
+> 0.3.0 ve 28.08.2026'da aynı numarayla yeniden derlenmiş olan. Elinizdeki
+> 0.3.0 paketini ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin. 0.4.0'dan
+> itibaren sürüm numarası tek kaynaktan gelir ve exe'nin dosya
+> özelliklerinde de görünür.
 
 ## [Yayımlanmamış]
+
+## [0.4.0] — 28.08.2026
 
 ### Eklendi
 - **Başvuru kapısı** (OKY md.58/2-d): okuldan mezun olamayan 12. sınıf

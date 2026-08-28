@@ -5,18 +5,16 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 28.08.2026.
+Son gözden geçirme: 28.08.2026 (sürüm 0.4.0).
 
 ## Şimdi
 
-- [ ] **Sürüm numarasını yükselt.** 27.08.2026'da dağıtılan 0.3.0 paketi ile
-      bugün yeniden derlenen 0.3.0 paketi aynı değil: aradaki farkta başvuru
-      kapısı (OKY md.58/2-d) gibi davranış değişiklikleri var. Bir sonraki
-      dağıtımdan önce `cekirdek/surum.py` içindeki `SURUM` 0.4.0 yapılmalı,
-      CHANGELOG'da başlık açılmalı, paketler yeniden derlenmeli.
-- [ ] **Sürüm etiketi kullanmaya başla.** Depoda hiç `git tag` yok; hangi
-      commit'in hangi paket olduğu ancak tarihten tahmin ediliyor. Dağıtılan
-      her sürüm etiketlensin.
+- [ ] **Kurulu 0.3.0 paketlerini güncelle.** 0.3.0 numarasıyla iki farklı
+      paket derlendi (aradaki farkta başvuru kapısı var), yani o numara
+      hangi içeriği taşıdığını söylemiyor. Kurulu olduğu her yer 0.4.0 ile
+      güncellensin. Yapım klasöründeki kopya 28.08.2026'da silindi.
+- [ ] **Etiketleri uzağa gönder.** `v0.4.0` yerelde atıldı; `git push --tags`
+      henüz yapılmadı.
 
 ## Takvime bağlı
 

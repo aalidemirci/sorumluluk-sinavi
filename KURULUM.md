@@ -140,6 +140,9 @@ ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta çözülemez.
 
 ### Sürüm yükseltmek
 
+Sıra: `SURUM` güncellenir → CHANGELOG'da başlık açılır → testler koşar →
+paketler derlenir → commit → `git tag -a vX.Y.Z`.
+
 Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
 Arayüzdeki hakkında penceresi, `pyproject.toml`, PyInstaller betiği (exe'nin
 dosya özelliklerine gömülen sürüm kaynağı) ve Inno Setup betiği bu değeri
