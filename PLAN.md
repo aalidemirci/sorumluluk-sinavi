@@ -9,12 +9,17 @@ Son gözden geçirme: 28.08.2026 (sürüm 0.4.0).
 
 ## Şimdi
 
-- [ ] **Okuldaki makineleri 0.4.0'a güncelle.** 0.3.0 numarasıyla iki farklı
-      paket derlendi (aradaki farkta başvuru kapısı var), yani o numara hangi
-      içeriği taşıdığını söylemiyor; kurulu olduğu her yere 0.4.0 gitmeli.
-      Yordam KURULUM.md → "Kurulu makineleri güncelleme" başlığında.
-      28.08.2026: geliştirme makinesi güncellendi, yapım klasöründeki eski
-      kopya silindi. Okul makineleri bekliyor.
+- [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
+      makineleri güncelleme" başlığında. 28.08.2026: geliştirme makinesi
+      güncellendi; okul makineleri bekliyor.
+- [ ] **v0.4.0 etiketi yayımlanan paketle örtüşmüyor.** Etiket `8292321`
+      commit'ini gösteriyor ama yeniden yayımlanan 0.4.0 paketi palet ve logo
+      commit'lerinden (`4ecd40c`) derlendi. Etiket ya bu commit'e taşınmalı
+      ya da bir sonraki sürümde numara yükseltilerek düzeltilmeli.
+- [ ] **Sürüm numarasını bir daha yerinde değiştirme.** 0.3.0 ve 0.4.0'ın
+      ikisi de aynı numarayla iki kez derlendi; hangi kurulumun ne taşıdığı
+      SHA-256'ya bakmadan anlaşılmıyor. Sonraki değişiklik görsel bile olsa
+      numarayı yükseltin.
 
 ## Takvime bağlı
 

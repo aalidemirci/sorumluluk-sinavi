@@ -14,16 +14,29 @@ derlenir.
 > dağıtılan ilk paket 27.08.2026 tarihli 0.3.0'dır. Bu yüzden 0.3.0 öncesi
 > tek başlık altında toplandı.
 
-> **Dikkat.** 0.4.0 altındaki işler bir ara 0.3.0 numarasıyla da derlendi.
-> Yani 0.3.0 etiketli iki farklı paket bulunabilir: 27.08.2026 tarihli asıl
-> 0.3.0 ve 28.08.2026'da aynı numarayla yeniden derlenmiş olan. Elinizdeki
-> 0.3.0 paketini ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin. 0.4.0'dan
-> itibaren sürüm numarası tek kaynaktan gelir ve exe'nin dosya
-> özelliklerinde de görünür.
+> **Dikkat — 0.4.0 iki kez derlendi.** 28.08.2026 sabahı yayımlanan 0.4.0
+> paketi eski lacivert-turkuaz arayüzü taşıyordu. Aynı gün arayüz paleti ve
+> logo değiştirildi ve paket **aynı numarayla** yeniden derlenip yayımlanan
+> dosyaların üzerine yazıldı. Ayırt etmek için SHA-256 özetine bakın:
+>
+> | Derleme | Kurulum dosyası SHA-256 (ilk 16) |
+> |---|---|
+> | İlk (sabah, turkuaz) | `ea635b65bd539ca5` |
+> | Geçerli (bordo) | `9da05566062a3853` |
+>
+> Aynı sorun 0.3.0'da da yaşandı: 27.08.2026 tarihli asıl 0.3.0 ile
+> 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
+> ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
 ## [Yayımlanmamış]
 
 ## [0.4.0] — 28.08.2026
+
+### Değiştirildi (paket aynı numarayla yeniden yayımlandı)
+- Arayüz paleti okulapp.org'un Sorumluluk Sınavı bölümüyle aynı kümeye
+  (`ss`: bordo + sıcak kum) çevrildi. Renkler `arayuz/palet.py`'de tek yerde;
+  önce iki ayrı sözlükte ve yirmiye yakın doğrudan yazılmış kodda dağınıktı.
+- Logo da aynı paletten üretiliyor; dış kare bordo, başlık şeridi sıcak kum.
 
 ### Eklendi
 - **Başvuru kapısı** (OKY md.58/2-d): okuldan mezun olamayan 12. sınıf
