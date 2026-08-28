@@ -11,23 +11,27 @@ import tkinter as tk
 from datetime import date, time
 from tkinter import ttk
 
+from arayuz.palet import RENK as _P
+
 
 GUN_KISALTMALARI = ("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
 
+# Izgaranın kendi ad kümesi var ama renkler tek yerden, arayuz.palet'ten
+# gelir; site paletiyle uyumu orada tutulur.
 RENK = {
-    "zemin": "#FFFFFF",
-    "izgara": "#D6DFE6",
-    "baslik": "#EAF0F4",
-    "baslik_yazi": "#142739",
-    "hafta_sonu": "#FFF7E8",
-    "kart": "#E8F1FA",
-    "kart_kenar": "#7FA8CC",
-    "kart_yazi": "#142739",
-    "kilit": "#EEF1F3",
-    "kilit_kenar": "#AAB6C4",
-    "uygulama": "#EAF7EE",
-    "uygulama_kenar": "#7FC49A",
-    "hedef": "#CDE8FF",
+    "zemin": _P["kart"],
+    "izgara": _P["cizgi"],
+    "baslik": _P["tint"],
+    "baslik_yazi": _P["yazi"],
+    "hafta_sonu": _P["uyari_zemin"],
+    "kart": _P["chip"],
+    "kart_kenar": _P["takvim_kart_kenar"],
+    "kart_yazi": _P["yazi"],
+    "kilit": _P["pasif_zemin"],
+    "kilit_kenar": _P["takvim_kilit_kenar"],
+    "uygulama": _P["basari_zemin"],
+    "uygulama_kenar": _P["takvim_uygulama_kenar"],
+    "hedef": _P["takvim_hedef"],
 }
 
 

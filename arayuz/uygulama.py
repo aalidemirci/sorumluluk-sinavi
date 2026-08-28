@@ -18,6 +18,7 @@ from datetime import date
 from pathlib import Path
 from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 
+from arayuz.palet import RENK
 from cekirdek.kaynak import varlik_yolu
 from cekirdek.modeller import IkiAsamaliSayim, PlanParametreleri
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
@@ -32,11 +33,6 @@ from . import yardim_metni
 from .takvim import SurukleBirakTakvim
 
 
-RENK = {
-    "kenar": "#082642", "kenar2": "#0C3454", "vurgu": "#008E92", "vurgu2": "#09A6AA",
-    "zemin": "#F6F8FA", "kart": "#FFFFFF", "yazi": "#142739", "soluk": "#536576",
-    "cizgi": "#D6DFE6", "basari": "#168B5C", "uyari": "#B7791F", "engel": "#9B1C1C",
-}
 
 ADIMLAR = (
     ("01", "Kurum Ayarları", "Okul bilgileri ve dönem tarihleri"),
@@ -152,19 +148,19 @@ class Uygulama:
                     font=("Segoe UI Semibold", 19))
         s.configure("KartBaslik.TLabel", background=RENK["kart"], foreground=RENK["yazi"],
                     font=("Segoe UI Semibold", 12))
-        s.configure("TEntry", fieldbackground="#FBFCFD", padding=6)
-        s.configure("TCombobox", fieldbackground="#FBFCFD", padding=5)
+        s.configure("TEntry", fieldbackground=RENK["alan"], padding=6)
+        s.configure("TCombobox", fieldbackground=RENK["alan"], padding=5)
         s.configure("TCheckbutton", background=RENK["kart"], font=("Segoe UI", 9))
-        s.configure("Ana.TButton", font=("Segoe UI Semibold", 10), foreground="white",
+        s.configure("Ana.TButton", font=("Segoe UI Semibold", 10), foreground=RENK["vurgu_yazi"],
                     background=RENK["vurgu"], borderwidth=0, padding=(15, 9))
-        s.map("Ana.TButton", background=[("active", RENK["vurgu2"]), ("disabled", "#9CC3C4")])
+        s.map("Ana.TButton", background=[("active", RENK["vurgu2"]), ("disabled", RENK["vurgu_pasif"])])
         s.configure("Ikincil.TButton", font=("Segoe UI Semibold", 9),
-                    foreground=RENK["yazi"], background="#EAF0F4", borderwidth=0,
+                    foreground=RENK["yazi"], background=RENK["tint"], borderwidth=0,
                     padding=(12, 7))
         s.configure("Treeview", font=("Segoe UI", 9), rowheight=26,
-                    background="white", fieldbackground="white")
+                    background=RENK["kart"], fieldbackground=RENK["kart"])
         s.configure("Treeview.Heading", font=("Segoe UI Semibold", 9),
-                    background="#EAF0F4", padding=6)
+                    background=RENK["tint"], padding=6)
 
     def _kabuk(self) -> None:
         sol = tk.Frame(self.kok, bg=RENK["kenar"], width=232)
@@ -182,18 +178,18 @@ class Uygulama:
             except tk.TclError:
                 png = None
         if png is None:
-            tk.Label(marka, text="S", font=("Segoe UI Semibold", 19), fg="white",
+            tk.Label(marka, text="S", font=("Segoe UI Semibold", 19), fg=RENK["vurgu_yazi"],
                      bg=RENK["vurgu"], width=2).pack(side=LEFT, padx=(15, 9), pady=15)
         tk.Label(marka, text="SORUMLULUK\nSINAVI", justify=LEFT,
-                 font=("Segoe UI Semibold", 10), fg="#EFF8FC",
+                 font=("Segoe UI Semibold", 10), fg=RENK["panel_yazi"],
                  bg=RENK["kenar"]).pack(side=LEFT)
         tk.Label(sol, text="ÇALIŞMA AKIŞI", font=("Segoe UI Semibold", 8),
-                 fg="#A6C1D3", bg=RENK["kenar"]).pack(anchor="w", padx=17, pady=(12, 6))
+                 fg=RENK["panel_silik"], bg=RENK["kenar"]).pack(anchor="w", padx=17, pady=(12, 6))
         self.nav = []
         for sira, (no, ad, _) in enumerate(ADIMLAR):
             dugme = tk.Button(
                 sol, text=f"{no}   {ad}", anchor="w", font=("Segoe UI Semibold", 9),
-                fg="#A6C1D3", bg=RENK["kenar"], activeforeground="white",
+                fg=RENK["panel_soluk"], bg=RENK["kenar"], activeforeground=RENK["panel_yazi"],
                 activebackground=RENK["kenar2"], bd=0, padx=17, pady=9, cursor="hand2",
                 command=lambda x=sira: self._sayfa_goster(x))
             dugme.pack(fill=X, padx=7, pady=1)
@@ -201,9 +197,9 @@ class Uygulama:
         alt = tk.Frame(sol, bg=RENK["kenar2"])
         alt.pack(side=tk.BOTTOM, fill=X, padx=11, pady=11)
         tk.Label(alt, text="●  Çevrimdışı çalışır", font=("Segoe UI Semibold", 9),
-                 fg="#62D5A4", bg=RENK["kenar2"]).pack(anchor="w", padx=9, pady=(8, 0))
+                 fg=RENK["vurgu2"], bg=RENK["kenar2"]).pack(anchor="w", padx=9, pady=(8, 0))
         tk.Label(alt, text="Veriler yalnız bu bilgisayarda", font=("Segoe UI", 8),
-                 fg="#A6C1D3", bg=RENK["kenar2"]).pack(anchor="w", padx=9, pady=(0, 8))
+                 fg=RENK["panel_silik"], bg=RENK["kenar2"]).pack(anchor="w", padx=9, pady=(0, 8))
 
         sag = tk.Frame(self.kok, bg=RENK["zemin"])
         sag.pack(side=RIGHT, fill=BOTH, expand=True)
@@ -213,7 +209,7 @@ class Uygulama:
     def _sayfa_goster(self, sira: int) -> None:
         for i, dugme in enumerate(self.nav):
             dugme.configure(bg=RENK["vurgu2"] if i == sira else RENK["kenar"],
-                            fg="white" if i == sira else "#A6C1D3")
+                            fg=RENK["vurgu_yazi"] if i == sira else RENK["panel_soluk"])
         for cocuk in self.icerik.winfo_children():
             cocuk.destroy()
         ttk.Label(self.icerik, text=ADIMLAR[sira][1], style="Baslik.TLabel").pack(anchor="w")
@@ -327,8 +323,9 @@ class Uygulama:
             kart, ("ad", "unvan", "kadro", "brans", "durum", "gorev"),
             ("Adı Soyadı", "Görevi", "Kadro", "Branşı", "Durum", "Görev"),
             (215, 165, 115, 185, 115, 55), 10)
-        for etiket, renk in (("eklenecek", "#E8F6EF"), ("guncellenecek", "#FFF3DC"),
-                             ("pasif", "#EEF1F3")):
+        for etiket, renk in (("eklenecek", RENK["basari_zemin"]),
+                             ("guncellenecek", RENK["uyari_zemin"]),
+                             ("pasif", RENK["pasif_zemin"])):
             self.personel_tablosu.tag_configure(etiket, background=renk)
         self._personel_listesini_doldur()
         self._personel_yonetim_bolumu(kart)
@@ -762,7 +759,7 @@ class Uygulama:
             kart, ("ad", "brans", "iki", "kayit"),
             ("Ders", "Branş", "İki aşamalı", "Sorumluluk kaydı"),
             (300, 250, 110, 130), 10)
-        tablo.tag_configure("eksik", background="#FFE6E6")
+        tablo.tag_configure("eksik", background=RENK["engel_zemin"])
         for kayit in dersler:
             ders_id, ad, brans, iki, _yabanci, kayit_sayisi = kayit[:6]
             esdeger = hizmet.ders_esdeger_branslari(kayit)
@@ -913,8 +910,8 @@ class Uygulama:
                                         ("aciklama", "Açıklama", 900)):
             self.ihlal_tablosu.heading(sutun, text=baslik)
             self.ihlal_tablosu.column(sutun, width=genislik, anchor="w")
-        self.ihlal_tablosu.tag_configure("ENGEL", background="#FFE6E6")
-        self.ihlal_tablosu.tag_configure("UYARI", background="#FFF3DC")
+        self.ihlal_tablosu.tag_configure("ENGEL", background=RENK["engel_zemin"])
+        self.ihlal_tablosu.tag_configure("UYARI", background=RENK["uyari_zemin"])
         self.ihlal_tablosu.pack(fill=X, padx=15, pady=(0, 4))
 
         alt = tk.Frame(kart, bg=RENK["kart"])
@@ -1285,8 +1282,8 @@ class Uygulama:
             ana, ("sinav", "tarih", "evrak", "adet", "eden", "alan", "durum"),
             ("Sınav", "Tarih", "Evrak", "Adet", "Teslim eden", "Teslim alan", "Durum"),
             (200, 80, 150, 55, 140, 140, 100), 11)
-        self.teslim_tablosu.tag_configure("gecikti", background="#FFE6E6")
-        self.teslim_tablosu.tag_configure("teslim alındı", background="#E8F6EF")
+        self.teslim_tablosu.tag_configure("gecikti", background=RENK["engel_zemin"])
+        self.teslim_tablosu.tag_configure("teslim alındı", background=RENK["basari_zemin"])
 
         form = tk.Frame(ana, bg=RENK["kart"])
         form.pack(fill=X, padx=12, pady=(0, 6))
@@ -1402,19 +1399,19 @@ class Uygulama:
 
     def _rapor_ipucu(self, ana: tk.Frame, rapor_kodu: str, aciklama: str) -> None:
         """İçe aktarma ekranlarında hangi raporun nasıl indirileceğini anlatır."""
-        kutu = tk.Frame(ana, bg="#EEF4FA", highlightthickness=1,
+        kutu = tk.Frame(ana, bg=RENK["chip"], highlightthickness=1,
                         highlightbackground=RENK["cizgi"])
         kutu.pack(fill=X, padx=15, pady=(4, 8))
-        tk.Label(kutu, text=f"e-Okul raporu:  {rapor_kodu}", bg="#EEF4FA",
+        tk.Label(kutu, text=f"e-Okul raporu:  {rapor_kodu}", bg=RENK["chip"],
                  fg=RENK["kenar"], font=("Segoe UI Semibold", 10),
                  anchor="w").pack(fill=X, padx=12, pady=(8, 0))
-        tk.Label(kutu, text=aciklama, bg="#EEF4FA", fg=RENK["yazi"],
+        tk.Label(kutu, text=aciklama, bg=RENK["chip"], fg=RENK["yazi"],
                  font=("Segoe UI", 9), anchor="w", justify=LEFT,
                  wraplength=980).pack(fill=X, padx=12, pady=(2, 2))
         tk.Label(kutu,
                  text="Raporu HTML5 görüntüleyicide açın → dışa aktarmadan Excel'i seçin → "
                       "SADECE VERİ seçeneğini işaretleyin. Biçimlendirilmiş çıktı okunamaz.",
-                 bg="#EEF4FA", fg=RENK["engel"], font=("Segoe UI Semibold", 9),
+                 bg=RENK["chip"], fg=RENK["engel"], font=("Segoe UI Semibold", 9),
                  anchor="w", justify=LEFT, wraplength=980).pack(fill=X, padx=12, pady=(0, 9))
 
     # ============================================================ 09 lisans
