@@ -67,6 +67,22 @@ Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
 arayüz bu değeri oradan okur. Ayrıntı ve tuzaklar için KURULUM.md →
 "Sürüm yükseltmek".
 
+## okulapp.org yayını (ortak yayın alanı)
+
+Bu projenin sitedeki alanı, yan klon `../okulapp.org` içinde
+`src/data/ss-release.json` (indirme kartı) ile `/sorumluluk-sinavi/**`
+sayfalarıdır; o sayfalar projenin tek tanıtımıdır ve kaynağı bu depodaki
+BENIOKU.md, KURULUM.md ve CHANGELOG.md'dir. Sürüm yükseltince
+`ss-release.json` ve sitedeki proje kartının `badge` alanı da güncellenir;
+yoksa site eski paketi göstermeye devam eder.
+
+Siteye dokunmadan önce `../okulapp.org/CLAUDE.md` → **"Ortak çalışma
+düzeni"** okunur ve uygulanır. Özet: sitede yalnız kendi alanına yaz ·
+işe `git fetch` + güncel `origin/main` ile başla, eski tabandan açılmış
+dal güncellenmeden merge edilmez · production yalnız `main` push'uyla
+değişir (Cloudflare "Version command" = `npx wrangler versions upload`;
+`deploy` yapılmaz).
+
 ## KVKK
 
 Öğrenci, veli ve personel verisi depoya, GitHub'a, hata bildirimine ya da
