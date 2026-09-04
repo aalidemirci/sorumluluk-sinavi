@@ -235,6 +235,10 @@ takımı üç ortamda koşturur: Windows'ta Python 3.11 ve 3.12, bir de Pardus
 Bu makinedeki `pytest` bunun yerini tutmaz — özellikle Linux ayağı burada
 hiç denenmiyor.
 
+Yalnız `.md`, `LICENSE` ve `NOTICE` değiştiren itmelerde iki iş akışı da
+koşmaz (`paths-ignore`). Listeye kod, test, `.gitignore` ya da iş akışı
+dosyası eklemeyin.
+
 ### Sürüm yükseltmek
 
 Sıra: `SURUM` güncellenir → CHANGELOG'da başlık açılır → testler koşar →
@@ -246,8 +250,14 @@ dosya özelliklerine gömülen sürüm kaynağı), Inno Setup betiği ve Pardus
 paketi betiği (`.deb` dosyasının adı ile `DEBIAN/control` içindeki `Version`)
 bu değeri oradan okur; başka hiçbir dosyada elle yazmayın.
 
-`vX.Y.Z` etiketi itildiğinde Pardus paketi GitHub Actions'ta üretilip yayıma
-kendiliğinden eklenir; Windows paketleri elle yüklenir.
+Sıranın sonu şudur: etiketi itin, GitHub'da **yayımı açın** (Windows
+paketlerini oraya yükleyerek). Yayım açıldığı anda GitHub Actions Pardus
+paketini üretip aynı yayıma ekler.
+
+Tetikleyici bilerek etiket itmesi değil `release: published` olayıdır:
+iş akışındaki `paths-ignore` süzgeci `push` olayına takılıdır ve etiket,
+main zaten itildikten sonra konduğu için o push'ta değişen dosya yoktur —
+süzgeç etiket itmesini sessizce atlar, paket hiç üretilmezdi.
 
 Inno Setup betiği `surum.py`'yi Python olarak çalıştıramaz, satırı **metin
 olarak** ayrıştırır. Bu yüzden satırın biçimi (`SURUM = "x.y.z"`, tek satır,

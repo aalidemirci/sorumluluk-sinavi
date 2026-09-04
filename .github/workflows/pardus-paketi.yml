@@ -1,19 +1,28 @@
-# Pardus (.deb) paketini üretir ve sürüm etiketlerinde yayıma ekler.
+# Pardus (.deb) paketini üretir ve yayım açıldığında ona ekler.
 #
 # Neden kap: glibc ileriye uyumludur, geriye değil. Ubuntu 24.04 koşucusunda
 # (glibc 2.39) derlenen ikili Pardus 23'te (glibc 2.36) açılmaz. Bu yüzden
 # yapım debian:12 kabında yapılır; çıkan paket Debian 12 ve üzerinde çalışır.
 # Gerekçenin tamamı: kararlar/0009-pardus-paketi-pyinstaller-ile.md
 #
-# main'e her itmede de koşar: paketleme yolunun bozulduğunu yayım gününde
-# değil, bozulduğu gün öğrenmek gerekir.
+# main'e her itmede de koşar (yalnız belge değişen itmeler hariç): paketleme
+# yolunun bozulduğunu yayım gününde değil, bozulduğu gün öğrenmek gerekir.
+#
+# DİKKAT — yayım tetikleyicisi neden `release` olayı, etiket itmesi değil:
+# `paths-ignore` yalnız `push` olayına takılıdır ama etiket itmesi de bir
+# push'tur ve etiket, main zaten itildikten sonra konduğu için o push'ta
+# değişen dosya yoktur. Süzgeçle birlikte etiket itmesi sessizce atlanır,
+# yani paket hiç üretilmez. `release: published` süzgeçten etkilenmez;
+# yayımı açtığınız anda paket üretilip ona eklenir.
 
 name: Pardus paketi
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    paths-ignore: ["**.md", "LICENSE", "NOTICE"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -74,7 +83,7 @@ jobs:
   yayim:
     name: Sürüm yayımına ekle
     needs: paket
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,8 +99,6 @@ jobs:
       - name: Yayıma yükle
         env:
           GH_TOKEN: ${{ github.token }}
+          ETIKET: ${{ github.event.release.tag_name }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-                 --title "$GITHUB_REF_NAME" --notes "Pardus paketi eklendi."
-          gh release upload "$GITHUB_REF_NAME" paket/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$ETIKET" paket/* --repo "$GITHUB_REPOSITORY" --clobber

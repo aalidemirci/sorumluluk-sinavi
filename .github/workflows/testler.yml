@@ -11,10 +11,16 @@
 
 name: Testler
 
+# paths-ignore: yalnız belge değiştiren itmelerde koşmaz. Listeye kod, test,
+# `.gitignore` ya da iş akışı dosyaları GİRMEZ — `.gitignore` değişikliği
+# test_gizlilik.py'yi doğrudan ilgilendirir.
+
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "LICENSE", "NOTICE"]
   pull_request:
+    paths-ignore: ["**.md", "LICENSE", "NOTICE"]
   workflow_dispatch:
 
 jobs:

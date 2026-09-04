@@ -30,6 +30,12 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+### Değiştirildi
+- İş akışları yalnız belge değiştiren itmelerde koşmuyor (`paths-ignore`:
+  `**.md`, `LICENSE`, `NOTICE`). Pardus paketinin yayıma eklenmesi artık
+  etiket itmesine değil **yayımın açılmasına** (`release: published`) bağlı;
+  süzgeç `push` olayına takılı olduğu için etiket itmesi sessizce atlanırdı.
+
 ## [0.5.0] — 29.08.2026
 
 Windows tarafında işleyiş değişmedi; bu sürüm uygulamayı **Pardus'a** taşır

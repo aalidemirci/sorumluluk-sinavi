@@ -54,5 +54,7 @@ görünür. Debian 12'de derlenen paket ise Debian 12 ve üzerinin tamamında
   bir spec dosyası tutulmaz.
 - Uygulama verisi Linux'ta `~/.local/share/sorumluluk-sinavi/plan`
   altındadır; paket kaldırıldığında dokunulmaz.
-- Paketleme yolunun bozulmadığı GitHub Actions'ta her itmede denetlenir:
-  paket üretilir, kaba kurulur ve xvfb altında açılıp açılmadığına bakılır.
+- Paketleme yolunun bozulmadığı GitHub Actions'ta, belge dışı her itmede
+  denetlenir: paket üretilir, kaba kurulur ve xvfb altında açılıp
+  açılmadığına bakılır. Yayıma ekleme `release: published` olayına bağlıdır
+  (etiket itmesi `paths-ignore` süzgecine takılacağı için).
