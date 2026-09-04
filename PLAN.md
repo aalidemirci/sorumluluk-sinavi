@@ -5,17 +5,18 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 28.08.2026 (sürüm 0.4.0).
+Son gözden geçirme: 04.09.2026 (sürüm 0.5.0).
 
 ## Şimdi
 
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 28.08.2026: geliştirme makinesi
-      güncellendi; okul makineleri bekliyor.
-- [ ] **v0.4.0 etiketi yayımlanan paketle örtüşmüyor.** Etiket `8292321`
-      commit'ini gösteriyor ama yeniden yayımlanan 0.4.0 paketi palet ve logo
-      commit'lerinden (`4ecd40c`) derlendi. Etiket ya bu commit'e taşınmalı
-      ya da bir sonraki sürümde numara yükseltilerek düzeltilmeli.
+      makineleri güncelleme" başlığında. 04.09.2026: yayımlanan sürüm 0.5.0;
+      okul makineleri bekliyor.
+- [ ] **Pardus paketi gerçek bir makinede denenmedi.** 0.5.0 ile yayımlanan
+      `.deb` yalnız `debian:12` kabında (GitHub Actions ve yerelde Docker)
+      kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23 makinesinde
+      kurulup menüden açılması, e-Okul raporu içe aktarılması ve evrak
+      üretilmesi denenmeli; ilk gerçek deneme sonucu buraya yazılsın.
 - [ ] **Sürüm numarasını bir daha yerinde değiştirme.** 0.3.0 ve 0.4.0'ın
       ikisi de aynı numarayla iki kez derlendi; hangi kurulumun ne taşıdığı
       SHA-256'ya bakmadan anlaşılmıyor. Sonraki değişiklik görsel bile olsa
