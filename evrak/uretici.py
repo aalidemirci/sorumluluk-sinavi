@@ -8,13 +8,14 @@ okulun kendi kayıtlarından hazırlanmış çıktılardır.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 
 from veri import hizmet
 from veri.veritabani import Veritabani
+from cekirdek.metin import buyult, esitle
+from cekirdek.modeller import PlanTuru
 from cekirdek.takvim import pencere_adi
-from .belge import Belge, tr_tarih
+from .belge import Belge, Imzaci, tr_tarih
 
 
 ALTBILGI_NOTU = (
@@ -26,6 +27,13 @@ ROL_ADLARI = {"komisyon_uyesi": "Komisyon üyesi", "gozcu": "Gözcü"}
 
 GUN_ADLARI = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma",
               "Cumartesi", "Pazar")
+# Adın ilk üç harfi pazartesi ile pazarı ayırmaz ("Paz"); kısaltma ayrı tutulur.
+GUN_KISALTMALARI = ("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
+
+TOPLU_SOZLESME_NOTU = (
+    "Toplu sözleşme gereği 01.01.2024 – 31.12.2027 tarihleri arasındaki sınav "
+    "görevlerinde bu sınırlar uygulanmaz (7. ve 8. Dönem Toplu Sözleşme, Eğitim, Öğretim ve "
+    "Bilim Hizmet Kolu; 8. Dönem md.4, RG 27.08.2025).")
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,8 @@ EVRAKLAR = (
               "05_ilan_sinav_takvimi.docx"),
     EvrakTuru("06_ilan_ogrenci_cizelgesi", "İLAN: öğrenci sınav çizelgesi (KVKK uyumlu)",
               "06_ilan_ogrenci_cizelgesi.docx"),
+    EvrakTuru("09_kisi_bazli_gorev_cizelgesi", "Kişi bazlı görev çizelgesi ve tebliğ",
+              "09_kisi_bazli_gorev_cizelgesi.docx"),
 )
 
 # Komisyon tutanağı, yoklama listesi, kâğıt sarf tutanağı ve evrak teslim
@@ -60,26 +70,62 @@ ILAN_EVRAKLARI = frozenset({"05_ilan_sinav_takvimi", "06_ilan_ogrenci_cizelgesi"
                             "07_ilan_basvuru_duyurusu"})
 
 
-def _kurum(vt: Veritabani) -> dict[str, str]:
+def ust_idare(il: str, ilce: str) -> str:
+    """Antetin ikinci satırı: ilçe okulunda kaymakamlık, merkez ilçede valilik.
+
+    Büyükşehir dışındaki illerin merkez ilçesinde kaymakamlık bulunmaz; okul
+    valiliğe bağlı il millî eğitim müdürlüğünün birimidir. Kurum ayarlarında
+    "Antet: üst idare" doldurulursa o yazılır.
+    """
+    if not ilce.strip() or esitle(ilce) == "merkez":
+        return f"{buyult(il.strip())} VALİLİĞİ" if il.strip() else ""
+    return f"{buyult(ilce.strip())} KAYMAKAMLIĞI"
+
+
+def birim_adi(okul_adi: str) -> str:
+    okul = okul_adi.strip()
+    return okul if esitle(okul).endswith("müdürlüğü") else f"{okul} Müdürlüğü"
+
+
+def _kurum(vt: Veritabani) -> dict:
     ayar = hizmet.ayarlari_getir(vt)
+    il, ilce, okul = ayar.get("il", ""), ayar.get("ilce", ""), ayar.get("okul_adi", "")
     return {
-        "okul": ayar.get("okul_adi", ""),
+        "okul": okul,
         "mudur": ayar.get("mudur_adi", ""),
-        "il": ayar.get("il", ""),
-        "ilce": ayar.get("ilce", ""),
+        "il": il,
+        "ilce": ilce,
         "yil": ayar.get("ogretim_yili", ""),
-        "ustbilgi": " / ".join(x for x in (ayar.get("il", ""), ayar.get("ilce", ""),
-                                           ayar.get("okul_adi", "")) if x),
+        # Resmî Yazışma Yönetmeliği md.10: T.C. / idarenin adı / birimin adı.
+        "antet": ("T.C.", (ayar.get("ust_idare") or ust_idare(il, ilce)).strip(),
+                  birim_adi(okul)),
+        "duzenleyen": ayar.get("duzenleyen_adi", ""),
+        "duzenleyen_unvani": ayar.get("duzenleyen_unvani", ""),
     }
 
 
-def _alt_baslik(kurum: dict, pencere_kodu: str) -> str:
+def _imzalar(kurum: dict, duzenleyen_sayisi: int = 1) -> list[Imzaci]:
+    duzenleyenler = [Imzaci("Düzenleyen", kurum["duzenleyen"], kurum["duzenleyen_unvani"])]
+    duzenleyenler += [Imzaci("Düzenleyen") for _ in range(duzenleyen_sayisi - 1)]
+    return duzenleyenler + [Imzaci("OLUR", kurum["mudur"], "Okul Müdürü", tarih_satiri=True)]
+
+
+def _tek_ders_mi(plan) -> bool:
+    return PlanTuru(plan.parametreler.plan_turu) is PlanTuru.TEK_DERS
+
+
+def _alt_baslik(kurum: dict, pencere_kodu: str, tek_ders: bool = False) -> str:
     return (f"{kurum['yil']} Öğretim Yılı • Sorumluluk Sınavları • "
-            f"{pencere_adi(pencere_kodu)} dönemi")
+            f"{pencere_adi(pencere_kodu)} dönemi"
+            + (" • Tek ders sınavı (OKY md.58/6)" if tek_ders else ""))
 
 
 def _oturum_saat(oturum: dict) -> str:
     return f"{tr_tarih(oturum['tarih'])} {oturum['saat']}"
+
+
+def _gozcu_metni(ad: str, salon: str) -> str:
+    return f"{ad} ({salon})" if salon else ad
 
 
 # ------------------------------------------------------------ 01 / 02 program
@@ -90,12 +136,12 @@ def sinav_programi(vt: Veritabani, plan_id: int, hedef: Path,
     plan, bilgi = hizmet.plan_yukle(vt, plan_id)
     oturumlar = hizmet.plan_oturumlari(vt, plan_id)
     nusha = "Görevli nüshası" if gorevli_nushasi else "Öğrenci nüshası"
-    b = Belge(kurum["ustbilgi"], "Sorumluluk Sınavı Programı",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu) + f" • {nusha}",
-              yatay=gorevli_nushasi)
+    b = Belge(kurum["antet"], "Sorumluluk Sınavı Programı",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu, _tek_ders_mi(plan))
+              + f" • {nusha}", yatay=gorevli_nushasi)
     if bilgi["kesin_mi"]:
         b.paragraf(f"Müdür onay no: {bilgi['mudur_onay_no']} — plan kesinleşmiştir.",
-                   kalin=True, boyut=9.5)
+                   kalin=True, boyut=11)
     else:
         b.uyari("TASLAK — plan henüz müdür onayıyla kesinleştirilmemiştir.")
 
@@ -105,7 +151,8 @@ def sinav_programi(vt: Veritabani, plan_id: int, hedef: Path,
         satirlar = [(
             _oturum_saat(o), o["etiket"], f"{o['sure']} dk",
             ", ".join(o["salonlar"]) or "—", o["ogrenci_sayisi"],
-            "; ".join(f"{ad} ({ROL_ADLARI.get(rol, rol)})" for ad, rol, _ in o["gorevliler"])
+            "; ".join(f"{_gozcu_metni(ad, salon) if rol == 'gozcu' else ad} "
+                      f"({ROL_ADLARI.get(rol, rol)})" for ad, rol, _, salon in o["gorevliler"])
             or "görevli atanmadı",
         ) for o in oturumlar]
     else:
@@ -116,9 +163,11 @@ def sinav_programi(vt: Veritabani, plan_id: int, hedef: Path,
     b.tablo(basliklar, satirlar, genislikler)
 
     b.dayanak_notu(
-        "Sınav tarihleri OKY md.58/2-a uyarınca dönem pencereleri içinde belirlenmiştir. "
-        "Sınav süresi ÖDY md.5/1-l gereği bir ders saatini aşmaz. " + ALTBILGI_NOTU)
-    b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
+        "Sınav tarihleri OKY md.58/2-a uyarınca dönem pencereleri içinde belirlenmiştir"
+        + (" (tek ders sınavı: OKY md.58/6, takip eden hafta)" if _tek_ders_mi(plan) else "")
+        + ". Yazılı sınav süresi ÖDY md.5/1-l gereği bir ders saatini aşmaz; uygulamalı "
+        "sınavın süresini zümre belirler (OKY md.45/1-f). " + ALTBILGI_NOTU)
+    b.imza_blogu(_imzalar(kurum))
     return b.kaydet(hedef)
 
 
@@ -128,26 +177,37 @@ def gorevlendirme_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
     """Komisyon bazlı görevlendirme çizelgesi ve tebliğ-tebellüğ bölümü.
 
     Her satır bir sınav komisyonudur: sınav, öğrenci sayısı, tarih, saat,
-    salon, komisyon üyeleri ve gözcüler bir arada görünür. Altta görevli her
-    personelin tarih yazıp imzalayacağı tebliğ-tebellüğ tablosu vardır.
+    salon, komisyon üyeleri ve gözcüler (salonlarıyla) bir arada görünür.
+    Altta görevli her personelin tarih yazıp imzalayacağı tebliğ-tebellüğ
+    tablosu vardır. Kesin planda müdür onayıyla yapılmış görevli
+    değişiklikleri en sonda listelenir.
     """
     kurum = _kurum(vt)
     plan, bilgi = hizmet.plan_yukle(vt, plan_id)
+    tek_ders = _tek_ders_mi(plan)
     oturumlar = hizmet.plan_oturumlari(vt, plan_id)
-    b = Belge(kurum["ustbilgi"], "Sınav Görevlendirme Çizelgesi",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu), yatay=True)
+    alt_baslik = _alt_baslik(kurum, plan.parametreler.pencere_kodu, tek_ders)
+    b = Belge(kurum["antet"], "Sınav Görevlendirme Çizelgesi", alt_baslik, yatay=True)
     if bilgi["kesin_mi"]:
-        b.paragraf(f"Müdür onay no: {bilgi['mudur_onay_no']}", kalin=True, boyut=9.5)
-    b.paragraf(
-        f"{kurum['yil']} öğretim yılı sorumluluk sınavlarında, Ortaöğretim Kurumları "
-        "Yönetmeliği'nin 58 inci maddesinin ikinci fıkrası uyarınca aşağıdaki komisyonların "
-        "kurulması ve karşılarında adı yazılı öğretmenlerin görevlendirilmeleri hususunu "
-        "olurlarınıza arz ederim.", bosluk=12)
+        b.paragraf(f"Müdür onay no: {bilgi['mudur_onay_no']}", kalin=True, boyut=11)
+    if tek_ders:
+        giris = (f"{kurum['yil']} öğretim yılı sorumluluk sınavları sonunda tek dersten "
+                 "başarısızlığı bulunan son sınıf öğrencileri için Ortaöğretim Kurumları "
+                 "Yönetmeliği'nin 58 inci maddesinin altıncı fıkrası uyarınca aynı usulle "
+                 "yapılacak sınavda aşağıdaki komisyonların kurulması ve karşılarında adı "
+                 "yazılı öğretmenlerin görevlendirilmeleri hususunu olurlarınıza arz ederim.")
+    else:
+        giris = (f"{kurum['yil']} öğretim yılı sorumluluk sınavlarında, Ortaöğretim Kurumları "
+                 "Yönetmeliği'nin 58 inci maddesinin ikinci fıkrası uyarınca aşağıdaki "
+                 "komisyonların kurulması ve karşılarında adı yazılı öğretmenlerin "
+                 "görevlendirilmeleri hususunu olurlarınıza arz ederim.")
+    b.paragraf(giris, bosluk=12)
 
     satirlar = []
     for oturum in oturumlar:
-        komisyon = [ad for ad, rol, _ in oturum["gorevliler"] if rol == "komisyon_uyesi"]
-        gozculer = [ad for ad, rol, _ in oturum["gorevliler"] if rol == "gozcu"]
+        komisyon = [ad for ad, rol, _, _ in oturum["gorevliler"] if rol == "komisyon_uyesi"]
+        gozculer = [_gozcu_metni(ad, salon) for ad, rol, _, salon in oturum["gorevliler"]
+                    if rol == "gozcu"]
         ders = oturum["ders"]
         if "/" in oturum["duzey"]:
             ders += f" ({oturum['duzey'].replace('/', '. ve ')}. sınıflar birleştirilmiştir)"
@@ -173,12 +233,11 @@ def gorevlendirme_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
         "komisyon üyeliği hem gözcülük verilmez ve yöneticilere sınav görevi için ücret "
         "ödenmez (Karar md.12/2-b, 2-c). " + ALTBILGI_NOTU)
 
-    b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
+    b.imza_blogu(_imzalar(kurum))
 
     # --- tebliğ-tebellüğ ---
     b.sayfa_sonu()
-    b.yeni_bolum_basligi("Tebliğ - Tebellüğ Belgesi",
-                         _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    b.yeni_bolum_basligi("Tebliğ - Tebellüğ Belgesi", alt_baslik)
     b.paragraf(
         "Yukarıdaki çizelgede gösterilen sınav görevleri tarafıma tebliğ edilmiştir. "
         "Görev yerimi, tarihini ve saatini okudum, anladım.", bosluk=12)
@@ -189,49 +248,66 @@ def gorevlendirme_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
              for sira, g in enumerate(gorevliler, 1)],
             [6, 24, 18, 9, 8, 14, 21])
     b.dayanak_notu(
-        "Tebliğ tarihi ve imza görevli tarafından elle doldurulur. " + ALTBILGI_NOTU)
+        "Tebliğ tarihi ve imza görevli tarafından elle doldurulur. Her görevlinin görev "
+        "dökümü 'Kişi bazlı görev çizelgesi' belgesindedir. " + ALTBILGI_NOTU)
+
+    degisiklikler = hizmet.gorevli_degisiklikleri(vt, plan_id)
+    if degisiklikler:
+        b.paragraf("Kesinleşmiş planda müdür onayıyla yapılan görevli değişiklikleri:",
+                   kalin=True, bosluk=4)
+        b.tablo(["Sınav", "Tarih / Saat", "Görev", "Yerine geçilen", "Görevlendirilen",
+                 "Onay no", "Gerekçe"],
+                [(d["ders"] + (" (uygulama)" if d["tur"] == "uygulama" else ""),
+                  f"{tr_tarih(d['tarih'])} {d['saat']}", ROL_ADLARI.get(d["rol"], d["rol"]),
+                  d["eski"], d["yeni"], d["onay_no"], d["gerekce"]) for d in degisiklikler],
+                [18, 12, 10, 16, 16, 10, 18])
     return b.kaydet(hedef)
 
 
-
-
-
-
-
-
-# -------------------------------------------------- 07 görev sayacı raporu
+# -------------------------------------------------- 04 görev sayacı raporu
 
 def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
     """Öğretim yılı boyunca kişi başına görev dağılımı; dönem dökümü dâhil.
 
     Rapor kesinleşmemiş planlardan da üretilir: görev yükünü kesinleştirmeden
-    önce görmek gerekir. Taslak plan varsa belgeye uyarı düşülür.
+    önce görmek gerekir. Taslak plan varsa belgeye uyarı düşülür. Ücret sınırı
+    görev tarihine göre hesaplanır; tutar hesaplanmaz.
     """
     kurum = _kurum(vt)
     sayaclar = hizmet.gorev_havuzu_ozeti(vt)
     taslaklar = hizmet.taslak_pencereler(vt)
-    b = Belge(kurum["ustbilgi"], "Öğretmen Sınav Görevi Sayacı",
-              f"{kurum['yil']} Öğretim Yılı — üç sınav dönemi toplamı")
+    b = Belge(kurum["antet"], "Öğretmen Sınav Görevi Sayacı",
+              f"{kurum['yil']} Öğretim Yılı — üç sınav dönemi toplamı", yatay=True)
     if taslaklar:
         b.uyari("TASLAK VERİ — şu dönemlerin planı henüz müdür onayıyla kesinleşmemiştir: "
                 + ", ".join(taslaklar) + ". Sayılar plan değiştikçe değişebilir.")
     b.paragraf(
         "Aşağıdaki sayılar okulun kendi kayıtlarından alınmıştır; ek ders ücreti tutarı "
         "hesaplanmamıştır. Tahakkuk işlemleri yetkili sistemde yapılır. Görev dağılımı "
-        "planlanırken önceki dönemlerin sayaçları da dikkate alınır.", bosluk=10)
+        "planlanırken önceki dönemlerin sayaçları da dikkate alınır. Tek ders sınavı "
+        "(OKY md.58/6) görevleri bağlı olduğu dönemin sütununa dâhildir.", bosluk=10)
 
     def donem(kayit: dict, kod: str) -> str:
         komisyon, gozcu = kayit["pencereler"].get(kod, (0, 0))
         return f"{komisyon}+{gozcu}" if (komisyon or gozcu) else "—"
 
+    def durum(kayit: dict) -> str:
+        if not kayit["ucretlendirilebilir"]:
+            return "ücretlendirilemez (yönetici)"
+        if kayit["asildi_mi"]:
+            parcalar = []
+            if kayit["ucretsiz_komisyon"]:
+                parcalar.append(f"{kayit['ucretsiz_komisyon']} komisyon")
+            if kayit["ucretsiz_gozcu"]:
+                parcalar.append(f"{kayit['ucretsiz_gozcu']} gözcülük")
+            return "sınır aşıldı: " + " ve ".join(parcalar) + " için ücret ödenmez"
+        return ""
+
     b.tablo(["Adı Soyadı", "Branşı", "Eylül", "Şubat", "Haziran", "Komisyon",
              "Gözcülük", "Toplam", "Durum"],
             [(k["ad"], k["brans"], donem(k, "P1"), donem(k, "P2"), donem(k, "P3"),
-              k["komisyon"], k["gozcu"], k["toplam"],
-              "sınır aşıldı" if k["asildi_mi"]
-              else ("ücretlendirilemez" if not k["ucretlendirilebilir"] else ""))
-             for k in sayaclar],
-            [22, 16, 7, 7, 7, 9, 9, 8, 12])
+              k["komisyon"], k["gozcu"], k["toplam"], durum(k)) for k in sayaclar],
+            [20, 15, 7, 7, 7, 8, 8, 7, 21])
     if not sayaclar:
         b.paragraf(
             "Henüz görevlendirme yapılmamıştır. Sınav Planı adımında planı üretip "
@@ -239,15 +315,14 @@ def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
     b.dayanak_notu(
         "Dönem sütunlarında komisyon üyeliği + gözcülük sayısı gösterilir. "
         "Karar md.12/2-a: bir öğretim yılında bir kişiye 12'den fazla sınav komisyon "
-        "üyeliği ve 15'ten fazla sınav gözcülüğü için ücret ödenmez. 8. Dönem Toplu "
-        "Sözleşme md.4 gereği 2025-2026 ve 2026-2027 öğretim yıllarında bu sınırlar "
-        "uygulanmaz. Karar md.12/2-c gereği yöneticilere sınav görevi için ücret "
-        "ödenmez. " + ALTBILGI_NOTU)
-    b.imza_blogu([("Düzenleyen", "")], kurum["mudur"])
+        "üyeliği ve 15'ten fazla sınav gözcülüğü için ücret ödenmez. " + TOPLU_SOZLESME_NOTU
+        + " Askı dışındaki görevler yıl içi sırasıyla sayılır. Karar md.12/2-c gereği "
+        "yöneticilere sınav görevi için ücret ödenmez. " + ALTBILGI_NOTU)
+    b.imza_blogu(_imzalar(kurum))
     return b.kaydet(hedef)
 
 
-# ============================================ 09 / 10 ilan çizelgeleri (KVKK)
+# ============================================ 05 / 06 ilan çizelgeleri (KVKK)
 
 KVKK_NOTU = (
     "Bu çizelge okul web sayfasında ilan edilmek üzere hazırlanmıştır. 6698 sayılı Kişisel "
@@ -266,8 +341,8 @@ def ilan_sinav_takvimi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
     kurum = _kurum(vt)
     plan, bilgi = hizmet.plan_yukle(vt, plan_id)
     takvim = hizmet.ilan_takvimi(vt, plan_id)
-    b = Belge(kurum["ustbilgi"], "Sorumluluk Sınavı Takvimi",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    b = Belge(kurum["antet"], "Sorumluluk Sınavı Takvimi",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu, _tek_ders_mi(plan)))
     if not bilgi["kesin_mi"]:
         b.uyari("TASLAK — plan müdür onayıyla kesinleşmeden ilan edilmemelidir.")
     b.paragraf(
@@ -289,7 +364,7 @@ def ilan_sinav_takvimi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
 
     b.paragraf(
         "Sınavla ilgili sorularınız için okul müdürlüğüne başvurabilirsiniz.",
-        bosluk=6, boyut=9.5)
+        bosluk=6, boyut=11)
     b.dayanak_notu(
         "Sınav tarihleri Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesi uyarınca "
         "belirlenmiştir. " + KVKK_NOTU)
@@ -302,13 +377,14 @@ def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path,
     """Hangi öğrencinin hangi derslerden sınava gireceğini gösteren ilan çizelgesi.
 
     Öğrenci kendi satırını okul numarasından bulur; açık ad yayımlanmaz.
-    Ad, seçilen biçime göre maskelenir ya da hiç yazılmaz.
+    Ad, seçilen biçime göre maskelenir ya da hiç yazılmaz. Birden çok salonlu
+    sınavda öğrencinin kendi salonu yazılır.
     """
     kurum = _kurum(vt)
     plan, bilgi = hizmet.plan_yukle(vt, plan_id)
     ogrenciler = hizmet.ilan_ogrenci_cizelgesi(vt, plan_id, gosterim)
-    b = Belge(kurum["ustbilgi"], "Öğrenci Sorumluluk Sınavı Çizelgesi",
-              _alt_baslik(kurum, plan.parametreler.pencere_kodu))
+    b = Belge(kurum["antet"], "Öğrenci Sorumluluk Sınavı Çizelgesi",
+              _alt_baslik(kurum, plan.parametreler.pencere_kodu, _tek_ders_mi(plan)))
     if not bilgi["kesin_mi"]:
         b.uyari("TASLAK — plan müdür onayıyla kesinleşmeden ilan edilmemelidir.")
     b.paragraf(
@@ -329,10 +405,54 @@ def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path,
 
     b.paragraf(
         f"Çizelgede {len(ogrenciler)} öğrenci yer almaktadır. Bilgilerinde yanlışlık "
-        "gördüğünüzü düşünüyorsanız okul müdürlüğüne başvurunuz.", bosluk=6, boyut=9.5)
+        "gördüğünüzü düşünüyorsanız okul müdürlüğüne başvurunuz.", bosluk=6, boyut=11)
     b.dayanak_notu(KVKK_NOTU)
     b.makam_satiri("Okul Müdürlüğü")
     return b.kaydet(hedef)
+
+
+# ------------------------------------------- 09 kişi bazlı görev çizelgesi
+
+def kisi_bazli_gorev_cizelgesi(vt: Veritabani, plan_id: int, hedef: Path) -> str:
+    """Her görevlinin kendi görev dökümü ve tebellüğ imzası.
+
+    Görevlendirme çizelgesi sınav başınadır; öğretmen kendi görevlerini
+    bulmak için bütün çizelgeyi taramak zorunda kalıyordu. Bu belgede her
+    satır bir kişidir; tebliğ, kişinin hangi görevleri tebellüğ ettiğini
+    gösterir. Kurum içi belgedir, ilan edilmez.
+    """
+    kurum = _kurum(vt)
+    plan, bilgi = hizmet.plan_yukle(vt, plan_id)
+    alt_baslik = _alt_baslik(kurum, plan.parametreler.pencere_kodu, _tek_ders_mi(plan))
+    b = Belge(kurum["antet"], "Kişi Bazlı Sınav Görev Çizelgesi", alt_baslik, yatay=True)
+    if bilgi["kesin_mi"]:
+        b.paragraf(f"Müdür onay no: {bilgi['mudur_onay_no']}", kalin=True, boyut=11)
+    else:
+        b.uyari("TASLAK — plan henüz müdür onayıyla kesinleştirilmemiştir.")
+    b.paragraf(
+        "Aşağıda adı yazılı personelin sorumluluk sınavlarındaki görevleri gösterilmiştir. "
+        "Görevlerimi, tarihini, saatini ve salonunu okudum; tarafıma tebliğ edilmiştir.",
+        bosluk=10)
+
+    satirlar = []
+    for sira, kisi in enumerate(hizmet.kisi_bazli_gorevler(vt, plan_id), 1):
+        gorevler = "\n".join(
+            f"{tr_tarih(g['tarih'])} {GUN_KISALTMALARI[g['tarih'].weekday()]} {g['saat']} — "
+            f"{g['sinav']} — {ROL_ADLARI.get(g['rol'], g['rol'])}"
+            + (f" — {g['salon']}" if g["salon"] else "")
+            for g in kisi["gorevler"])
+        satirlar.append((sira, f"{kisi['ad']}\n{kisi['brans']}", gorevler,
+                         len(kisi["gorevler"]), "", ""))
+    b.tablo(["S. No", "Adı Soyadı / Branşı", "Görevleri (tarih, saat, sınav, görev, salon)",
+             "Görev\nsayısı", "Tebliğ Tarihi", "İmza"],
+            satirlar, [5, 18, 49, 7, 10, 11])
+    b.dayanak_notu(
+        "Komisyon ve gözcü görevleri OKY md.58/2-a ve 2-b uyarınca okul müdürlüğünce "
+        "belirlenmiştir. Tebliğ tarihi ve imza görevli tarafından elle doldurulur. "
+        + ALTBILGI_NOTU)
+    b.imza_blogu(_imzalar(kurum))
+    return b.kaydet(hedef)
+
 
 # --------------------------------------------- 07 / 08 başvuru kapısı belgeleri
 # Bu ikisi PLANA değil PENCEREYE bağlıdır: duyuru plan doğmadan önce
@@ -352,7 +472,7 @@ def basvuru_duyurusu(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
             f"{pencere_adi(pencere_kodu)} penceresi için duyuru kaydedilmemiş; "
             "önce Başvuru adımından duyuruyu kaydedin.")
     pencere = hizmet.pencereleri_getir(vt)[pencere_kodu]
-    b = Belge(kurum["ustbilgi"], "Sorumluluk Sınavı Başvuru Duyurusu",
+    b = Belge(kurum["antet"], "Sorumluluk Sınavı Başvuru Duyurusu",
               _alt_baslik(kurum, pencere_kodu))
     b.paragraf(
         f"{kurum['yil']} öğretim yılı {pencere_adi(pencere_kodu)} dönemi sorumluluk "
@@ -374,7 +494,7 @@ def basvuru_duyurusu(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
         "Belirtilen son günden sonra yapılan başvurular, sınav tarihinden en az beş iş günü "
         "önce ulaşmış olmak kaydıyla okul müdürünün onayıyla değerlendirilir. Diğer "
         "öğrencilerimizin başvuru yapmasına gerek yoktur; onlar plana doğrudan alınır.",
-        bosluk=8, boyut=9.5)
+        bosluk=8, boyut=11)
     b.dayanak_notu(
         "Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesinin "
         "ikinci fıkrasının (d) bendi (Ek:RG-8/9/2023-32303). " + KVKK_NOTU)
@@ -392,7 +512,7 @@ def plan_disi_tutanagi(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
     kurum = _kurum(vt)
     duyuru = hizmet.duyuru_getir(vt, pencere_kodu)
     satirlar_ham = hizmet.plan_disi_birakilanlar(vt, pencere_kodu)
-    b = Belge(kurum["ustbilgi"], "Başvuru Yapmayanların Plan Dışı Bırakılması Tutanağı",
+    b = Belge(kurum["antet"], "Başvuru Yapmayanların Plan Dışı Bırakılması Tutanağı",
               _alt_baslik(kurum, pencere_kodu))
     if not duyuru:
         b.uyari("Bu pencere için başvuru duyurusu kaydedilmemiştir; tutanağın dayanağı eksiktir.")
@@ -418,13 +538,13 @@ def plan_disi_tutanagi(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
     b.paragraf(
         f"Toplam {len(satirlar_ham)} öğrenci plan dışında bırakılmıştır. "
         "\"Karar bekliyor\" durumundaki öğrenciler için henüz başvuru kararı girilmemiştir; "
-        "plan üretilmeden önce bu kayıtların tamamlanması gerekir.", bosluk=8, boyut=9.5)
+        "plan üretilmeden önce bu kayıtların tamamlanması gerekir.", bosluk=8, boyut=11)
     b.dayanak_notu(
         "Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesinin "
         "ikinci fıkrasının (d) bendi (Ek:RG-8/9/2023-32303) uyarınca, yazılı başvurusu "
         "bulunmayan öğrenciler sorumluluk sınavı planına dâhil edilmemiştir. Bu belge okul "
         "içi kayıt niteliğindedir; ilan edilmez.")
-    b.imza_blogu([("Düzenleyen", ""), ("Düzenleyen", "")], olur_adi=kurum["mudur"])
+    b.imza_blogu(_imzalar(kurum, duzenleyen_sayisi=2))
     return b.kaydet(hedef)
 
 
@@ -474,6 +594,7 @@ URETICILER = {
     "03_gorevlendirme_cizelgesi": gorevlendirme_cizelgesi,
     "04_gorev_sayac_raporu": gorev_sayac_raporu,
     "05_ilan_sinav_takvimi": ilan_sinav_takvimi,
+    "09_kisi_bazli_gorev_cizelgesi": kisi_bazli_gorev_cizelgesi,
 }
 
 # Öğrenci gösterim biçimi yalnız bu evraka geçirilir.

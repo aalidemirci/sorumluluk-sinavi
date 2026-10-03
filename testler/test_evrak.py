@@ -459,7 +459,109 @@ def test_kesinlesen_planda_taslak_uyarisi_yok(hazir) -> None:
 def test_teslim_tutanagi_belge_setinden_cikti() -> None:
     anahtarlar = {e.anahtar for e in uretici.EVRAKLAR}
     assert "05_evrak_teslim_tutanagi" not in anahtarlar
-    assert len(uretici.EVRAKLAR) == 6
+    assert "09_kisi_bazli_gorev_cizelgesi" in anahtarlar
+    assert len(uretici.EVRAKLAR) == 7
+
+
+# ======================================== Resmî Yazışma Yönetmeliği biçimi
+
+def test_antet_tc_idare_ve_birimden_olusur(hazir) -> None:
+    """Yönetmelik md.10: T.C. / idarenin adı büyük harfle / birimin adı."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "program.docx"
+    uretici.sinav_programi(vt, plan_id, yol)
+    from docx import Document
+    ilk_uc = [p.text for p in Document(yol).paragraphs[:3]]
+    assert ilk_uc == ["T.C.", "UYDURMA İLÇE KAYMAKAMLIĞI", "Uydurma Anadolu Lisesi Müdürlüğü"]
+
+
+def test_merkez_ilcede_antet_valiliktir() -> None:
+    assert uretici.ust_idare("Uydurma", "Merkez") == "UYDURMA VALİLİĞİ"
+    assert uretici.ust_idare("Uydurma", "Kırıkkale") == "KIRIKKALE KAYMAKAMLIĞI"
+
+
+def test_ust_idare_ayardan_yazilabilir(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    hizmet.ayarlari_kaydet(vt, dict(AYARLAR, ust_idare="UYDURMA BÜYÜKŞEHİR KAYMAKAMLIĞI"))
+    yol = tmp_path / "program.docx"
+    uretici.sinav_programi(vt, plan_id, yol)
+    assert "UYDURMA BÜYÜKŞEHİR KAYMAKAMLIĞI" in _metin(yol)
+
+
+def test_yazi_tipi_times_new_roman_ve_renksizdir(hazir) -> None:
+    """Yönetmelik md.7: Times New Roman; evrak siyah-beyaz yazıcıda çıkar."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "olur.docx"
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
+    from docx import Document
+    belge = Document(yol)
+    assert belge.styles["Normal"].font.name == "Times New Roman"
+    renkler = {str(r.font.color.rgb) for p in belge.paragraphs for r in p.runs
+               if r.font.color is not None and r.font.color.rgb is not None}
+    assert renkler <= {"000000", "404040"}
+
+
+def test_imza_blogunda_unvan_ve_olur_tarihi_var(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    hizmet.ayarlari_kaydet(vt, dict(AYARLAR, duzenleyen_adi="Uydurma Yardımcı",
+                                    duzenleyen_unvani="Müdür Yardımcısı"))
+    yol = tmp_path / "program.docx"
+    uretici.sinav_programi(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "Okul Müdürü" in metin and "…/…/20…" in metin
+    assert "Uydurma Yardımcı" in metin and "Müdür Yardımcısı" in metin
+
+
+# ================================================ kişi bazlı görev çizelgesi
+
+def test_kisi_bazli_cizelge_her_gorevliyi_gorevleriyle_yazar(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "kisi.docx"
+    uretici.kisi_bazli_gorev_cizelgesi(vt, plan_id, yol)
+    from docx import Document
+    tablo = Document(yol).tables[0]
+    gorevliler = hizmet.kisi_bazli_gorevler(vt, plan_id)
+    assert len(tablo.rows) - 1 == len(gorevliler)
+    ilk = gorevliler[0]
+    satir = tablo.rows[1].cells
+    assert ilk["ad"] in satir[1].text
+    assert len(satir[2].paragraphs) == len(ilk["gorevler"])
+    assert "Tebliğ Tarihi" in _metin(yol)
+
+
+def test_gozcunun_salonu_cizelgede_yazar(hazir) -> None:
+    """OKY md.58/2-b: her salon için bir gözcü; hangisi nerede yazılmalı."""
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
+    from docx import Document
+    gozcu_hucresi = Document(yol).tables[0].rows[1].cells[6].text
+    assert "(D-0" in gozcu_hucresi
+
+
+def test_kesin_planda_gorevli_degisikligi_cizelgeye_islenir(hazir) -> None:
+    from cekirdek.modeller import GorevRolu
+    vt, plan_id, tmp_path = hazir
+    hizmet.plan_kesinlestir(vt, plan_id, "Uydurma 2026/7")
+    plan, _ = hizmet.plan_yukle(vt, plan_id)
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    gozcu = next(g for g in plan.oturum_gorevleri(oturum.anahtar) if g.rol is GorevRolu.GOZCU)
+    aday = next(a for a in hizmet.gorevli_adaylari(vt, plan, oturum.anahtar, GorevRolu.GOZCU,
+                                                     gozcu.personel_kimligi) if a["uygun_mu"])
+    hizmet.kesin_plan_gorevli_degistir(vt, plan_id, oturum.anahtar, gozcu.personel_kimligi,
+                                       aday["kimlik"], "Uydurma 2026/9", "Başka görevde")
+    yol = tmp_path / "cizelge.docx"
+    uretici.gorevlendirme_cizelgesi(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "görevli değişiklikleri" in metin and "Uydurma 2026/9" in metin
+
+
+def test_sayac_raporu_toplu_sozlesme_tarih_araligini_yazar(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    yol = tmp_path / "sayac.docx"
+    uretici.gorev_sayac_raporu(vt, plan_id, yol)
+    metin = _metin(yol)
+    assert "01.01.2024 – 31.12.2027" in metin and "RG 27.08.2025" in metin
 
 
 # ================================================ başvuru kapısı belgeleri

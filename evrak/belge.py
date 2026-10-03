@@ -4,25 +4,29 @@ Belgeler şablon dosyasından değil doğrudan koddan üretilir: depoda ikili
 dosya durmaz, şablon ile kod birbirinden kopmaz ve sayfa düzeni tek yerde
 tanımlanır.
 
-Sayfa düzeni Türk resmî yazışma alışkanlığına göredir: A4 dikey, 2,5 cm
-kenar boşluğu, üstbilgide kurum adı, altbilgide sayfa numarası.
+Düzen Resmî Yazışmalarda Uygulanacak Usul ve Esaslar Hakkında Yönetmelik'e
+(RG 10.06.2020/31151) göredir: A4 (md.6), Times New Roman 12 punto, tabloda
+gerektiğinde 9 puntoya kadar (md.7), üst/sol/sağ 1,5 cm kenar (md.8),
+"T.C. / İDARE / Birim" başlığı (md.10). Renk kullanılmaz: evrak çoğunlukla
+siyah-beyaz yazıcıdan çıkar. Gerekçe: kararlar/0011.
 """
 
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from cekirdek.metin import buyult
 
 
-LACIVERT = "17365D"
-BASLIK_ZEMINI = "E8EEF5"
-SATIR_ZEMINI = "F7F9FB"
-CIZGI = "AAB6C4"
-SOLUK = "5C6773"
-KIRMIZI = "9B1C1C"
+YAZI_TIPI = "Times New Roman"
+SIYAH = "000000"
+BASLIK_ZEMINI = "D9D9D9"
+CIZGI = "000000"
+SOLUK = "404040"
+UYARI_ZEMINI = "EDEDED"
 
 
 def tr_tarih(deger: date | str | None) -> str:
@@ -37,10 +41,24 @@ def tr_tarih(deger: date | str | None) -> str:
     return deger.strftime("%d.%m.%Y")
 
 
+@dataclass(frozen=True)
+class Imzaci:
+    """İmza bloğundaki bir sütun.
+
+    OLUR sütununda onay tarihi elle yazılır; bu yüzden "…/…/20…" satırı
+    bırakılır. Ad boşsa imzalayacak kişi elle yazar.
+    """
+
+    rol: str
+    ad: str = ""
+    unvan: str = ""
+    tarih_satiri: bool = False
+
+
 class Belge:
     """Tek bir resmî evrakı kuran yardımcı."""
 
-    def __init__(self, kurum_adi: str, baslik: str, alt_baslik: str = "",
+    def __init__(self, antet: str | tuple[str, ...], baslik: str, alt_baslik: str = "",
                  yatay: bool = False):
         from docx import Document
         from docx.enum.section import WD_ORIENT
@@ -54,31 +72,32 @@ class Belge:
         else:
             bolum.orientation = WD_ORIENT.PORTRAIT
             bolum.page_width, bolum.page_height = Mm(210), Mm(297)
-        bolum.left_margin = bolum.right_margin = Mm(25)
-        bolum.top_margin = bolum.bottom_margin = Mm(20)
-        bolum.header_distance = bolum.footer_distance = Mm(12)
+        bolum.left_margin = bolum.right_margin = Mm(15)
+        bolum.top_margin = bolum.bottom_margin = Mm(15)
+        bolum.header_distance = bolum.footer_distance = Mm(8)
 
         normal = self.belge.styles["Normal"]
-        normal.font.name = "Calibri"
-        normal.font.size = Pt(10.5)
-        normal.font.color.rgb = RGBColor.from_string("20252B")
+        normal.font.name = YAZI_TIPI
+        normal.font.size = Pt(12)
+        normal.font.color.rgb = RGBColor.from_string(SIYAH)
         normal.paragraph_format.space_before = Pt(0)
-        normal.paragraph_format.space_after = Pt(5)
-        normal.paragraph_format.line_spacing = 1.1
+        normal.paragraph_format.space_after = Pt(6)
+        normal.paragraph_format.line_spacing = 1.0
 
-        self._ustbilgi(kurum_adi)
         self._altbilgi()
+        self._antet((antet,) if isinstance(antet, str) else tuple(antet))
         self._baslik(baslik, alt_baslik)
 
     # ------------------------------------------------------------ düzen
 
-    def _yazi(self, run, boyut=10.5, kalin=False, renk="20252B", italik=False):
+    def _yazi(self, run, boyut=12.0, kalin=False, renk=SIYAH, italik=False):
         from docx.oxml.ns import qn
         from docx.shared import Pt, RGBColor
-        run.font.name = "Calibri"
+        run.font.name = YAZI_TIPI
         rpr = run._element.get_or_add_rPr()
-        rpr.get_or_add_rFonts().set(qn("w:ascii"), "Calibri")
-        rpr.rFonts.set(qn("w:hAnsi"), "Calibri")
+        rfonts = rpr.get_or_add_rFonts()
+        for nitelik in ("w:ascii", "w:hAnsi", "w:cs", "w:eastAsia"):
+            rfonts.set(qn(nitelik), YAZI_TIPI)
         run.font.size = Pt(boyut)
         run.bold = kalin
         run.italic = italik
@@ -112,28 +131,30 @@ class Belge:
         if shd is None:
             shd = OxmlElement("w:shd")
             pr.append(shd)
+        shd.set(qn("w:val"), "clear")
         shd.set(qn("w:fill"), renk)
 
-    def _ustbilgi(self, kurum_adi: str) -> None:
+    def _antet(self, satirlar: tuple[str, ...]) -> None:
+        """Yönetmelik md.10: "T.C." / idarenin adı / birimin adı, ortalı.
+
+        Evrakta program logosu yoktur: belge okulun evrakıdır, yazılımın
+        tanıtımı değildir.
+        """
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.shared import Pt
-        # Evrakta program logosu yoktur: belge okulun evrakıdır, yazılımın
-        # tanıtımı değildir. Logo yalnız uygulama arayüzünde görünür.
-        paragraf = self.belge.sections[0].header.paragraphs[0]
-        paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        paragraf.paragraph_format.space_after = Pt(2)
-        self._yazi(paragraf.add_run(kurum_adi), 8.5, True, SOLUK)
-        self._kenarlik(paragraf, "bottom", CIZGI, "4")
+        for sira, satir in enumerate(s for s in satirlar if s):
+            paragraf = self.belge.add_paragraph()
+            paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraf.paragraph_format.space_after = Pt(0)
+            self._yazi(paragraf.add_run(satir), 12, True)
+        self.belge.add_paragraph().paragraph_format.space_after = Pt(2)
 
     def _altbilgi(self) -> None:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
-        from docx.shared import Pt
         paragraf = self.belge.sections[0].footer.paragraphs[0]
         paragraf.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        paragraf.paragraph_format.space_before = Pt(3)
-        self._kenarlik(paragraf, "top", CIZGI, "4")
         self._yazi(paragraf.add_run("Sayfa "), 8, False, SOLUK)
         alan = OxmlElement("w:fldSimple")
         alan.set(qn("w:instr"), "PAGE")
@@ -144,15 +165,14 @@ class Belge:
         from docx.shared import Pt
         paragraf = self.belge.add_paragraph()
         paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        paragraf.paragraph_format.space_after = Pt(3)
+        paragraf.paragraph_format.space_after = Pt(2)
         # Yerleşik upper() Türkçede 'i' harfini bozar: LISTESI / LİSTESİ.
-        self._yazi(paragraf.add_run(buyult(baslik)), 14, True, LACIVERT)
-        self._kenarlik(paragraf, "bottom", LACIVERT, "12")
+        self._yazi(paragraf.add_run(buyult(baslik)), 12, True)
         if alt_baslik:
             alt = self.belge.add_paragraph()
             alt.alignment = WD_ALIGN_PARAGRAPH.CENTER
             alt.paragraph_format.space_after = Pt(10)
-            self._yazi(alt.add_run(alt_baslik), 9.5, False, SOLUK)
+            self._yazi(alt.add_run(alt_baslik), 10.5)
 
     def yeni_bolum_basligi(self, baslik: str, alt_baslik: str = '') -> None:
         """Sayfa sonrasında başlığı yeniden yazar; çok sayfalı evraklar için."""
@@ -160,32 +180,32 @@ class Belge:
 
     # ------------------------------------------------------------ içerik
 
-    def paragraf(self, metin: str, kalin: bool = False, boyut: float = 10.5,
-                 renk: str = "20252B", ortala: bool = False, bosluk: int = 5):
+    def paragraf(self, metin: str, kalin: bool = False, boyut: float = 12,
+                 renk: str = SIYAH, ortala: bool = False, bosluk: int = 6):
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.shared import Pt
         paragraf = self.belge.add_paragraph()
         paragraf.paragraph_format.space_after = Pt(bosluk)
-        if ortala:
-            paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER if ortala else WD_ALIGN_PARAGRAPH.JUSTIFY
         self._yazi(paragraf.add_run(metin), boyut, kalin, renk)
         return paragraf
 
     def bilgi_satirlari(self, ciftler: list[tuple[str, str]]) -> None:
-        """Etiket/değer çiftlerini iki sütunlu, çerçevesiz bir bloğa yazar."""
+        """Etiket/değer çiftlerini çerçevesiz bir bloğa yazar."""
         from docx.shared import Pt
         for etiket, deger in ciftler:
             paragraf = self.belge.add_paragraph()
             paragraf.paragraph_format.space_after = Pt(2)
-            self._yazi(paragraf.add_run(f"{etiket}: "), 10, True)
-            self._yazi(paragraf.add_run(str(deger)), 10)
+            self._yazi(paragraf.add_run(f"{etiket}: "), 11, True)
+            self._yazi(paragraf.add_run(str(deger)), 11)
 
     def tablo(self, basliklar: list[str], satirlar: list[tuple],
               genislikler: list[int] | None = None, bos_metin: str = "Kayıt yok"):
-        """Başlık satırı gölgeli, kenarlıklı bir tablo ekler.
+        """Başlık satırı gri zeminli, ince siyah çerçeveli bir tablo ekler.
 
-        `genislikler` yirmide bir punto (dxa) cinsindendir; verilmezse
-        sütunlar eşit bölünür.
+        `genislikler` göreli oranlardır; kullanılabilir genişliğe ölçeklenir.
+        Yazı 10 punto, yedi ve daha çok sütunda 9 puntodur (Yönetmelik md.7
+        gerektiğinde 9 puntoya izin verir).
         """
         from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
         from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -195,7 +215,7 @@ class Belge:
 
         sutun_sayisi = len(basliklar)
         tablo = self.belge.add_table(rows=1, cols=sutun_sayisi)
-        tablo.alignment = WD_TABLE_ALIGNMENT.LEFT
+        tablo.alignment = WD_TABLE_ALIGNMENT.CENTER
         tablo.autofit = False
 
         bolum = self.belge.sections[0]
@@ -236,6 +256,7 @@ class Belge:
                 for ek in satir_metinleri[1:]:
                     hucre.add_paragraph(ek)
 
+        boyut = 9 if sutun_sayisi >= 7 else 10
         for satir_no, satir in enumerate(tablo.rows):
             trpr = satir._tr.get_or_add_trPr()
             trpr.append(OxmlElement("w:cantSplit"))
@@ -245,8 +266,8 @@ class Belge:
                 trpr.append(tekrar)
             for sutun_no, (hucre, genislik) in enumerate(zip(satir.cells, genislikler)):
                 hucre.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-                self._golgele(hucre, LACIVERT if satir_no == 0
-                              else (SATIR_ZEMINI if satir_no % 2 == 0 else "FFFFFF"))
+                if satir_no == 0:
+                    self._golgele(hucre, BASLIK_ZEMINI)
                 tcw = hucre._tc.get_or_add_tcPr().get_or_add_tcW()
                 tcw.set(qn("w:w"), str(genislik))
                 tcw.set(qn("w:type"), "dxa")
@@ -257,40 +278,49 @@ class Belge:
                     if satir_no == 0 or sutun_no == 0:
                         paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in paragraf.runs:
-                        self._yazi(run, 8.5 if sutun_sayisi >= 7 else 9.5,
-                                   satir_no == 0, "FFFFFF" if satir_no == 0 else "20252B")
+                        self._yazi(run, boyut, satir_no == 0)
         self.belge.add_paragraph()
         return tablo
 
     def dayanak_notu(self, metin: str) -> None:
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.shared import Pt
         paragraf = self.belge.add_paragraph()
-        paragraf.paragraph_format.space_before = Pt(6)
-        self._yazi(paragraf.add_run(metin), 8.5, False, SOLUK, italik=True)
+        paragraf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        paragraf.paragraph_format.space_before = Pt(4)
+        self._yazi(paragraf.add_run(metin), 9, False, SOLUK, italik=True)
 
-    def imza_blogu(self, sutunlar: list[tuple[str, str]], olur_adi: str = "") -> None:
-        """Sekme duraklarıyla imza bloğu kurar; tablo kullanılmaz."""
+    def imza_blogu(self, imzacilar: list[Imzaci]) -> None:
+        """İmzacıları sekme duraklarıyla yan yana dizer; tablo kullanılmaz.
+
+        Her sütun: rol, (OLUR'da) …/…/20… tarih satırı, imza boşluğu, ad,
+        unvan. Ad ya da unvan boşsa elle yazılacak noktalı yer bırakılır.
+        """
         from docx.enum.text import WD_TAB_ALIGNMENT
         from docx.shared import Mm, Pt
 
-        girisler = list(sutunlar) + ([("OLUR", olur_adi)] if olur_adi else [])
-        if not girisler:
+        if not imzacilar:
             return
         bolum = self.belge.sections[0]
         genislik = bolum.page_width - bolum.left_margin - bolum.right_margin
-        adim = genislik / len(girisler)
-
-        roller = self.belge.add_paragraph()
-        roller.paragraph_format.space_before = Pt(20)
-        roller.paragraph_format.keep_together = True
-        adlar = self.belge.add_paragraph()
-        adlar.paragraph_format.space_before = Pt(26)
-        for paragraf in (roller, adlar):
-            for sira in range(1, len(girisler)):
+        adim = genislik / len(imzacilar)
+        tarihli = any(i.tarih_satiri for i in imzacilar)
+        satirlar = [
+            ([i.rol for i in imzacilar], True, Pt(18)),
+            *([([("…/…/20…" if i.tarih_satiri else "") for i in imzacilar], False, Pt(2))]
+              if tarihli else []),
+            ([i.ad or "…………………………" for i in imzacilar], False, Pt(28)),
+            ([i.unvan for i in imzacilar], False, Pt(0)),
+        ]
+        for degerler, kalin, bosluk in satirlar:
+            paragraf = self.belge.add_paragraph()
+            paragraf.paragraph_format.space_before = bosluk
+            paragraf.paragraph_format.space_after = Pt(0)
+            paragraf.paragraph_format.keep_with_next = True
+            for sira in range(len(imzacilar)):
                 paragraf.paragraph_format.tab_stops.add_tab_stop(
                     Mm(int((adim * sira + adim / 2) / 36000)), WD_TAB_ALIGNMENT.CENTER)
-        self._yazi(roller.add_run("\t".join(rol for rol, _ in girisler)), 9.5, True, LACIVERT)
-        self._yazi(adlar.add_run("\t".join(ad or "…………………………" for _, ad in girisler)), 9)
+            self._yazi(paragraf.add_run("\t" + "\t".join(degerler)), 11, kalin)
 
     def makam_satiri(self, metin: str) -> None:
         """Belgeyi çıkaran makamı sağa yaslı yazar; kişi adı içermez.
@@ -304,16 +334,19 @@ class Belge:
         paragraf.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         paragraf.paragraph_format.space_before = Pt(22)
         paragraf.paragraph_format.keep_together = True
-        self._yazi(paragraf.add_run(metin), 10, True, LACIVERT)
+        self._yazi(paragraf.add_run(metin), 12, True)
 
     def uyari(self, metin: str) -> None:
+        """Siyah-beyaz yazıcıda da seçilen, çerçeveli uyarı satırı."""
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from docx.shared import Pt
         paragraf = self.belge.add_paragraph()
         paragraf.alignment = WD_ALIGN_PARAGRAPH.CENTER
         paragraf.paragraph_format.space_after = Pt(8)
-        self._golgele(paragraf, "FDE8E7")
-        self._yazi(paragraf.add_run(metin), 9.5, True, KIRMIZI)
+        self._golgele(paragraf, UYARI_ZEMINI)
+        for yer in ("top", "bottom", "left", "right"):
+            self._kenarlik(paragraf, yer, CIZGI, "8")
+        self._yazi(paragraf.add_run(metin), 11, True)
 
     def sayfa_sonu(self) -> None:
         from docx.enum.text import WD_BREAK
