@@ -1,9 +1,9 @@
 """Arayüz ve evrak kaynaklarında emoji (BMP dışı karakter) bulunmaz.
 
-Tk 8.6 Linux'ta renkli emoji çizemez; Pardus'un varsayılan yazı tipi DejaVu'da
-da emoji yoktur. Kesinleşmiş sınav kartındaki kilit emojisi debian:12 kabında
-kare olarak göründü (03.10.2026). Windows'ta da BMP dışı karakterin çizimi Tk
-sürümüne bağlıdır. İşaret gerekiyorsa DejaVu'da bulunan bir karakter seçilir
+Pardus'un varsayılan yazı tipi DejaVu'da emoji yoktur; Tk sürümünde kesinleşmiş
+sınav kartındaki kilit emojisi debian:12 kabında kare olarak göründü
+(03.10.2026). Qt yazı tipi yedeğine düşse de kurulu yazı tipine bağlıdır.
+Alt klasörler (arayuz/sayfalar) de taranır. İşaret gerekiyorsa DejaVu'da bulunan bir karakter seçilir
 (ör. ✓, U+2713). Evrak da aynı kurala uyar: belgeyi açan makinede emoji yazı
 tipi olmayabilir.
 """
@@ -18,7 +18,7 @@ KOK = Path(__file__).resolve().parents[1]
 def _bmp_disi_satirlar(kok: Path, klasorler: tuple[str, ...]) -> list[str]:
     bulunan = []
     for klasor in klasorler:
-        for yol in sorted((kok / klasor).glob("*.py")):
+        for yol in sorted((kok / klasor).rglob("*.py")):
             for no, satir in enumerate(yol.read_text(encoding="utf-8").splitlines(), 1):
                 if any(ord(karakter) > 0xFFFF for karakter in satir):
                     bulunan.append(f"{yol.relative_to(kok).as_posix()}:{no}")

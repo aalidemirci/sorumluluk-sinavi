@@ -64,4 +64,22 @@ RENK = {
     "takvim_kilit_kenar": "#C9B3B8",
     "takvim_uygulama_kenar": "#6FA98A",
     "takvim_hedef": "#F5DFC5",
+
+    # --- Qt arayüzü (arayuz/tema.py) -----------------------------------
+    # Türetilmiş: tablo satır şeridi ve kaydırma çubuğu; sitede karşılıkları
+    # yok, zemin ile kart arasından seçildi.
+    "zebra": "#FBF5F3",
+    "kaydirma": "#D9C5CA",
+    "kaydirma_ust": "#BFA2AA",
+    # Durum şeritlerinin kenarı ve uyarı çipinin yazısı: zeminlerinin koyusu.
+    "uyari_kenar": "#EBCFAE",
+    "engel_kenar": "#EDBDB7",
+    "basari_kenar": "#BFDCC9",
+    "uyari_yazi": "#8A5A12",
+    # Edilgin denetimin yazısı; edilgin ana düğmenin yazısı.
+    "pasif_yazi": "#A8949A",
+    "vurgu_pasif_yazi": "#7A6250",
+    # Yarı saydam katmanlar: meşgul örtüsü (zemin) ve şerit içi düğme.
+    "ortu": "rgba(247, 241, 238, 0.82)",
+    "serit_dugme": "rgba(255, 255, 255, 0.55)",
 }

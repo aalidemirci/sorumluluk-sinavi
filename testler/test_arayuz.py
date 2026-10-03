@@ -1,86 +1,68 @@
-"""Arayüz akış testleri.
+"""Arayüz akış testleri (Qt, ekransız).
 
-Tkinter penceresi gerçekten kurulur; yalnızca gerçekten ekransız bir ortamda
-(bkz. EKRANSIZ_IZLERI) atlanır, başka her Tk hatası testi kırar. Amaç görsel
-denetim değil, arayüz ile servis katmanı arasındaki bağlantının kopmadığını
-doğrulamak: plan üretme, sürükle-bırak taşıma, geri/ileri al ve kaydetme.
+Pencere gerçekten kurulur; amaç görsel denetim değil, arayüz ile servis
+katmanı arasındaki bağlantının kopmadığını doğrulamak: plan üretme,
+sürükle-bırak taşıma, geri/ileri al, kaydetme, başvuru işaretleri ve
+güncelleme şeridi. İleti kutuları kayıt tutan sahteyle değiştirilir;
+pencereler açılmadan kurulup yöntemleri doğrudan çağrılır.
 """
 
 from __future__ import annotations
 
-import os
-import time
+from datetime import date, time, timedelta
 from pathlib import Path
 
 import pytest
 
-tkinter = pytest.importorskip("tkinter")
+pytest.importorskip("PySide6")
+pytest.importorskip("pytestqt")
 
-from arayuz.uygulama import ADIMLAR  # noqa: E402
+from PySide6.QtCore import QItemSelectionModel, Qt  # noqa: E402
+
+from arayuz import tema  # noqa: E402
+from arayuz.uygulama import ADIMLAR, Uygulama, sayfa_sirasi  # noqa: E402
+from cekirdek.modeller import PlanTuru  # noqa: E402
 from testler.test_hizmet import AYARLAR, _personel_xlsx, _sorumluluk_csv  # noqa: E402
 from veri import hizmet  # noqa: E402
 from veri.veritabani import Veritabani  # noqa: E402
 
-# Yalnızca bu izleri taşıyan TclError "ekran yok" sayılır. Liste bilinçli
-# olarak dardır: eskiden bütün TclError'lar atlamaya yol açıyordu ve arayüzde
-# bozulan bir şey testi kırmak yerine sessizce atlatabiliyordu.
-EKRANSIZ_IZLERI = (
-    "no display name",
-    "couldn't connect to display",
-    "can't find package tk",
-)
-
-TK_KOKU_DENEME = 5
+PLAN_ZAMAN_ASIMI_MS = 120_000
 
 
-def ekransiz_mi(hata: BaseException) -> bool:
-    """TclError gerçekten ekransızlıktan mı geliyor?"""
-    return any(iz in str(hata).lower() for iz in EKRANSIZ_IZLERI)
+class KayitliIleti:
+    """İleti kutularının yerine geçer: ne gösterildiğini kaydeder, soruya `cevap` döner."""
+
+    def __init__(self) -> None:
+        self.kayitlar: list[tuple[str, str, str]] = []
+        self.cevap = True
+
+    def hata(self, baslik: str, metin: str, ust=None) -> None:
+        self.kayitlar.append(("hata", baslik, metin))
+
+    def uyari(self, baslik: str, metin: str, ust=None) -> None:
+        self.kayitlar.append(("uyari", baslik, metin))
+
+    def bilgi(self, baslik: str, metin: str, ust=None) -> None:
+        self.kayitlar.append(("bilgi", baslik, metin))
+
+    def soru(self, baslik: str, metin: str, evet: str = "Evet", hayir: str = "Vazgeç",
+             uyari: bool = False, ust=None) -> bool:
+        self.kayitlar.append(("soru", baslik, metin))
+        return self.cevap
+
+    def turden(self, tur: str) -> list[str]:
+        return [metin for t, _b, metin in self.kayitlar if t == tur]
 
 
-def sayfa(ad: str) -> int:
-    """Adım adından sıra numarası.
-
-    Sabit indis yazılırsa araya yeni bir adım eklendiğinde testler sessizce
-    yanlış sayfayı açar; ADIMLAR'dan türetmek bunu önler.
-    """
-    return next(i for i, (_, baslik, _) in enumerate(ADIMLAR) if baslik == ad)
-
-
-@pytest.fixture(scope="session")
-def tk_koku():
-    """Bütün oturumun paylaştığı tek Tk kökü.
-
-    Her `tk.Tk()` çağrısı Tcl'in kitaplık dosyalarını (`tk.tcl`, `ttk/*.tcl`)
-    yeniden okur. Bu dosyalar sanal ortamda değil sistem Python kurulumunda
-    durur; makinedeki bütün süreçler aynı kopyayı paylaşır. Test başına bir
-    kök kurulduğunda bu okuma on kez tekrarlanıyor ve virüs taraması dosyayı
-    anlık kilitlediğinde `couldn't read file …` ya da
-    `invalid command name "tcl_findLibrary"` hatası düşüyordu. Kökü bir kez
-    kurmak bu yüzeyi onda bire indirir; kalan tek okuma da yeniden denenir.
-    """
-    hata = None
-    for kalan in reversed(range(TK_KOKU_DENEME)):
-        try:
-            kok = tkinter.Tk()
-            break
-        except tkinter.TclError as tcl_hatasi:
-            if ekransiz_mi(tcl_hatasi):
-                pytest.skip(f"Tkinter ekranı yok: {tcl_hatasi}")
-            hata = tcl_hatasi
-            if not kalan:                 # geçici değilmiş: testler kırmızı versin
-                raise
-            time.sleep(0.3)
-    if hata is not None:
-        print(f"Tk kökü {TK_KOKU_DENEME - 1} denemeden sonra kuruldu; son hata: {hata}")
-    kok.withdraw()                        # boş kök pencere ekranda görünmesin
-    yield kok
-    kok.destroy()
+@pytest.fixture(scope="session", autouse=True)
+def _tema(qapp):
+    """Gerçek stil sayfası uygulanır: bozuk bir kural burada da görünür."""
+    tema.uygula(qapp)
 
 
 @pytest.fixture()
-def uygulama(tk_koku, tmp_path: Path, monkeypatch):
-    """Hazır veriyle kurulmuş bir uygulama penceresi."""
+def uygulama(qtbot, tmp_path: Path, monkeypatch):
+    """Hazır veriyle kurulmuş bir ana pencere."""
     monkeypatch.setenv("SORUMLULUK_VERI_KLASORU", str(tmp_path))
     vt = Veritabani(tmp_path / "sorumluluk.db")
     vt.gocleri_uygula()
@@ -95,307 +77,460 @@ def uygulama(tk_koku, tmp_path: Path, monkeypatch):
         hizmet.ders_brans_esle(vt, ders_id, brans, "Zümre kararı")
         if ad == "İNGİLİZCE":
             hizmet.ders_ozellik_guncelle(vt, ders_id, True, True)
-
-    # Ekranlar bugünün tarihine göre dönem seçer; testler takvimden bağımsız
-    # olsun diye Eylül'e sabitlenir.
+    # Ekranlar bugünün tarihine göre dönem seçer; testler Eylül'e sabitlenir.
     monkeypatch.setattr(hizmet, "varsayilan_pencere",
                         lambda vt, gecmise_bak=False, bugun=None: "P1")
-    from arayuz.uygulama import Uygulama
-    # Kök `tk_koku`dan gelir; buradaki TclError artık atlanmaz, testi kırar.
-    pencere = Uygulama(tkinter.Toplevel(tk_koku))
+    pencere = Uygulama()
+    pencere.ileti = KayitliIleti()
+    qtbot.addWidget(pencere)
     yield pencere
-    for cocuk in list(pencere.kok.winfo_children()):
-        if isinstance(cocuk, tkinter.Toplevel):
-            cocuk.destroy()
-    pencere.kok.destroy()
+    pencere.sayfalar.get(sayfa_sirasi("Sınav Planı")) and setattr(
+        pencere.sayfalar[sayfa_sirasi("Sınav Planı")], "kaydedilmemis", False)
 
 
-def test_yalnizca_ekransizlik_testi_atlatir() -> None:
-    """Atlama kuralı dar mı: gerçek arayüz hatası yutuluyor mu?
-
-    Eskiden fikstür bütün TclError'ları yutup testi atlıyordu; arayüzde bozulan
-    bir şey kırmızı vermek yerine sessizce atlanabiliyordu. Aşağıdaki ikinci
-    grup, kararsızlığın kaynağı olan geçici Tcl okuma hatalarıdır — onlar da
-    atlama sebebi değildir, yeniden denenir ve sürerse testi kırar.
-    """
-    assert ekransiz_mi(tkinter.TclError(
-        'no display name and no $DISPLAY environment variable'))
-    assert ekransiz_mi(tkinter.TclError('couldn\'t connect to display ":0"'))
-
-    assert not ekransiz_mi(tkinter.TclError('invalid command name "tcl_findLibrary"'))
-    assert not ekransiz_mi(tkinter.TclError(
-        'couldn\'t read file ".../ttk/combobox.tcl": no such file or directory'))
-    assert not ekransiz_mi(tkinter.TclError('unknown option "-bg"'))
+def plan_sayfasi(uyg):
+    uyg.sayfa_goster(sayfa_sirasi("Sınav Planı"))
+    return uyg.sayfalar[sayfa_sirasi("Sınav Planı")]
 
 
-def test_tum_sayfalar_hatasiz_cizilir(uygulama) -> None:
-    """Adım eklendiğinde dağıtımın ADIMLAR ile uyumsuz kalmadığını doğrular."""
-    for sira in range(len(ADIMLAR)):
-        uygulama._sayfa_goster(sira)
-        uygulama.kok.update_idletasks()
+def plan_uret(uyg, qtbot):
+    sayfa = plan_sayfasi(uyg)
+    sayfa.plan_sonucu = None
+    sayfa.plan_uret()
+    qtbot.waitUntil(lambda: sayfa.plan_sonucu is not None and not uyg.mesgul.isVisible(),
+                    timeout=PLAN_ZAMAN_ASIMI_MS)
+    return sayfa
 
 
-def test_plan_ekraninda_plan_uretilir(uygulama) -> None:
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    assert uygulama.plan_sonucu is not None
-    assert len(uygulama.plan_sonucu.plan.oturumlar) == 4
-    assert uygulama.kaydedilmemis is True
-    assert str(uygulama.kaydet_dugmesi["state"]) == "normal"
+def basvuru_sayfasi(uyg):
+    uyg.sayfa_goster(sayfa_sirasi("Başvuru"))
+    return uyg.sayfalar[sayfa_sirasi("Başvuru")]
 
 
-def test_surukle_birak_gecerli_tasimayi_uygular(uygulama) -> None:
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    plan = uygulama.plan_sonucu.plan
-    # Tek aşamalı bir oturumu bir gün ileri taşı.
-    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
-    yeni_tarih = max(o.tarih for o in plan.oturumlar)
-    from datetime import timedelta
-    hedef = yeni_tarih + timedelta(days=1)
-    while hedef.weekday() >= 5:
-        hedef += timedelta(days=1)
-    uygulama._kart_birakildi(oturum.anahtar, hedef, oturum.saat)
-    assert plan.oturum_bul(oturum.anahtar).tarih == hedef
-    assert len(uygulama.geri_yigini) == 1
+def _ogrenci_id(vt, okul_no: str) -> int:
+    with vt.baglan() as b:
+        return b.execute("SELECT id FROM v_ogrenci WHERE okul_no=?", (okul_no,)).fetchone()[0]
 
 
-def test_geri_al_ve_ileri_al_calisir(uygulama) -> None:
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    plan = uygulama.plan_sonucu.plan
-    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
-    onceki_tarih = oturum.tarih
-    from datetime import timedelta
+def _bos_is_gunu(plan) -> date:
     hedef = max(o.tarih for o in plan.oturumlar) + timedelta(days=1)
     while hedef.weekday() >= 5:
         hedef += timedelta(days=1)
-    uygulama._kart_birakildi(oturum.anahtar, hedef, oturum.saat)
+    return hedef
+
+
+# ================================================================== genel
+
+def test_tum_sayfalar_hatasiz_acilir(uygulama) -> None:
+    """Adım eklendiğinde sayfa sınıfı ve ADIMLAR uyumsuz kalmasın."""
+    for sira, adim in enumerate(ADIMLAR):
+        uygulama.sayfa_goster(sira)
+        assert uygulama.baslik.text() == adim[1]
+        assert uygulama.yigin.currentWidget() is uygulama.sayfalar[sira]
+    assert uygulama.ileti.turden("hata") == []
+
+
+def test_qt_metinleri_turkce(qapp) -> None:
+    """Sağ tık menüsü ve standart düğmeler Qt'nin Türkçe çevirisinden gelir."""
+    from PySide6.QtCore import QCoreApplication
+    assert QCoreApplication.translate("QLineEdit", "&Undo") == "&Geri Al"
+    assert QCoreApplication.translate("QPlatformTheme", "Cancel") == "İptal"
+
+
+def test_beklenmeyen_hata_gosterilir_iletisi_gunluge_yazilmaz(uygulama, caplog) -> None:
+    """Paketlenmiş programda konsol yok: yuvada fırlatılan beklenmeyen hata
+    kullanıcıya gösterilir. Günlüğe çağrı yığını ve tür yazılır; ileti öğrenci
+    adı taşıyabileceği için yazılmaz (KVKK)."""
+    import logging
+    import sys
+    from arayuz.uygulama import beklenmeyen_hata_kancasi
+    kanca = beklenmeyen_hata_kancasi(uygulama)
+    uygulama.mesgul_ac("Deneme")
+    ad = "Uydurma " + "Öğrenci Bir"        # kaynak satırında ad geçmesin
+    try:
+        raise KeyError(ad)
+    except KeyError:
+        tur, deger, iz = sys.exc_info()
+    with caplog.at_level(logging.ERROR):
+        kanca(tur, deger, iz)
+    assert "KeyError" in caplog.text and "test_arayuz.py" in caplog.text
+    assert ad not in caplog.text
+    assert any(ad in metin for metin in uygulama.ileti.turden("hata"))
+    assert not uygulama.mesgul.isVisible()
+
+
+def test_kisayol_etkin_sayfaya_iletilir(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    assert sayfa.kaydedilmemis
+    uygulama._sayfaya_ilet("kisayol_kaydet")
+    assert not sayfa.kaydedilmemis and sayfa.aktif_plan_id is not None
+
+
+def test_kapanista_kaydedilmemis_plan_sorulur(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    uygulama.show()
+    uygulama.ileti.cevap = False
+    assert uygulama.close() is False
+    assert uygulama.ileti.turden("soru") and sayfa.kaydedilmemis
+
+
+# ============================================================ sınav planı
+
+def test_plan_ekraninda_plan_uretilir(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    assert len(sayfa.plan_sonucu.plan.oturumlar) == 4
+    assert sayfa.kaydedilmemis is True
+    assert sayfa.kaydet_dugmesi.isEnabled()
+    assert set(sayfa.takvim.kart_widgetlari) == {o.anahtar for o in sayfa.plan_sonucu.plan.oturumlar}
+
+
+def test_surukle_birak_gecerli_tasimayi_uygular_ve_geri_alinir(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    onceki, hedef = oturum.tarih, _bos_is_gunu(plan)
+    sayfa.kart_birakildi(oturum.anahtar, hedef, oturum.saat)
+    assert plan.oturum_bul(oturum.anahtar).tarih == hedef
+    assert len(sayfa.geri_yigini) == 1
+    sayfa.geri_al()
+    assert plan.oturum_bul(oturum.anahtar).tarih == onceki
+    assert not sayfa.geri_dugmesi.isEnabled()
+    sayfa.ileri_al()
     assert plan.oturum_bul(oturum.anahtar).tarih == hedef
 
-    uygulama._geri_al()
-    assert plan.oturum_bul(oturum.anahtar).tarih == onceki_tarih
-    assert str(uygulama.geri_dugmesi["state"]) == "disabled"
 
-    uygulama._ileri_al()
-    assert plan.oturum_bul(oturum.anahtar).tarih == hedef
-
-
-@pytest.mark.parametrize("sure, beklenen", [("90", "(uyg. –09:30)"), ("40", "(uyg.)")])
-def test_sonraki_saate_tasan_uygulama_karti_bitisini_gosterir(uygulama, sure, beklenen) -> None:
-    """Kart yalnız başladığı satırda çizilir; 08:00'de başlayan 90 dakikalık
-    uygulama bitişiyle yazılmazsa 09:00 hücresi boş sanılır. 40 dakikada
-    (olumsuz senaryo) kart eskisi gibidir."""
-    from datetime import time as saat, timedelta
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama.uygulama_suresi.set(sure)
-    uygulama._plan_uret()
-    plan = uygulama.plan_sonucu.plan
-    oturum = next(o for o in plan.oturumlar if o.oturum_turu.value == "uygulama")
-    hedef = max(o.tarih for o in plan.oturumlar) + timedelta(days=1)
-    while hedef.weekday() >= 5:
-        hedef += timedelta(days=1)
-    uygulama._kart_birakildi(oturum.anahtar, hedef, saat(8, 0))
-    assert (oturum.tarih, oturum.saat) == (hedef, saat(8, 0))
-    kart = next(k for k in uygulama.takvim.kartlar if k["anahtar"] == oturum.anahtar)
-    assert kart["baslik"].endswith(beklenen)
-
-
-def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, monkeypatch) -> None:
-    """Aynı öğrencinin iki sınavı aynı saate getirilemez."""
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    plan = uygulama.plan_sonucu.plan
-    # 101 numaralı öğrenci hem MATEMATİK hem FİZİK sınavına giriyor.
+def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, qtbot) -> None:
+    """Aynı öğrencinin iki sınavı aynı saate getirilemez (101: MATEMATİK ve FİZİK)."""
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
     matematik = next(o for o in plan.oturumlar if o.ders_adi == "MATEMATİK")
     fizik = next(o for o in plan.oturumlar if o.ders_adi == "FİZİK")
-    uyarilar = []
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showwarning",
-                        lambda baslik, mesaj, **k: uyarilar.append(mesaj))
     onceki = fizik.tarih, fizik.saat
-    uygulama._kart_birakildi(fizik.anahtar, matematik.tarih, matematik.saat)
-    assert (fizik.tarih, fizik.saat) == onceki          # taşıma geri alındı
-    assert uyarilar and "Öğrenci çakışması" in uyarilar[0]
+    sayfa.kart_birakildi(fizik.anahtar, matematik.tarih, matematik.saat)
+    assert (fizik.tarih, fizik.saat) == onceki
+    assert any("Öğrenci çakışması" in m for m in uygulama.ileti.turden("uyari"))
 
 
-def test_kaydet_plani_veritabanina_yazar(uygulama, monkeypatch) -> None:
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uygulama._plan_kaydet()
-    assert uygulama.aktif_plan_id is not None
-    assert uygulama.kaydedilmemis is False
-    assert str(uygulama.kaydet_dugmesi["state"]) == "disabled"
-    plan, bilgi = hizmet.plan_yukle(uygulama.vt, uygulama.aktif_plan_id)
-    assert len(plan.oturumlar) == 4
-    assert bilgi["kesin_mi"] == 0
+def test_kaydet_ve_yeniden_acilis(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    sayfa.plan_kaydet()
+    plan_id = sayfa.aktif_plan_id
+    assert plan_id is not None and not sayfa.kaydedilmemis
+    plan, bilgi = hizmet.plan_yukle(uygulama.vt, plan_id)
+    assert len(plan.oturumlar) == 4 and bilgi["kesin_mi"] == 0
+    uygulama.sayfa_goster(sayfa_sirasi("Kurum Ayarları"))
+    uygulama.sayfa_goster(sayfa_sirasi("Sınav Planı"))
+    assert sayfa.aktif_plan_id == plan_id and not sayfa.kaydedilmemis
 
 
-def test_kaydedilen_plan_yeniden_acildiginda_yuklenir(uygulama, monkeypatch) -> None:
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uygulama._plan_kaydet()
-    plan_id = uygulama.aktif_plan_id
-    uygulama._sayfa_goster(sayfa("Kurum Ayarları"))
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    assert uygulama.aktif_plan_id == plan_id
-    assert uygulama.kaydedilmemis is False
+def test_kaydedilmemis_plan_sayfa_degisince_kaybolmaz(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    uretilen = sayfa.plan_sonucu
+    uygulama.sayfa_goster(sayfa_sirasi("Salonlar"))
+    uygulama.sayfa_goster(sayfa_sirasi("Sınav Planı"))
+    assert sayfa.plan_sonucu is uretilen and sayfa.kaydedilmemis
 
 
-def test_kesinlesen_plan_kilitlenir(uygulama, monkeypatch) -> None:
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uygulama._plan_kaydet()
-    uygulama.onay_girdisi.delete(0, "end")
-    uygulama.onay_girdisi.insert(0, "2026/144")
-    uygulama._plan_kesinlestir()
-    plan, bilgi = hizmet.plan_yukle(uygulama.vt, uygulama.aktif_plan_id)
-    assert bilgi["kesin_mi"] == 1
-    assert all(o.kilitli_mi for o in plan.oturumlar)
-
-
-def test_kilitli_oturum_tasinamaz(uygulama, monkeypatch) -> None:
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    hatalar = []
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showerror",
-                        lambda baslik, mesaj, **k: hatalar.append(mesaj))
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uygulama._plan_kaydet()
-    uygulama.onay_girdisi.delete(0, "end")
-    uygulama.onay_girdisi.insert(0, "2026/144")
-    uygulama._plan_kesinlestir()
-    plan = uygulama.plan_sonucu.plan
-    oturum = plan.oturumlar[0]
-    from datetime import timedelta
-    uygulama._kart_birakildi(oturum.anahtar, oturum.tarih + timedelta(days=1), oturum.saat)
-    assert hatalar and "kilitli oturum" in hatalar[0].lower()
-
-
-def test_basvuru_sayfasi_acilir_ve_bayrakli_ogrenciyi_gosterir(uygulama) -> None:
-    """Başvuru sayfası servis katmanına bağlı mı; bayraklı öğrenci görünüyor mu."""
-    from datetime import date
-
-    with uygulama.vt.baglan() as b:
-        ogrenci_id = b.execute("SELECT id FROM v_ogrenci ORDER BY okul_no").fetchone()[0]
-    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, ogrenci_id, True, False)
-    hizmet.duyuru_kaydet(uygulama.vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
-                         "Duyuru 2026/1", "Okul web sayfası")
-
-    uygulama._sayfa_goster(sayfa("Başvuru"))
-    uygulama.kok.update_idletasks()
-
-    satirlar = hizmet.basvuru_tablosu(uygulama.vt, "P1")
-    bayrakli = [s for s in satirlar if s["bayrakli_mi"]]
-    assert len(bayrakli) == 1
-    assert bayrakli[0]["ozet"] == "KARAR BEKLİYOR"
-    assert len(hizmet.basvuru_bekleyenler(uygulama.vt, "P1")) == 1
-
-
-def test_basvuru_ekraninda_secilen_ogrencinin_isaretleri_kutulara_gelir(uygulama) -> None:
-    """Eski sürümde kutular boş açılıyor, tek bayrağı değiştirmek isteyen
-    kullanıcı öbürünü sessizce siliyordu: öğrenci başvurusuz plana giriyordu."""
-    with uygulama.vt.baglan() as b:
-        ogrenci_id = b.execute("SELECT id FROM v_ogrenci ORDER BY okul_no").fetchone()[0]
-    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, ogrenci_id, False, True)
-    uygulama._sayfa_goster(sayfa("Başvuru"))
-    uygulama.basvuru_tablosu.selection_set(str(ogrenci_id))
-    uygulama.kok.update()
-    mezun, devamsiz = uygulama.basvuru_isaretleri
-    assert mezun.get() is False and devamsiz.get() is True
-
-
-def _plan_kaydet(uygulama, monkeypatch) -> int:
-    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uygulama._plan_kaydet()
-    return uygulama.aktif_plan_id
-
-
-def test_donem_degisince_o_donemin_plani_acilir(uygulama, monkeypatch) -> None:
+def test_donem_degisince_o_donemin_plani_acilir(uygulama, qtbot) -> None:
     """Eski sürümde dönem kutusu değişse de ekranda Eylül planı kalıyordu."""
-    plan_id = _plan_kaydet(uygulama, monkeypatch)
-    secenekler = [s[1:] for s in uygulama._plan_secenekleri]
-    from cekirdek.modeller import PlanTuru
-    uygulama.pencere_secimi.current(secenekler.index(("P2", PlanTuru.OLAGAN)))
-    uygulama._plan_donemi_degisti()
-    assert uygulama.aktif_plan_id is None and uygulama.plan_sonucu is None
-    uygulama.pencere_secimi.current(secenekler.index(("P1", PlanTuru.OLAGAN)))
-    uygulama._plan_donemi_degisti()
-    assert uygulama.aktif_plan_id == plan_id
+    sayfa = plan_uret(uygulama, qtbot)
+    sayfa.plan_kaydet()
+    plan_id = sayfa.aktif_plan_id
+    secenekler = [s[1:] for s in sayfa.secenekler]
+    sayfa.pencere_secimi.setCurrentIndex(secenekler.index(("P2", PlanTuru.OLAGAN)))
+    assert sayfa.aktif_plan_id is None and sayfa.plan_sonucu is None
+    sayfa.pencere_secimi.setCurrentIndex(secenekler.index(("P1", PlanTuru.OLAGAN)))
+    assert sayfa.aktif_plan_id == plan_id
 
 
-def test_kaydedilmemis_plan_sayfa_degisince_kaybolmaz(uygulama) -> None:
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    uretilen = uygulama.plan_sonucu
-    uygulama._sayfa_goster(sayfa("Salonlar"))
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    assert uygulama.plan_sonucu is uretilen and uygulama.kaydedilmemis is True
+def test_kesinlesen_plan_kilitlenir_ve_tasinamaz(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    sayfa.plan_kaydet()
+    sayfa.onay_girdisi.setText("2026/144")
+    sayfa.plan_kesinlestir()
+    plan, bilgi = hizmet.plan_yukle(uygulama.vt, sayfa.aktif_plan_id)
+    assert bilgi["kesin_mi"] == 1 and all(o.kilitli_mi for o in plan.oturumlar)
+    assert not sayfa.kesinlestir_dugmesi.isEnabled()
+    oturum = sayfa.plan_sonucu.plan.oturumlar[0]
+    sayfa.kart_birakildi(oturum.anahtar, oturum.tarih + timedelta(days=1), oturum.saat)
+    assert any("kilitli oturum" in m.lower() for m in uygulama.ileti.turden("hata"))
 
 
-def test_karta_tiklamak_gorevlileri_gosterir(uygulama) -> None:
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    oturum = uygulama.plan_sonucu.plan.oturumlar[0]
-    uygulama._kart_secildi(oturum.anahtar)
-    assert "Komisyon:" in uygulama.secim_etiketi["text"]
-    assert str(uygulama.gorevli_dugmesi["state"]) == "normal"
+def test_karta_tiklamak_gorevlileri_gosterir(uygulama, qtbot) -> None:
+    sayfa = plan_uret(uygulama, qtbot)
+    oturum = sayfa.plan_sonucu.plan.oturumlar[0]
+    sayfa.takvim.secildi(oturum.anahtar)
+    assert "Komisyon:" in sayfa.secim_etiketi.text()
+    assert sayfa.gorevli_dugmesi.isEnabled()
+    assert sayfa.takvim.kart_widgetlari[oturum.anahtar].property("secili") is True
 
 
-def test_gorevli_degistir_penceresi_degisikligi_uygular_ve_geri_alinir(uygulama) -> None:
+def test_gorevli_degistir_penceresi_degisikligi_uygular_ve_geri_alinir(uygulama, qtbot) -> None:
     from arayuz.pencereler import GorevliDegistirPenceresi
-    uygulama._sayfa_goster(sayfa("Sınav Planı"))
-    uygulama._plan_uret()
-    plan = uygulama.plan_sonucu.plan
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
     oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
-    pencere = GorevliDegistirPenceresi(uygulama, oturum.anahtar)
-    gozcu = next(i for i in pencere.mevcut.get_children() if i.endswith("|gozcu"))
-    pencere.mevcut.selection_set(gozcu)
-    pencere._adaylari_doldur()
-    aday = pencere.adaylar.get_children()[0]
-    pencere.adaylar.selection_set(aday)
-    pencere._degistir()
-    assert int(aday) in {g.personel_kimligi for g in plan.oturum_gorevleri(oturum.anahtar)}
-    assert len(uygulama.geri_yigini) == 1 and uygulama.kaydedilmemis
-    uygulama._geri_al()
-    assert int(aday) not in {g.personel_kimligi for g in plan.oturum_gorevleri(oturum.anahtar)}
+    pencere = GorevliDegistirPenceresi(uygulama, sayfa, oturum.anahtar)
+    qtbot.addWidget(pencere)
+    gozcu = next(g for g in plan.oturum_gorevleri(oturum.anahtar) if g.rol.value == "gozcu")
+    assert pencere.mevcut.sec(f"{gozcu.personel_kimligi}|gozcu")
+    aday = next(a for a in pencere.adaylar.gorunen_satirlar() if a["uygun_mu"])
+    assert pencere.adaylar.sec(aday["kimlik"])
+    pencere.degistir()
+    assert aday["kimlik"] in {g.personel_kimligi for g in plan.oturum_gorevleri(oturum.anahtar)}
+    assert len(sayfa.geri_yigini) == 1 and sayfa.kaydedilmemis
+    sayfa.geri_al()
+    assert aday["kimlik"] not in {g.personel_kimligi
+                                  for g in plan.oturum_gorevleri(oturum.anahtar)}
 
 
-def test_tek_ders_ve_musaitlik_pencereleri_acilir(uygulama, monkeypatch) -> None:
+@pytest.mark.parametrize("sure, beklenen, suren", [(90, "(uyg. –09:30)", True),
+                                                   (40, "(uyg.)", False)])
+def test_sonraki_saate_tasan_uygulama_takvimde_gorunur(uygulama, qtbot, sure, beklenen,
+                                                       suren) -> None:
+    """Kart yalnız başladığı satırda çizilir; 08:00'de başlayan 90 dakikalık
+    uygulama bitişiyle yazılır ve 09:00 hücresinde "sürüyor" işareti bırakır.
+    40 dakikada (olumsuz senaryo) kart eskisi gibidir."""
+    sayfa = plan_sayfasi(uygulama)
+    sayfa.uygulama_suresi.setValue(sure)
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if o.oturum_turu.value == "uygulama")
+    hedef = _bos_is_gunu(plan)
+    sayfa.kart_birakildi(oturum.anahtar, hedef, time(8, 0))
+    assert (oturum.tarih, oturum.saat) == (hedef, time(8, 0))
+    kart = next(k for k in sayfa.takvim.kartlar if k["anahtar"] == oturum.anahtar)
+    assert kart["baslik"].endswith(beklenen)
+    hucre = sayfa.takvim.hucre(hedef, time(9, 0))
+    surenler = [hucre.duzen.itemAt(i).widget() for i in range(hucre.duzen.count())
+                if hucre.duzen.itemAt(i).widget() is not None]
+    assert any(w.objectName() == "Suren" for w in surenler) is suren
+
+
+def test_takvim_kalabalik_hucredeki_butun_kartlari_cizer(qtbot) -> None:
+    """Eski sürüm bir hücreye üçten fazla oturum düşünce fazlasını çizmiyordu."""
+    from arayuz.takvim import SurukleBirakTakvim
+    kartlar = [{"anahtar": f"k{i}", "baslik": f"Ders {i}", "tarih": date(2026, 9, 14),
+                "saat": time(9, 0), "tur": "yazili", "kilitli": False} for i in range(6)]
+    takvim = SurukleBirakTakvim([date(2026, 9, 14)], [time(9, 0), time(10, 0)], kartlar,
+                                lambda *a: None)
+    qtbot.addWidget(takvim)
+    assert set(takvim.kart_widgetlari) == {f"k{i}" for i in range(6)}
+    assert takvim.hucre(date(2026, 9, 14), time(10, 0)) is not None
+
+
+def test_tek_ders_ve_musaitlik_pencereleri(uygulama, qtbot) -> None:
     from arayuz.pencereler import MusaitlikPenceresi, TekDersPenceresi
-    _plan_kaydet(uygulama, monkeypatch)
-    TekDersPenceresi(uygulama, "P1").destroy()
-    uygulama._sayfa_goster(sayfa("Öğretmen Listesi"))
-    kisi = uygulama.personel_kayitlari[0]
+    sayfa = plan_uret(uygulama, qtbot)
+    sayfa.plan_kaydet()
+    tek = TekDersPenceresi(uygulama, "P1")
+    qtbot.addWidget(tek)
+    kisi = hizmet.personel_ayrintili_liste(uygulama.vt)[0]
     pencere = MusaitlikPenceresi(uygulama, kisi)
-    pencere.gun.current(2)
-    pencere.h_bas.insert(0, "08:00")
-    pencere.h_bit.insert(0, "12:00")
+    qtbot.addWidget(pencere)
+    pencere.gun.setCurrentIndex(2)
+    pencere.h_bas.setText("08:00")
+    pencere.h_bit.setText("12:00")
     pencere._haftalik_ekle()
-    assert len(pencere.tablo.get_children()) == 1
-    pencere._kapat()
+    assert pencere.tablo.model.rowCount() == 1
     assert hizmet.musaitlik_listesi(uygulama.vt, kisi["kimlik"])[0]["zaman"] == "Her çarşamba"
 
 
-def test_takvim_kalabalik_hucredeki_butun_kartlari_cizer(tk_koku) -> None:
-    """Eski sürüm bir hücreye üçten fazla oturum düşünce fazlasını çizmiyordu."""
-    from datetime import date, time
-    from arayuz.takvim import SurukleBirakTakvim
-    ust = tkinter.Toplevel(tk_koku)
-    try:
-        kartlar = [{"anahtar": f"k{i}", "baslik": f"Ders {i}", "tarih": date(2026, 9, 14),
-                    "saat": time(9, 0), "tur": "yazili", "kilitli": False} for i in range(6)]
-        takvim = SurukleBirakTakvim(ust, [date(2026, 9, 14)], [time(9, 0), time(10, 0)],
-                                    kartlar, lambda *a: None)
-        cizilen = {etiket for nesne in takvim.canvas.find_withtag("kart")
-                   for etiket in takvim.canvas.gettags(nesne) if etiket.startswith("kart:")}
-        assert cizilen == {f"kart:k{i}" for i in range(6)}
-        # Satır büyüdüğü için ikinci saatin hücresi hâlâ doğru bulunur.
-        x, y = takvim.hucre_merkezi(date(2026, 9, 14), time(10, 0))
-        assert takvim._koordinattan_hucre(x, y) == (0, 1)
-    finally:
-        ust.destroy()
+# ================================================================ başvuru
+
+def _satir_sec(tablo, anahtarlar) -> None:
+    secim = tablo.gorunum.selectionModel()
+    secim.clearSelection()
+    for satir in range(tablo.suzgec.rowCount()):
+        indeks = tablo.suzgec.index(satir, 0)
+        if tablo.suzgec.data(indeks, Qt.ItemDataRole.UserRole) in anahtarlar:
+            secim.select(indeks, QItemSelectionModel.SelectionFlag.Select
+                         | QItemSelectionModel.SelectionFlag.Rows)
+
+
+def test_basvuruda_kutucuk_hemen_kaydeder_ve_geri_alinir(uygulama) -> None:
+    """Tk sürümünde öğrenci seçilip kutu işaretleniyor, ayrı düğmeyle kaydediliyor
+    ve sayfa baştan çiziliyordu. Burada kutucuk hemen kaydeder, bildirim geri alır."""
+    sayfa = basvuru_sayfasi(uygulama)
+    kimlik = _ogrenci_id(uygulama.vt, "102")
+    satir = next(s for s in sayfa.tablo.gorunen_satirlar() if s["ogrenci_id"] == kimlik)
+    sayfa.tablo.model.setData(sayfa.tablo.model.index(sayfa.tablo.model.sira_bul(kimlik), 0),
+                              Qt.CheckState.Checked.value, Qt.ItemDataRole.CheckStateRole)
+    guncel = {s["ogrenci_id"]: s for s in hizmet.basvuru_tablosu(uygulama.vt, "P1")}
+    assert guncel[kimlik]["mezun_olamayan_mi"] and not guncel[kimlik]["devamsizlik_tebligati_mi"]
+    assert satir["okul_no"] in uygulama.bildirim.metin.text()
+    assert uygulama.bildirim.eylem.isVisibleTo(uygulama.bildirim)
+    uygulama.bildirim.eylem.click()
+    guncel = {s["ogrenci_id"]: s for s in hizmet.basvuru_tablosu(uygulama.vt, "P1")}
+    assert not guncel[kimlik]["bayrakli_mi"]
+
+
+def test_basvuruda_toplu_isaret_obur_bayraga_dokunmaz(uygulama) -> None:
+    sayfa = basvuru_sayfasi(uygulama)
+    birinci, ikinci = _ogrenci_id(uygulama.vt, "101"), _ogrenci_id(uygulama.vt, "102")
+    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, ikinci, False, True)
+    sayfa.tazele()
+    _satir_sec(sayfa.tablo, {birinci, ikinci})
+    sayfa.toplu_isaretle("mezun_olamayan", True)
+    guncel = {s["ogrenci_id"]: s for s in hizmet.basvuru_tablosu(uygulama.vt, "P1")}
+    assert guncel[birinci]["mezun_olamayan_mi"] and guncel[ikinci]["mezun_olamayan_mi"]
+    assert guncel[ikinci]["devamsizlik_tebligati_mi"]          # öbür bayrak korundu
+    assert {s["ogrenci_id"] for s in sayfa.tablo.secili_satirlar()} == {birinci, ikinci}
+
+
+def test_basvuru_aramasi_ve_suzgecleri(uygulama, qtbot) -> None:
+    sayfa = basvuru_sayfasi(uygulama)
+    toplam = sayfa.tablo.suzgec.rowCount()
+    assert toplam == 3
+    sayfa.tablo.suzgec.aramayi_ayarla("ogrenci iki")          # Türkçe karaktersiz yazım
+    assert [s["okul_no"] for s in sayfa.tablo.gorunen_satirlar()] == ["102"]
+    sayfa.tablo.suzgec.aramayi_ayarla("")
+    sayfa.yalniz_isaretli.setChecked(True)
+    assert sayfa.tablo.suzgec.rowCount() == 0
+    sayfa.yalniz_isaretli.setChecked(False)
+    sayfa.sube_suzgeci.setCurrentText("10/B")
+    assert [s["okul_no"] for s in sayfa.tablo.gorunen_satirlar()] == ["201"]
+
+
+def test_numara_listesiyle_isaretleme(uygulama, qtbot) -> None:
+    from arayuz.pencereler import NumaraListesiPenceresi
+    basvuru_sayfasi(uygulama)
+    pencere = NumaraListesiPenceresi(uygulama)
+    qtbot.addWidget(pencere)
+    pencere.metin.setPlainText("101 Uydurma Öğrenci Bir 9/A\n201, 999")
+    pencere.tur.setCurrentIndex(1)                            # devamsızlık tebligatı
+    pencere.onizle()
+    assert [(s["no"], s["durum"]) for s in pencere.satirlar] == [
+        ("101", "bulundu"), ("201", "bulundu"), ("999", "bulunamadi")]
+    assert pencere.uygula_dugmesi.isEnabled()
+    pencere.uygula()
+    assert pencere.degisen == 2
+    guncel = {s["okul_no"]: s for s in hizmet.basvuru_tablosu(uygulama.vt, "P1")}
+    assert guncel["101"]["devamsizlik_tebligati_mi"] and guncel["201"]["devamsizlik_tebligati_mi"]
+    assert not guncel["102"]["bayrakli_mi"]
+
+
+def test_basvuru_karari_kaydedilir_ve_sonrakine_gecilir(uygulama) -> None:
+    for no in ("101", "102"):
+        hizmet.ogrenci_bayrak_guncelle(uygulama.vt, _ogrenci_id(uygulama.vt, no), True, False)
+    hizmet.duyuru_kaydet(uygulama.vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
+                         "Duyuru 2026/1", "Okul web sayfası")
+    sayfa = basvuru_sayfasi(uygulama)
+    assert not sayfa.duyuru_yok_seridi.isVisibleTo(sayfa)
+    sira = [s["ogrenci_id"] for s in sayfa.karar_tablosu.gorunen_satirlar()]
+    assert len(sira) == 2
+    sayfa.karar_tablosu.sec(sira[0])
+    sayfa.basvuru_tarihi.ayarla(date(2026, 9, 3))
+    sayfa.dilekce.setText("Dilekçe 2026/5")
+    sayfa.karari_kaydet(sonrakine=True)
+    guncel = {s["ogrenci_id"]: s for s in hizmet.basvuru_tablosu(uygulama.vt, "P1")}
+    assert guncel[sira[0]]["basvuru_durumu"] == "basvurdu"
+    assert sayfa.karar_tablosu.secili_satir()["ogrenci_id"] == sira[1]
+
+
+def test_gec_basvuruda_onay_alani_acilir(uygulama) -> None:
+    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, _ogrenci_id(uygulama.vt, "101"), True, False)
+    hizmet.duyuru_kaydet(uygulama.vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
+                         "Duyuru 2026/1", "Okul web sayfası")
+    sayfa = basvuru_sayfasi(uygulama)
+    sayfa.karar_tablosu.sec(_ogrenci_id(uygulama.vt, "101"))
+    sayfa.basvuru_tarihi.ayarla(date(2026, 9, 5))
+    assert not sayfa.gec_onay.isEnabled()
+    sayfa.basvuru_tarihi.ayarla(date(2026, 9, 8))             # son günden sonra
+    assert sayfa.gec_onay.isEnabled() and "müdür onayına" in sayfa.gec_ipucu.text()
+
+
+# ================================================================ güncelleme
+
+GUNCEL_DURUM = {"calisan_surum": "0.8.0", "son_surum": "0.9.0", "guncelleme_var": True,
+                "yayim_adi": "Sorumluluk Sınavı 0.9.0", "yayim_zamani": "", "sayfa_adresi": "",
+                "platform": "windows", "indirilebilir": True,
+                "kurulum_adi": "SorumlulukSinavi-Kurulum-0.9.0.exe", "kurulum_boyutu": 16_000_000}
+
+
+def test_guncelleme_seridi_gosterilir_ve_ertelenir(uygulama) -> None:
+    uygulama.guncelleme_durumu_geldi(dict(GUNCEL_DURUM))
+    assert uygulama.guncelleme_seridi.isVisibleTo(uygulama)
+    assert "0.9.0 hazır" in uygulama.guncelleme_seridi.metin.text()
+    uygulama._guncellemeyi_ertele()
+    assert not uygulama.guncelleme_seridi.isVisibleTo(uygulama)
+    uygulama.guncelleme_durumu_geldi(dict(GUNCEL_DURUM))     # aynı sürüm yeniden önerilmez
+    assert not uygulama.guncelleme_seridi.isVisibleTo(uygulama)
+
+
+def test_guncel_programda_serit_cikmaz(uygulama) -> None:
+    """Olumsuz senaryo: yeni sürüm yoksa şerit görünmez."""
+    uygulama.guncelleme_durumu_geldi({**GUNCEL_DURUM, "guncelleme_var": False,
+                                      "son_surum": "0.8.0"})
+    assert not uygulama.guncelleme_seridi.isVisibleTo(uygulama)
+
+
+def test_hakkinda_paneli_platforma_gore_yol_gosterir(uygulama) -> None:
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    sayfa.durumu_goster(dict(GUNCEL_DURUM))
+    assert sayfa.indir_dugmesi.isVisibleTo(sayfa) and not sayfa.baslat_dugmesi.isVisibleTo(sayfa)
+    sayfa.durumu_goster({**GUNCEL_DURUM, "platform": "linux", "indirilebilir": False})
+    assert not sayfa.indir_dugmesi.isVisibleTo(sayfa)
+    assert sayfa.sayfa_dugmesi.isVisibleTo(sayfa) and ".deb" in sayfa.sonuc.metin.text()
+
+
+def test_acilis_denetimi_kapatilabilir(uygulama, monkeypatch) -> None:
+    from arayuz.uygulama import acilis_denetimi_acik_mi
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_DENETIMI", "1")
+    uygulama.ayarlar.setValue("guncelleme/acilista_denetle", True)
+    assert acilis_denetimi_acik_mi(uygulama.ayarlar)
+    uygulama.ayarlar.setValue("guncelleme/acilista_denetle", False)
+    assert not acilis_denetimi_acik_mi(uygulama.ayarlar)
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_DENETIMI", "0")
+    uygulama.ayarlar.setValue("guncelleme/acilista_denetle", True)
+    assert not acilis_denetimi_acik_mi(uygulama.ayarlar)
+
+
+def test_hakkinda_secenegi_tercihi_yazar(uygulama, monkeypatch) -> None:
+    from veri import guncelleme
+    # Ortam "1" iken açılış zamanlayıcısı ağa çıkmasın.
+    monkeypatch.setattr(guncelleme, "guncelleme_durumu", lambda **_: dict(GUNCEL_DURUM))
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_DENETIMI", "1")
+    uygulama.ayarlar.setValue("guncelleme/acilista_denetle", True)
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    assert sayfa.acilista.isChecked() and sayfa.acilista.isEnabled()
+    sayfa.acilista.setChecked(False)
+    assert uygulama.ayarlar.value("guncelleme/acilista_denetle", type=bool) is False
+
+
+def test_kurum_kapattiysa_secenek_kapali_gorunur(uygulama) -> None:
+    """Olumsuz senaryo: ortam değişkeni denetimi kapatmışsa kutu işaretli
+    görünmez, değiştirilemez; kullanıcının kendi tercihi de bozulmaz."""
+    uygulama.ayarlar.setValue("guncelleme/acilista_denetle", True)
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))      # conftest: denetim kapalı
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    assert not sayfa.acilista.isChecked() and not sayfa.acilista.isEnabled()
+    assert uygulama.ayarlar.value("guncelleme/acilista_denetle", type=bool) is True
+
+
+# ================================================================== bileşen
+
+def test_tablo_turkce_siralar_ve_harf_duyarsiz_arar(qtbot) -> None:
+    from arayuz.bilesenler import Sutun, Tablo
+    tablo = Tablo([Sutun("Ad", lambda s: s, 200)], anahtar=lambda s: s,
+                  siralama=(0, Qt.SortOrder.AscendingOrder))
+    qtbot.addWidget(tablo)
+    tablo.yukle(["Zeynep", "Çiğdem", "İlker", "Irmak", "Ömer", "Cem"])
+    assert tablo.gorunen_satirlar() == ["Cem", "Çiğdem", "Irmak", "İlker", "Ömer", "Zeynep"]
+    tablo.suzgec.aramayi_ayarla("cigdem")
+    assert tablo.gorunen_satirlar() == ["Çiğdem"]
+    tablo.suzgec.aramayi_ayarla("xyz")
+    assert tablo.gorunen_satirlar() == [] and tablo.bos.isVisibleTo(tablo)
+
+
+def test_tablo_yeniden_yuklemede_secimi_korur(qtbot) -> None:
+    from arayuz.bilesenler import Sutun, Tablo
+    tablo = Tablo([Sutun("Ad", lambda s: s["ad"], 200)], anahtar=lambda s: s["no"],
+                  coklu_secim=True)
+    qtbot.addWidget(tablo)
+    tablo.yukle([{"no": i, "ad": f"Öğrenci {i}"} for i in range(5)])
+    _satir_sec(tablo, {1, 3})
+    tablo.yukle([{"no": i, "ad": f"Öğrenci {i} (güncel)"} for i in range(5)])
+    assert [s["no"] for s in tablo.secili_satirlar()] == [1, 3]

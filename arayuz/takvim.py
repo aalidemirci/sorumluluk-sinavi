@@ -1,235 +1,196 @@
-"""Sürükle-bırak sınav takvimi.
+"""Sürükle-bırak sınav takvimi (Qt).
 
 Sütunlar gün, satırlar oturum saatidir. Aynı hücrede birden fazla kart
 bulunabilir; motor paralel oturuma izin verdiği için bu normaldir. Kart
-bırakıldığında taşımayı çağıran katman denetler ve gerekirse geri alır.
-Kart sürüklenmeden bırakılırsa bu bir seçimdir; çağıran katman oturumun
+bırakıldığında taşımayı çağıran katman denetler ve gerekirse geri alır. Kart
+sürüklenmeden bırakılırsa bu bir seçimdir; çağıran katman oturumun
 ayrıntısını gösterir.
+
+Sonraki oturum saatine taşan uzun uygulama sınavı, sürdüğü hücrelerde kesikli
+bir "sürüyor" işaretiyle görünür; Tk sürümünde kart yalnız başladığı satırda
+duruyor, devamı boş hücre sanılabiliyordu.
 """
 
 from __future__ import annotations
 
-from bisect import bisect_right
-from collections import Counter
 from datetime import date, time
-from tkinter import ttk
-import tkinter as tk
+from typing import Any, Callable
 
-from arayuz.palet import RENK as _P
+from PySide6.QtCore import QMimeData, QPoint, Qt
+from PySide6.QtGui import QDrag, QMouseEvent
+from PySide6.QtWidgets import (
+    QApplication, QFrame, QGridLayout, QLabel, QScrollArea, QVBoxLayout, QWidget,
+)
 
+from arayuz.bilesenler import turu_ayarla
 
 GUN_KISALTMALARI = ("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
-
-# Izgaranın kendi ad kümesi var ama renkler tek yerden, arayuz.palet'ten
-# gelir; site paletiyle uyumu orada tutulur.
-RENK = {
-    "zemin": _P["kart"],
-    "izgara": _P["cizgi"],
-    "baslik": _P["tint"],
-    "baslik_yazi": _P["yazi"],
-    "hafta_sonu": _P["uyari_zemin"],
-    "kart": _P["chip"],
-    "kart_kenar": _P["takvim_kart_kenar"],
-    "kart_yazi": _P["yazi"],
-    "kilit": _P["pasif_zemin"],
-    "kilit_kenar": _P["takvim_kilit_kenar"],
-    "uygulama": _P["basari_zemin"],
-    "uygulama_kenar": _P["takvim_uygulama_kenar"],
-    "hedef": _P["takvim_hedef"],
-    "secili_kenar": _P["kenar"],
-}
+MIME_TURU = "application/x-sorumluluk-oturum"
+SUTUN_GENISLIGI = 188
 
 
-class SurukleBirakTakvim(ttk.Frame):
-    SOL = 84
-    UST = 46
-    GUN_GENISLIK = 168
-    SATIR_YUKSEKLIK = 96
-    KART_YUKSEKLIK = 26
-    KART_ARASI = 3
-    # Bundan kısa fare hareketi sürükleme değil tıklamadır.
-    SURUKLEME_ESIGI = 6
+class OturumKarti(QFrame):
+    """Takvimdeki sınav kartı; sürüklenebilir, tıklanınca seçilir."""
 
-    def __init__(self, parent, gunler: list[date], saatler: list[time],
-                 kartlar: list[dict], birak_geri_cagirimi, sec_geri_cagirimi=None):
-        super().__init__(parent)
-        self.gunler = list(gunler)
-        self.saatler = list(saatler)
-        self.kartlar = list(kartlar)
-        self.birak = birak_geri_cagirimi
-        self.sec = sec_geri_cagirimi
-        self.suruklenen: str | None = None
-        self.hedef_hucre: tuple[int, int] | None = None
-        self.basis_noktasi: tuple[float, float] | None = None
-        self.surukleniyor = False
+    def __init__(self, kart: dict, takvim: "SurukleBirakTakvim"):
+        super().__init__()
+        self.kart = kart
+        self.anahtar = kart["anahtar"]
+        self.takvim = takvim
+        self.setObjectName("OturumKarti")
+        self.setProperty("tur", kart.get("tur", "yazili"))
+        self.setProperty("kilitli", bool(kart.get("kilitli")))
+        self.setProperty("secili", False)
+        duzen = QVBoxLayout(self)
+        duzen.setContentsMargins(8, 5, 8, 5)
+        duzen.setSpacing(1)
+        baslik = QLabel(kart["baslik"] + (" ✓" if kart.get("kilitli") else ""))
+        baslik.setObjectName("KartBasligi")
+        alt = QLabel(kart.get("alt", ""))
+        alt.setObjectName("KartAlti")
+        duzen.addWidget(baslik)
+        duzen.addWidget(alt)
+        self.setToolTip(kart.get("ipucu", kart["baslik"]))
+        self.setCursor(Qt.CursorShape.ForbiddenCursor if kart.get("kilitli")
+                       else Qt.CursorShape.OpenHandCursor)
+        self._bas: QPoint | None = None
+
+    def mousePressEvent(self, olay: QMouseEvent) -> None:  # noqa: N802
+        if olay.button() == Qt.MouseButton.LeftButton:
+            self._bas = olay.position().toPoint()
+        super().mousePressEvent(olay)
+
+    def mouseMoveEvent(self, olay: QMouseEvent) -> None:  # noqa: N802
+        if self._bas is None or not (olay.buttons() & Qt.MouseButton.LeftButton):
+            return
+        if (olay.position().toPoint() - self._bas).manhattanLength() \
+                < QApplication.startDragDistance():
+            return
+        self._bas = None
+        veri = QMimeData()
+        veri.setData(MIME_TURU, self.anahtar.encode("utf-8"))
+        surukle = QDrag(self)
+        surukle.setMimeData(veri)
+        surukle.setPixmap(self.grab())
+        surukle.setHotSpot(olay.position().toPoint())
+        surukle.exec(Qt.DropAction.MoveAction)
+
+    def mouseReleaseEvent(self, olay: QMouseEvent) -> None:  # noqa: N802
+        if self._bas is not None and olay.button() == Qt.MouseButton.LeftButton:
+            self.takvim.secildi(self.anahtar)
+        self._bas = None
+        super().mouseReleaseEvent(olay)
+
+    def secili_yap(self, secili: bool) -> None:
+        turu_ayarla(self, "secili", secili)
+
+
+class Hucre(QFrame):
+    """Gün × saat hücresi; kartları alt alta dizer, bırakılan kartı kabul eder."""
+
+    def __init__(self, tarih: date, saat: time, takvim: "SurukleBirakTakvim"):
+        super().__init__()
+        self.tarih, self.saat, self.takvim = tarih, saat, takvim
+        self.setObjectName("Hucre")
+        self.setProperty("hafta_sonu", tarih.weekday() >= 5)
+        self.setProperty("hedef", False)
+        self.setAcceptDrops(True)
+        self.setMinimumHeight(64)
+        self.duzen = QVBoxLayout(self)
+        self.duzen.setContentsMargins(5, 5, 5, 5)
+        self.duzen.setSpacing(4)
+        self.duzen.addStretch(1)
+
+    def ekle(self, oge: QWidget) -> None:
+        self.duzen.insertWidget(self.duzen.count() - 1, oge)
+
+    def dragEnterEvent(self, olay) -> None:  # noqa: N802
+        if olay.mimeData().hasFormat(MIME_TURU):
+            olay.acceptProposedAction()
+            turu_ayarla(self, "hedef", True)
+
+    def dragLeaveEvent(self, olay) -> None:  # noqa: N802
+        turu_ayarla(self, "hedef", False)
+
+    def dropEvent(self, olay) -> None:  # noqa: N802
+        turu_ayarla(self, "hedef", False)
+        anahtar = bytes(olay.mimeData().data(MIME_TURU)).decode("utf-8")
+        olay.acceptProposedAction()
+        self.takvim.birakildi(anahtar, self.tarih, self.saat)
+
+
+class SurukleBirakTakvim(QScrollArea):
+    """`kartlar`: anahtar, baslik, alt, ipucu, tarih, saat, tur, kilitli,
+    suren_saatler (uzun uygulamanın sürdüğü sonraki saatler)."""
+
+    def __init__(self, gunler: list[date], saatler: list[time], kartlar: list[dict],
+                 birak_geri_cagirimi: Callable[[str, date, time], Any],
+                 sec_geri_cagirimi: Callable[[str], Any] | None = None):
+        super().__init__()
+        self.gunler, self.saatler, self.kartlar = list(gunler), list(saatler), list(kartlar)
+        self._birak, self._sec = birak_geri_cagirimi, sec_geri_cagirimi
         self.secili: str | None = None
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        izgara_kabi = QWidget()
+        izgara_kabi.setObjectName("TakvimIzgara")
+        izgara = QGridLayout(izgara_kabi)
+        izgara.setContentsMargins(0, 0, 4, 4)
+        izgara.setHorizontalSpacing(6)
+        izgara.setVerticalSpacing(6)
+        izgara.setColumnMinimumWidth(0, 56)
+        for sutun, gun in enumerate(self.gunler, 1):
+            etiket = QLabel(f"{GUN_KISALTMALARI[gun.weekday()]}  {gun.strftime('%d.%m')}")
+            etiket.setObjectName("TakvimGun")
+            etiket.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            turu_ayarla(etiket, "hafta_sonu", gun.weekday() >= 5)
+            izgara.addWidget(etiket, 0, sutun)
+            izgara.setColumnMinimumWidth(sutun, SUTUN_GENISLIGI)
+        self.hucreler: dict[tuple[date, time], Hucre] = {}
+        for satir, saat in enumerate(self.saatler, 1):
+            etiket = QLabel(saat.strftime("%H:%M"))
+            etiket.setObjectName("TakvimSaat")
+            etiket.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+            izgara.addWidget(etiket, satir, 0)
+            for sutun, gun in enumerate(self.gunler, 1):
+                hucre = Hucre(gun, saat, self)
+                self.hucreler[(gun, saat)] = hucre
+                izgara.addWidget(hucre, satir, sutun)
+        izgara.setRowStretch(len(self.saatler) + 1, 1)
+        izgara.setColumnStretch(len(self.gunler) + 1, 1)
 
-        self.canvas = tk.Canvas(self, bg=RENK["zemin"], highlightthickness=1,
-                                highlightbackground=RENK["izgara"])
-        yatay = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
-        dikey = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(xscrollcommand=yatay.set, yscrollcommand=dikey.set)
-        self.canvas.grid(row=0, column=0, sticky="nsew")
-        dikey.grid(row=0, column=1, sticky="ns")
-        yatay.grid(row=1, column=0, sticky="ew")
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=1)
-
-        self.canvas.bind("<ButtonPress-1>", self._basildi)
-        self.canvas.bind("<B1-Motion>", self._suruklendi)
-        self.canvas.bind("<ButtonRelease-1>", self._birakildi)
-        self.ciz()
-
-    # ------------------------------------------------------------- çizim
-
-    def _satir_yukseklikleri(self) -> list[int]:
-        """Her saat satırı, o saatteki en kalabalık hücrenin kartlarını alır.
-
-        Eski sürüm satır yüksekliğini sabit tutuyordu; bir hücreye üçten fazla
-        paralel oturum düşünce fazlası hiç çizilmiyor, sürüklenemiyordu.
-        """
-        doluluk = Counter()
+        self.kart_widgetlari: dict[str, OturumKarti] = {}
         for kart in self.kartlar:
-            yer = self._hucre_indisi(kart["tarih"], kart["saat"])
-            if yer is not None:
-                doluluk[yer] += 1
-        yukseklikler = []
-        for satir in range(len(self.saatler)):
-            en_cok = max((adet for (_, s), adet in doluluk.items() if s == satir), default=0)
-            gereken = 8 + en_cok * (self.KART_YUKSEKLIK + self.KART_ARASI)
-            yukseklikler.append(max(self.SATIR_YUKSEKLIK, gereken))
-        return yukseklikler
-
-    def ciz(self) -> None:
-        c = self.canvas
-        c.delete("all")
-        yukseklikler = self._satir_yukseklikleri()
-        self._satir_ustleri = [self.UST]
-        for yukseklik in yukseklikler:
-            self._satir_ustleri.append(self._satir_ustleri[-1] + yukseklik)
-        genislik = self.SOL + len(self.gunler) * self.GUN_GENISLIK
-        toplam = self._satir_ustleri[-1]
-        c.configure(scrollregion=(0, 0, genislik, toplam))
-
-        c.create_rectangle(0, 0, genislik, self.UST, fill=RENK["baslik"], outline="")
-        for sutun, gun in enumerate(self.gunler):
-            x = self.SOL + sutun * self.GUN_GENISLIK
-            if gun.weekday() >= 5:
-                c.create_rectangle(x, self.UST, x + self.GUN_GENISLIK, toplam,
-                                   fill=RENK["hafta_sonu"], outline="")
-            c.create_text(x + self.GUN_GENISLIK / 2, self.UST / 2,
-                          text=f"{GUN_KISALTMALARI[gun.weekday()]}  {gun.strftime('%d.%m')}",
-                          font=("Segoe UI Semibold", 9), fill=RENK["baslik_yazi"])
-            c.create_line(x, 0, x, toplam, fill=RENK["izgara"])
-        for satir, saat in enumerate(self.saatler):
-            y = self._satir_ustleri[satir]
-            c.create_line(0, y, genislik, y, fill=RENK["izgara"])
-            c.create_text(self.SOL / 2, y + 14, text=saat.strftime("%H:%M"),
-                          font=("Segoe UI", 9), fill=RENK["baslik_yazi"])
-        c.create_line(self.SOL, 0, self.SOL, toplam, fill=RENK["izgara"])
-
-        hucre_sayaci: dict[tuple[int, int], int] = {}
-        for kart in self.kartlar:
-            yer = self._hucre_indisi(kart["tarih"], kart["saat"])
-            if yer is None:
+            hucre = self.hucreler.get((kart["tarih"], kart["saat"]))
+            if hucre is None:
                 continue
-            sutun, satir = yer
-            sira = hucre_sayaci.get(yer, 0)
-            hucre_sayaci[yer] = sira + 1
-            self._kart_ciz(kart, sutun, satir, sira)
+            widget = OturumKarti(kart, self)
+            self.kart_widgetlari[kart["anahtar"]] = widget
+            hucre.ekle(widget)
+            for saat in kart.get("suren_saatler", ()):
+                devam = self.hucreler.get((kart["tarih"], saat))
+                if devam is not None:
+                    isaret = QLabel(f"↳ {kart['baslik']} sürüyor")
+                    isaret.setObjectName("Suren")
+                    isaret.setToolTip(kart.get("ipucu", kart["baslik"]))
+                    devam.ekle(isaret)
+        self.setWidget(izgara_kabi)
 
-    def _kart_ciz(self, kart: dict, sutun: int, satir: int, sira: int) -> None:
-        x = self.SOL + sutun * self.GUN_GENISLIK + 5
-        y = self._satir_ustleri[satir] + 4 + sira * (self.KART_YUKSEKLIK + self.KART_ARASI)
-        kilitli = kart.get("kilitli")
-        uygulama = kart.get("tur") == "uygulama"
-        dolgu = RENK["kilit"] if kilitli else (RENK["uygulama"] if uygulama else RENK["kart"])
-        kenar = (RENK["kilit_kenar"] if kilitli
-                 else (RENK["uygulama_kenar"] if uygulama else RENK["kart_kenar"]))
-        etiketler = ("kart", f"kart:{kart['anahtar']}")
-        secili = kart["anahtar"] == self.secili
-        self.canvas.create_rectangle(x, y, x + self.GUN_GENISLIK - 10, y + self.KART_YUKSEKLIK,
-                                     fill=dolgu, outline=RENK["secili_kenar"] if secili else kenar,
-                                     width=3 if secili else 1, tags=etiketler)
-        # Kilit emojisi (U+1F512) değil: Tk Linux'ta renkli emoji çizemez ve
-        # DejaVu'da bu karakter yoktur, Pardus'ta kare görünüyordu.
-        yazi = kart["baslik"] + (" ✓" if kilitli else "")
-        self.canvas.create_text(x + 7, y + self.KART_YUKSEKLIK / 2, anchor="w", text=yazi,
-                                font=("Segoe UI", 8), fill=RENK["kart_yazi"], tags=etiketler)
+    def birakildi(self, anahtar: str, tarih: date, saat: time) -> None:
+        self._birak(anahtar, tarih, saat)
+
+    def secildi(self, anahtar: str) -> None:
+        self.secimi_goster(anahtar)
+        if self._sec is not None:
+            self._sec(anahtar)
 
     def secimi_goster(self, anahtar: str | None) -> None:
-        if anahtar != self.secili:
-            self.secili = anahtar
-            self.ciz()
+        if self.secili in self.kart_widgetlari:
+            self.kart_widgetlari[self.secili].secili_yap(False)
+        self.secili = anahtar
+        if anahtar in self.kart_widgetlari:
+            self.kart_widgetlari[anahtar].secili_yap(True)
+            self.ensureWidgetVisible(self.kart_widgetlari[anahtar], 40, 40)
 
-    # ------------------------------------------------------ yer hesapları
-
-    def _hucre_indisi(self, tarih: date, saat: time) -> tuple[int, int] | None:
-        if tarih not in self.gunler or saat not in self.saatler:
-            return None
-        return self.gunler.index(tarih), self.saatler.index(saat)
-
-    def _koordinattan_hucre(self, x: float, y: float) -> tuple[int, int] | None:
-        if x < self.SOL or y < self.UST:
-            return None
-        sutun = int((x - self.SOL) // self.GUN_GENISLIK)
-        satir = bisect_right(self._satir_ustleri, y) - 1
-        if 0 <= sutun < len(self.gunler) and 0 <= satir < len(self.saatler):
-            return sutun, satir
-        return None
-
-    def hucre_merkezi(self, tarih: date, saat: time) -> tuple[float, float]:
-        """Bir hücrenin tuval üzerindeki orta noktası (sınama için)."""
-        sutun, satir = self._hucre_indisi(tarih, saat)
-        return (self.SOL + sutun * self.GUN_GENISLIK + self.GUN_GENISLIK / 2,
-                (self._satir_ustleri[satir] + self._satir_ustleri[satir + 1]) / 2)
-
-    # --------------------------------------------------------- olaylar
-
-    def _basildi(self, olay) -> None:
-        x, y = self.canvas.canvasx(olay.x), self.canvas.canvasy(olay.y)
-        self.basis_noktasi = (x, y)
-        self.surukleniyor = False
-        for nesne in reversed(self.canvas.find_overlapping(x, y, x, y)):
-            for etiket in self.canvas.gettags(nesne):
-                if etiket.startswith("kart:"):
-                    self.suruklenen = etiket.split(":", 1)[1]
-                    return
-        self.suruklenen = None
-
-    def _suruklendi(self, olay) -> None:
-        if not self.suruklenen:
-            return
-        x, y = self.canvas.canvasx(olay.x), self.canvas.canvasy(olay.y)
-        if self.basis_noktasi and not self.surukleniyor:
-            bx, by = self.basis_noktasi
-            if abs(x - bx) + abs(y - by) < self.SURUKLEME_ESIGI:
-                return
-            self.surukleniyor = True
-        hucre = self._koordinattan_hucre(x, y)
-        if hucre == self.hedef_hucre:
-            return
-        self.hedef_hucre = hucre
-        self.canvas.delete("hedef")
-        if hucre:
-            sutun, satir = hucre
-            hx = self.SOL + sutun * self.GUN_GENISLIK
-            ust, alt = self._satir_ustleri[satir], self._satir_ustleri[satir + 1]
-            self.canvas.create_rectangle(hx + 2, ust + 2, hx + self.GUN_GENISLIK - 2, alt - 2,
-                                         outline=RENK["hedef"], width=3, tags="hedef")
-
-    def _birakildi(self, olay) -> None:
-        self.canvas.delete("hedef")
-        anahtar, self.suruklenen, self.hedef_hucre = self.suruklenen, None, None
-        surukledi, self.surukleniyor = self.surukleniyor, False
-        if not anahtar:
-            return
-        if not surukledi:
-            if self.sec is not None:
-                self.sec(anahtar)
-            return
-        hucre = self._koordinattan_hucre(self.canvas.canvasx(olay.x), self.canvas.canvasy(olay.y))
-        if hucre is None:
-            return
-        sutun, satir = hucre
-        self.birak(anahtar, self.gunler[sutun], self.saatler[satir])
+    def hucre(self, tarih: date, saat: time) -> Hucre | None:
+        return self.hucreler.get((tarih, saat))

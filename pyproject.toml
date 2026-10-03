@@ -13,10 +13,14 @@ dependencies = [
   "python-docx>=1.1,<2",
   "xlrd==2.0.2",
   "tzdata>=2026.1",
+  # Tam sabit: NOTICE dağıtılan Qt sürümünü ve kaynak kodu adresini yazar
+  # (LGPL-3.0). Yükseltirken NOTICE ve yardım metni de değişir; test_lisans.py
+  # ikisinin ayrışmasını engeller.
+  "PySide6-Essentials==6.11.2",
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8,<9"]
+test = ["pytest>=8,<9", "pytest-qt>=4.4,<5"]
 build-windows = ["pyinstaller>=6,<7"]
 araclar = ["pillow>=10,<12"]
 
@@ -28,7 +32,7 @@ version = {attr = "cekirdek.surum.SURUM"}
 
 [tool.setuptools]
 py-modules = ["sorumluluk_sinavi"]
-packages = ["cekirdek", "veri", "evrak", "arayuz"]
+packages = ["cekirdek", "veri", "veri.hizmet", "evrak", "arayuz", "arayuz.sayfalar"]
 
 [tool.pytest.ini_options]
 testpaths = ["testler"]

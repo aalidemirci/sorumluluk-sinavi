@@ -49,9 +49,9 @@ BOLUMLER = [
             "sayacı tutar; tutar hesabı yetkili sistemde yapılır.",
             "• komisyon tutanağı, yoklama/salon listesi ve kâğıt sarf tutanağı üretimi — "
             "bunlar e-Okul'dan alınır.",
-            "Program hiçbir ağ isteği yapmaz. e-Okul, MEBBİS ya da başka bir sisteme "
-            "bağlanmaz, kullanıcı adı veya şifre istemez. Yalnız sizin dışa aktardığınız "
-            "dosyaları okur.",
+            "Program e-Okul, MEBBİS ya da başka bir sisteme bağlanmaz, kullanıcı adı veya "
+            "şifre istemez. Yalnız sizin dışa aktardığınız dosyaları okur. İnternete çıkan "
+            "tek isteği yeni sürüm denetimidir ve veri taşımaz (bkz. \"Güncelleme\").",
         ],
     ),
     (
@@ -190,7 +190,12 @@ BOLUMLER = [
             "üretilir ve takvim ilan edilir. Başvuru bu yüzden bir oturuma değil pencereye "
             "bağlanır — mevzuat başvuruyu plandan önce ister.",
             "e-Okul sorumluluk raporu bu iki grubu ayırt etmez; öğrencileri Başvuru "
-            "adımında elle işaretlersiniz. İşaret konduğu öğretim yılına aittir: yeni yılda "
+            "adımında siz işaretlersiniz: listede ad ya da numarayla arayıp satırdaki "
+            "kutucuğu tıklayarak, birden çok satırı seçip \"Beklemeli işaretle\" ya da "
+            "\"Devamsız işaretle\" düğmesiyle, ya da e-Okul'dan kopyaladığınız okul "
+            "numaralarını \"Numara listesiyle işaretle\" penceresine yapıştırarak. Her "
+            "işaret hemen kaydedilir; alttaki bildirimden geri alınabilir. İşaret konduğu "
+            "öğretim yılına aittir: yeni yılda "
             "program önceki yıldan kalan işaretleri gözden geçirmenizi ister. Başvuru her "
             "dönemde yenilenir: Eylülde başvuran öğrenci Şubata başvurmuş sayılmaz.",
             "Mevzuattaki süre sınav tarihine bağlıdır. Okul tek bir başvuru son günü ilan "
@@ -255,10 +260,11 @@ BOLUMLER = [
             "• 03 Salonlar — salon sayısı ve kapasitesi, aynı saatte kaç sınav "
             "yapılabileceğini belirler.",
             "• 04 e-Okul Sorumluluk — OOK12001R010 raporunu yükleyin. Rapor okulun "
-            "tamamını kapsıyorsa 'tam listedir' işaretli kalsın.",
+            "tamamını kapsıyorsa 'Bu rapor okulun tam listesidir' işaretli kalsın.",
             "• 05 Başvuru — beklemeli ve devamsız öğrencileri işaretleyin, duyuruyu "
-            "kaydedin ve başvuru kararlarını girin. Bu adım atlanırsa bu öğrenciler "
-            "plana alınmaz; diğer öğrenciler etkilenmez. (OKY md.58/2-d)",
+            "kaydedin ve başvuru kararlarını girin (\"Kaydet ve sonrakine geç\" sıradaki "
+            "öğrenciyi açar). Bu adım atlanırsa bu öğrenciler plana alınmaz; diğer "
+            "öğrenciler etkilenmez. (OKY md.58/2-d)",
             "• 06 Ders / Branş — her dersi bir branşa eşleyin, iki aşamalı dersleri "
             "işaretleyin. Eşlenmemiş ders varken plan üretilmez.",
             "• 07 Sınav Planı — dönemi ve parametreleri seçin, isterseniz önce 'Yükü "
@@ -268,7 +274,10 @@ BOLUMLER = [
             "• 08 Evrak ve Teslim — plan belgelerini üretin; sınavlardan sonra komisyondan "
             "geri alınan evrakı çizelgeye işleyin. Başvuru duyurusu ve plan dışı tutanağı "
             "05 Başvuru adımından üretilir, çünkü ikisi de plandan önce doğar.",
-            "• 09 Yardım, 10 Lisans — bu sayfa ve program bilgisi.",
+            "• 09 Yardım, 10 Hakkında — bu sayfa; sürüm, güncelleme denetimi ve lisans.",
+            "Kısayollar: Ctrl+1 … Ctrl+0 adımlar arasında geçer, Ctrl+F sayfadaki aramaya "
+            "gider, Ctrl+S kaydeder, plan ekranında Ctrl+Z ve Ctrl+Y taşımayı geri ve "
+            "ileri alır, F1 bu sayfayı açar.",
         ],
     ),
     (
@@ -328,6 +337,25 @@ BOLUMLER = [
             "Gerçek veriyi e-posta, kişisel bulut veya herkese açık depoya koymayın.",
         ],
     ),
+    (
+        "Güncelleme",
+        [
+            "Program açılışta yayımlanan son sürümün numarasını sorar. İstek yalnız sürüm "
+            "bilgisini alır; öğrenci, personel ya da okul verisi gönderilmez. İnternet "
+            "yoksa sessizce geçer, program çevrimdışı çalışmaya devam eder.",
+            "Yeni sürüm varsa pencerenin üstünde bir şerit çıkar; \"Daha sonra\" o sürüm "
+            "için şeridi kapatır. Hakkında sayfasında \"Şimdi denetle\" ile elle "
+            "denetleyebilir, açılıştaki denetimi kapatabilirsiniz.",
+            "Windows'ta \"Doğrula ve indir\" kurulum dosyasını indirir ve yayımlanan "
+            "SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz. \"Kurulumu "
+            "başlat\" programı kapatıp kurulumu açar. Kurulum eski sürümün üzerine yapılır, "
+            "veritabanına ve ayarlara dokunmaz.",
+            "Pardus'ta yeni paket okulapp.org indirme sayfasından alınır ve "
+            "\"sudo apt install ./sorumluluk-sinavi_<sürüm>_amd64.deb\" ile kurulur.",
+            "Kurum genelinde denetimi kapatmak için SORUMLULUK_GUNCELLEME_DENETIMI ortam "
+            "değişkenini 0 yapın; Hakkında sayfasındaki seçenek de o zaman kapalı görünür.",
+        ],
+    ),
 ]
 
 
@@ -368,15 +396,22 @@ LISANS_BOLUMLERI = [
             "• xlrd (BSD) — .xls okuma",
             "• python-docx (MIT) — .docx üretimi",
             "• tzdata (Apache-2.0) — IANA saat dilimi verisi",
-            "Uygulama simgesi ve evrak düzeni bu projeye aittir; üçüncü taraf görsel "
-            "varlık içermez.",
+            "• Qt 6.11.2 ve Qt for Python 6.11.2 (PySide6, Shiboken6) — arayüz. Telif hakkı "
+            "The Qt Company Ltd. ve Qt katkıcılarına aittir; GNU LGPL sürüm 3 ile kullanılır. "
+            "Lisans metinleri programla birlikte kurulan LICENSES klasöründedir "
+            "(LGPL-3.0-only.txt, GPL-3.0-only.txt); kaynak kodunun adresi NOTICE "
+            "dosyasındadır. Qt kitaplıkları değiştirilmemiştir ve ayrı dosyalar olarak "
+            "kurulur.",
+            "Uygulama simgesi, arayüz simgeleri ve evrak düzeni bu projeye aittir; üçüncü "
+            "taraf görsel varlık içermez.",
         ],
     ),
     (
         "Veri sorumluluğu",
         [
-            "Program hiçbir ağ isteği yapmaz; veri yalnız bu bilgisayarda kalır. "
-            "Öğrenci, veli ve personel verisi 6698 sayılı Kanun kapsamındadır. "
+            "Program öğrenci, veli ve personel verisini hiçbir yere göndermez; veri yalnız "
+            "bu bilgisayarda kalır. İnternete çıkan tek istek yeni sürüm denetimidir ve "
+            "veri taşımaz. Öğrenci, veli ve personel verisi 6698 sayılı Kanun kapsamındadır. "
             "Veritabanını e-posta, kişisel bulut veya herkese açık depoya koymayın.",
             "Sorun bildiriminde günlük dosyası paylaşılabilir; günlük kişisel veri "
             "içermeyecek biçimde yazılır. Yine de kurum dışına çıkarmadan önce gözle "

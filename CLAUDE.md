@@ -37,7 +37,9 @@ cekirdek/   saf iş kuralları — veritabanı, dosya, arayüz görmez
 veri/       şema göçleri, servis katmanı (veri/hizmet/ paketi; modül katmanları
             __init__.py'de yazılı), e-Okul rapor ayrıştırma
 evrak/      .docx üretimi; belge düzeni koddan gelir, şablondan değil
-arayuz/     Tkinter masaüstü arayüzü
+arayuz/     Qt (PySide6) masaüstü arayüzü: sayfalar/ her adımın ekranı,
+            bilesenler.py ortak tablo/form parçaları, tema.py + palet.py görünüm
+            (karar 0016). Renk yalnız palet.py'de tanımlanır.
 testler/    pytest; her kural olumsuz senaryosuyla birlikte test edilir
 yapim/      paketleme: Inno Setup betiği (Windows), deb_paketi.py (Pardus)
 araclar/    tek seferlik yardımcı betikler (logo üretimi gibi)
@@ -150,6 +152,12 @@ Ubuntu koşucusunda derlemeyin — glibc geriye uyumlu değildir.
 Testler GitHub Actions'ta da koşar (`.github/workflows/testler.yml`): Windows
 3.11/3.12 ve Debian 12. Linux ayağı yalnız orada denendiği için `arayuz/` ya
 da paketleme tarafında değişiklik yapınca iş akışının sonucuna bakın.
+
+Arayüz testleri pytest-qt ile ekransız (`QT_QPA_PLATFORM=offscreen`) koşar;
+`testler/conftest.py` bunu ve açılış güncelleme denetiminin kapalı olmasını
+ayarlar, testler ağa çıkmaz. Qt sürümü `pyproject.toml`'da tam sabittir;
+yükseltirken NOTICE ve yardım metnindeki sürüm de değişir
+(`testler/test_lisans.py`, LGPL-3.0 koşulu).
 
 Türkçe karakterli commit mesajlarını PowerShell'den geçirirken `git commit -F`
 kullanın.

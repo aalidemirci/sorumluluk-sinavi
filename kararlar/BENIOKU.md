@@ -28,3 +28,4 @@ Durum, Bağlam, Karar, Gerekçe, Sonuçlar.
 | [0013](0013-ucret-siniri-askisi-tarihe-bagli.md) | Ücret sınırı askısı görev tarihine bağlıdır | Kabul |
 | [0014](0014-gunluk-sinav-siniri.md) | Günlük sınav sınırı: kısa takvim, mevzuat ölçüsü görünür | Kabul |
 | [0015](0015-guncelleme-denetimi.md) | Yeni sürüm GitHub'dan denetlenir; istek veri taşımaz | Kabul |
+| [0016](0016-arayuz-qt.md) | Arayüz Qt for Python (PySide6) ile yazılır | Kabul |
