@@ -151,7 +151,9 @@ class SurukleBirakTakvim(ttk.Frame):
         self.canvas.create_rectangle(x, y, x + self.GUN_GENISLIK - 10, y + self.KART_YUKSEKLIK,
                                      fill=dolgu, outline=RENK["secili_kenar"] if secili else kenar,
                                      width=3 if secili else 1, tags=etiketler)
-        yazi = kart["baslik"] + (" 🔒" if kilitli else "")
+        # Kilit emojisi (U+1F512) değil: Tk Linux'ta renkli emoji çizemez ve
+        # DejaVu'da bu karakter yoktur, Pardus'ta kare görünüyordu.
+        yazi = kart["baslik"] + (" ✓" if kilitli else "")
         self.canvas.create_text(x + 7, y + self.KART_YUKSEKLIK / 2, anchor="w", text=yazi,
                                 font=("Segoe UI", 8), fill=RENK["kart_yazi"], tags=etiketler)
 
