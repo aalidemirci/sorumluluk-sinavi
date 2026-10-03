@@ -6,7 +6,7 @@ geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
 Son gözden geçirme: 03.10.2026 (ayrıntılı tarama; sonuçlar CHANGELOG
-"Yayımlanmamış" başlığında).
+0.6.0 başlığında).
 
 ## Şimdi
 

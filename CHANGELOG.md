@@ -28,11 +28,15 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.6.0] — 03.10.2026
 
 03.10.2026 tarihli ayrıntılı gözden geçirmenin (mevzuat, mimari, arayüz,
 evrak) sonucu. Mevzuat atıfları resmî metinlerden yeniden doğrulandı.
-Şema göçü: `008_takvim_musaitlik_tek_ders.sql`.
+
+**Yükseltme:** veritabanı ilk açılışta şema 8'e göç eder
+(`008_takvim_musaitlik_tek_ders.sql`); göçten önce yedeği kendiliğinden
+alınır. Kesinleşmiş eski planlar olduğu gibi açılır. Yükseltmeden sonra
+Kurum Ayarları'na o yılın tatil günlerini girin.
 
 ### Eklendi
 - **Tatil ve idari izin günleri** (SP-08): Kurum Ayarları'ndan girilir. Plan
@@ -76,7 +80,9 @@ evrak) sonucu. Mevzuat atıfları resmî metinlerden yeniden doğrulandı.
   belirler.
 - **EK-05 ücret sınırı**: toplu sözleşme askısı öğretim yılına değil görev
   tarihine bağlandı (01.01.2024 – 31.12.2027); yıllık sayaç tek planı değil
-  yılın bütün geçerli planlarını sayar. Gerekçe:
+  yılın bütün geçerli planlarını sayar. Dayanak iki toplu sözleşmenin eğitim
+  hizmet kolu md.4'üdür: 7. Dönem (RG 03.09.2023/32298) ve 8. Dönem
+  (RG 27.08.2025/32999). Gerekçe:
   [kararlar/0013](kararlar/0013-ucret-siniri-askisi-tarihe-bagli.md).
 - **Evrak Resmî Yazışma Yönetmeliği biçiminde**: "T.C. / … KAYMAKAMLIĞI /
   Okul Müdürlüğü" başlığı, Times New Roman, 1,5 cm kenar, siyah-beyaz;
