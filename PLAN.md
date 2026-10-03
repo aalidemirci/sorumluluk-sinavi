@@ -36,9 +36,6 @@ Son gözden geçirme: 03.10.2026 (ayrıntılı tarama; sonuçlar CHANGELOG
       md.4 gereği 12/15 görev sınırları 01.01.2026 – 31.12.2027 arasındaki
       görevlerde uygulanmıyor; 01.01.2028 sonrası görevler için yeni metne
       bakılacak (bkz. `kararlar/0013`).
-- [ ] **7. Dönem madde numarası:** 7. Dönem (2024–2025) toplu sözleşmede
-      aynı hükmün varlığı haber kaynağından bilinir; resmî metinden madde
-      numarası teyit edilip `SINIR_ASKILARI` dayanağına yazılmalı.
 
 ## Bilinen borçlar
 
@@ -56,6 +53,14 @@ Son gözden geçirme: 03.10.2026 (ayrıntılı tarama; sonuçlar CHANGELOG
   mı, gerçek bir dosyada bakılmalı.
 - **Uzun uygulama sınavı:** uygulama süresi bir slot saatinden uzunsa
   planlayıcı yine tek slot ayırır; ardışık slot kullanımı yok.
+- **Toplu sözleşme md.17 dayanak olarak yazılmadı:** 7. ve 8. Dönem eğitim
+  hizmet kolu md.17, sorumluluk sınavlarında yabancı dil "yazılı ve sözlü"
+  sınav komisyon üyeliklerinin ayrı ayrı değerlendirileceğini söyler (RG
+  03.09.2023/32298 s.9; RG 27.08.2025/32999 s.10). Program iki aşamalı her
+  oturumu zaten ayrı görev sayıyor. Hükmün "sözlü" dediği sınavın OKY
+  md.58/2-e'deki "uygulama" aşaması olduğu yorumu doğrulanırsa yardım metnine
+  ve görev sayacına dayanak olarak eklenebilir. Türk dili ve edebiyatı için
+  böyle bir hüküm yok.
 
 ## İzlenen kırılganlıklar
 

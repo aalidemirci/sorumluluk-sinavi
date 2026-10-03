@@ -219,10 +219,11 @@ açık depoya koymayın.
 
 ## Bilinmesi gerekenler
 
-- **Toplu sözleşme askısı:** Karar md.12/2-a'daki 12/15 sınırları, 8. Dönem
-  Toplu Sözleşme eğitim hizmet kolu md.4 (RG 27.08.2025) gereği
-  **01.01.2026 – 31.12.2027** tarihleri arasındaki sınav görevlerinde
-  uygulanmaz; 7. Dönemde (2024–2025) de aynı hüküm vardı. Askı takvim yılına
+- **Toplu sözleşme askısı:** Karar md.12/2-a'daki 12/15 sınırları, Eğitim,
+  Öğretim ve Bilim Hizmet Kolu md.4 gereği **01.01.2024 – 31.12.2027**
+  tarihleri arasındaki sınav görevlerinde uygulanmaz: 7. Dönem Toplu Sözleşme
+  (RG 03.09.2023/32298) 2024–2025'i, 8. Dönem (RG 27.08.2025/32999)
+  2026–2027'yi kapsar. Askı takvim yılına
   bağlıdır, öğretim yılına değil: aralık `cekirdek/kurallar.py` içindeki
   `SINIR_ASKILARI` sabitindedir ve 9. Dönem toplu sözleşmesi yayımlanınca
   güncellenmelidir ([kararlar/0013](kararlar/0013-ucret-siniri-askisi-tarihe-bagli.md)).

@@ -7,9 +7,11 @@
 Karar md.12/2-a (2006/11350): "Bir öğretim yılında bir kişiye 12'den fazla
 sınav komisyon üyeliği ve 15'ten fazla sınav gözcülüğü görevleri … için ücret
 ödenmez." 8. Dönem Toplu Sözleşme, Eğitim, Öğretim ve Bilim Hizmet Kolu md.4
-(RG 27.08.2025) bu sınırların uygulanmayacağını söyler; hüküm 01.01.2026 –
-31.12.2027 arasında uygulanır. Aynı hüküm 7. Dönem (2024–2025) toplu
-sözleşmesinde de vardı.
+(RG 27.08.2025/32999) bu sınırların uygulanmayacağını söyler; hüküm
+01.01.2026 – 31.12.2027 arasında uygulanır. Aynı hüküm harfi harfine 7. Dönem
+Toplu Sözleşmede de vardır (RG 03.09.2023/32298, aynı hizmet kolu md.4;
+01.01.2024 – 31.12.2025). Hizmet kolu hükümleri Hakem Kurulu kararı değil
+Çalışma ve Sosyal Güvenlik Bakanlığı tebliği olarak yayımlanır.
 
 Program askıyı öğretim yılına bağlamıştı (`SINIRSIZ_OGRETIM_YILLARI =
 {"2025-2026", "2026-2027"}`). Toplu sözleşme takvim yılına bağlıdır: Eylül
@@ -37,5 +39,5 @@ yapılmaz.
 
 - 9. Dönem Toplu Sözleşme (Ağustos 2027) yayımlanınca `SINIR_ASKILARI`
   güncellenir (PLAN.md, "Takvime bağlı").
-- 7. Dönem hükmünün madde numarası resmî metinden teyit edilmedi; dayanak
-  metninde madde numarası yazılmadı.
+- 7. Dönem hükmünün madde numarası 03.10.2026'da Resmî Gazete'nin taranmış
+  sayfasından okunarak teyit edildi ve dayanak metnine yazıldı.

@@ -410,7 +410,10 @@ def test_ek05_toplu_sozlesme_askisi_takvim_yilina_baglidir() -> None:
     öğretim yılına bağladığı için Eylül 2027 görevlerini sınırlı sayıyordu."""
     assert sinir_askisi(date(2027, 9, 20)) is not None
     assert "8. Dönem" in sinir_askisi(date(2026, 1, 1)).dayanak
-    assert sinir_askisi(date(2025, 9, 15)) is not None          # 7. Dönem
+    # 7. Dönem: RG 03.09.2023/32298, hizmet kolu md.4; 01.01.2024 – 31.12.2025.
+    yedinci = sinir_askisi(date(2025, 9, 15))
+    assert yedinci is not None and "32298" in yedinci.dayanak and "md.4" in yedinci.dayanak
+    assert sinir_askisi(date(2023, 12, 31)) is None
     assert sinir_askisi(date(2028, 1, 1)) is None
 
 

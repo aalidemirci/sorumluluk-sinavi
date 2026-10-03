@@ -70,13 +70,16 @@ class SinirAskisi:
 
 # Yeni toplu sözleşme yayımlanınca buraya yeni dönem eklenir (bkz. PLAN.md).
 SINIR_ASKILARI: tuple[SinirAskisi, ...] = (
-    # Madde numarası resmî metinden teyit edilmedi; hükmün sürdüğü 7. Dönem
-    # eğitim hizmet kolu metninden bilinmektedir.
+    # Hizmet kolu hükümleri Hakem Kurulu kararı değil ÇSGB tebliği olarak
+    # yayımlanır; iki dönemde de madde başlığı "Sınav komisyon üyeliği ve sınav
+    # gözcülüğü", metin harfi harfine aynıdır. Uygulama aralığı her tebliğin
+    # Birinci Kısım md.3/1'indedir. 03.10.2026'da RG görüntüsünden okundu.
     SinirAskisi(date(2024, 1, 1), date(2025, 12, 31),
-                "7. Dönem Toplu Sözleşme (2024–2025), Eğitim, Öğretim ve Bilim Hizmet Kolu"),
+                "7. Dönem Toplu Sözleşme (RG 03.09.2023/32298), Eğitim, Öğretim ve Bilim "
+                "Hizmet Kolu md.4"),
     SinirAskisi(date(2026, 1, 1), date(2027, 12, 31),
-                "8. Dönem Toplu Sözleşme (RG 27.08.2025), Eğitim, Öğretim ve Bilim Hizmet "
-                "Kolu md.4"),
+                "8. Dönem Toplu Sözleşme (RG 27.08.2025/32999), Eğitim, Öğretim ve Bilim "
+                "Hizmet Kolu md.4"),
 )
 
 

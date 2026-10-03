@@ -32,8 +32,8 @@ GUN_KISALTMALARI = ("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
 
 TOPLU_SOZLESME_NOTU = (
     "Toplu sözleşme gereği 01.01.2024 – 31.12.2027 tarihleri arasındaki sınav "
-    "görevlerinde bu sınırlar uygulanmaz (7. ve 8. Dönem Toplu Sözleşme, Eğitim, Öğretim ve "
-    "Bilim Hizmet Kolu; 8. Dönem md.4, RG 27.08.2025).")
+    "görevlerinde bu sınırlar uygulanmaz (7. Dönem Toplu Sözleşme, RG 03.09.2023/32298 ve "
+    "8. Dönem Toplu Sözleşme, RG 27.08.2025/32999; Eğitim, Öğretim ve Bilim Hizmet Kolu md.4).")
 
 
 @dataclass(frozen=True)

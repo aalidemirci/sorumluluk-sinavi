@@ -63,8 +63,9 @@ BOLUMLER = [
             "(RG 09.09.2023/32304).",
             "• Karar — Millî Eğitim Bakanlığı Yönetici ve Öğretmenlerinin Ders ve Ek Ders "
             "Saatlerine İlişkin Karar (01.12.2006 tarihli ve 2006/11350 sayılı BKK).",
-            "• Toplu Sözleşme — 8. Dönem (2026–2027) Toplu Sözleşme, Eğitim, Öğretim ve Bilim "
-            "Hizmet Kolu (RG 27.08.2025).",
+            "• Toplu Sözleşme — Hizmet kollarına yönelik 7. Dönem (2024–2025, RG "
+            "03.09.2023/32298) ve 8. Dönem (2026–2027, RG 27.08.2025/32999) Toplu Sözleşme, "
+            "Eğitim, Öğretim ve Bilim Hizmet Kolu.",
             "• Resmî Yazışma Yönetmeliği — Resmî Yazışmalarda Uygulanacak Usul ve Esaslar "
             "Hakkında Yönetmelik (RG 10.06.2020/31151).",
             "Program kuralı mevzuattan değil okulun kendi kararından geliyorsa bunu "
@@ -133,8 +134,8 @@ BOLUMLER = [
             "Bir öğretim yılında bir kişiye 12'den fazla komisyon üyeliği ve 15'ten fazla "
             "gözcülük için ücret ödenmez (Karar md.12/2-a). Toplu sözleşme gereği "
             "01.01.2024 – 31.12.2027 tarihleri arasındaki sınav görevlerinde bu sınırlar "
-            "uygulanmaz (8. Dönem Toplu Sözleşme, eğitim hizmet kolu md.4; 7. Dönemde de aynı "
-            "hüküm vardı). Program sınırı görev tarihine göre uygular: askıdaki görevler yıl "
+            "uygulanmaz (7. ve 8. Dönem Toplu Sözleşme, eğitim hizmet kolu md.4). Program "
+            "sınırı görev tarihine göre uygular: askıdaki görevler yıl "
             "içi sayaca girer ama kendileri sınıra takılmaz, askı dışındaki görev yıl içi "
             "sırası 12'yi ya da 15'i aşıyorsa uyarı verir. Bu, iki hükmün birlikte "
             "okunmasında programın yorumudur.",
