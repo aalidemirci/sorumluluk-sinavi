@@ -28,14 +28,22 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.6.2] — 03.10.2026
 
 ### Eklendi
 - Site görselleri için iki yardımcı betik: `araclar/site_ornekleri.py`
   (örnek okul, belgeler ve PDF önizlemeleri) ve
   `araclar/site_ekranlari.py` (Debian 12 kabında sanal ekrandan ekran
   görüntüleri). Yayım sonrası indirme alanı ve site adımları KURULUM.md'ye
-  yazıldı. Programın davranışı değişmedi.
+  yazıldı.
+
+### Düzeltildi
+- Plan dışı bırakılanlar tutanağı, karar bekleyen öğrenci olmasa da
+  "Karar bekliyor durumundaki öğrenciler için henüz başvuru kararı
+  girilmemiştir…" cümlesini basıyordu; kesinleşmiş bir dönemin tutanağı
+  olmayan bir eksikten söz ediyordu. Cümle artık yalnız karar bekleyen varsa
+  ve kaç öğrenci olduğunu söyleyerek yazılır. Plan dışı kimse yoksa
+  "Toplam 0 öğrenci…" cümlesi de basılmaz.
 
 ## [0.6.1] — 03.10.2026
 

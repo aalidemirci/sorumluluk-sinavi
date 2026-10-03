@@ -5,13 +5,13 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 03.10.2026 (0.6.1 yayımı; ayrıntılı taramanın sonuçları
+Son gözden geçirme: 03.10.2026 (0.6.2 yayımı; ayrıntılı taramanın sonuçları
 CHANGELOG 0.6.0 başlığında).
 
 ## Şimdi
 
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 03.10.2026: yayımlanan sürüm 0.6.1;
+      makineleri güncelleme" başlığında. 03.10.2026: yayımlanan sürüm 0.6.2;
       okul makineleri bekliyor. 0.6 ilk açılışta veritabanını şema 8'e
       geçirir (öncesinde yedek alır); geçişten sonra tatil günleri girilmeli.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
