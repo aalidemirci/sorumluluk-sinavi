@@ -20,32 +20,38 @@ de Python kurulu olması gerekmez. Kurulum yordamı KURULUM.md'dedir.
    plandan çıkarır (OKY md.58/2-d).
 4. Dersleri branşlara eşler; iki aşamalı dersleri işaretler.
 5. Sınav planını üretir: oturumları günlere ve saatlere yerleştirir,
-   komisyon ve gözcüleri görevlendirir.
-6. Planı sürükle-bırakla düzenletir, çakışmaları gösterir, müdür onayıyla
-   kesinleştirir.
-7. Sınav evrakını .docx olarak üretir ve sınav sonrası komisyondan geri
+   komisyon ve gözcüleri görevlendirir. Tatil günlerine sınav koymaz,
+   öğretmenin dersi, izni ya da başka görevi olan saatlere görev vermez.
+6. Planı sürükle-bırakla ve görevli değişikliğiyle düzenletir, çakışmaları
+   gösterir, müdür onayıyla kesinleştirir. Kesinleşmiş planda görevli ancak
+   müdür onay numarasıyla değişir.
+7. Tek dersten başarısız kalan son sınıf öğrencisinin takip eden haftadaki
+   sınavını planlar (OKY md.58/6).
+8. Sınav evrakını .docx olarak üretir ve sınav sonrası komisyondan geri
    alınan evrakı izler.
 
 ## Ne yapmaz
 
-Sınav sonrası işlemler kapsam dışıdır: sonuç ve puan girişi, itiraz, telafi,
-ek sınav, diploma tarihi ve disiplin işlemleri **e-Okul'da** yürütülür. Ek ders
-ücreti hesaplanmaz; uygulama yalnız Karar md.12/2-a'daki 12 komisyon / 15
-gözcülük sınırı için görev sayacı tutar, tutar hesabı MYS'de yapılır.
+Sınav sonrası işlemler kapsam dışıdır: sonuç ve puan girişi (tek ders sınavı
+dâhil), itiraz, telafi, diploma tarihi ve disiplin işlemleri **e-Okul'da**
+yürütülür. Ek ders ücreti hesaplanmaz; uygulama yalnız Karar md.12/2-a'daki
+12 komisyon / 15 gözcülük sınırı için görev sayacı tutar, tutar hesabı MYS'de
+yapılır.
 
 ## Üretilen evrak
 
 Belgeler şablon dosyasından değil koddan üretilir; sayfa düzeni tek yerde
-tanımlıdır ve şablon ile kod birbirinden kopmaz. Sekiz belge vardır (ikisi başvuru kapısına aittir):
+tanımlıdır ve şablon ile kod birbirinden kopmaz. Dokuz belge vardır (ikisi başvuru kapısına aittir):
 
 | Belge | İçerik |
 |---|---|
 | Sınav programı (öğrenci nüshası) | Tarih, saat, ders, süre, salon |
-| Sınav programı (görevli nüshası) | + komisyon ve gözcüler |
-| Görevlendirme çizelgesi | Komisyon bazlı: ders(ler), öğrenci sayısı, tarih, saat, salon, komisyon üyeleri, gözcüler + tebliğ-tebellüğ sayfası |
-| Öğretmen görev sayacı | Üç dönemin dökümü, komisyon/gözcülük sayıları, 12/15 durumu |
+| Sınav programı (görevli nüshası) | + komisyon ve gözcüler (gözcünün salonuyla) |
+| Görevlendirme çizelgesi | Komisyon bazlı: ders(ler), öğrenci sayısı, tarih, saat, salon, komisyon üyeleri, salonlarıyla gözcüler + tebliğ-tebellüğ sayfası; kesin planda müdür onayıyla yapılan görevli değişiklikleri |
+| Kişi bazlı görev çizelgesi | Her görevlinin kendi görevleri (tarih, saat, sınav, görev, salon) ve tebellüğ imzası |
+| Öğretmen görev sayacı | Üç dönemin dökümü, komisyon/gözcülük sayıları, ücret sınırı durumu |
 | **İLAN:** sınav takvimi | Web sayfasında yayımlanmak üzere; kişisel veri içermez |
-| **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden sınava gireceği, ad maskeli |
+| **İLAN:** öğrenci çizelgesi | Hangi öğrencinin hangi derslerden, hangi salonda sınava gireceği; ad maskeli |
 | **İLAN:** başvuru duyurusu | Beklemeli/devamsız öğrencinin başvuru zorunluluğu ve son gün; kişi adı içermez |
 | Plan dışı bırakılanlar tutanağı | Başvurusu bulunmadığı için plana alınmayanlar; okul içi kayıt, ilan edilmez |
 
@@ -53,8 +59,14 @@ Komisyon tutanağı, yoklama/salon listesi, kâğıt sarf tutanağı ve evrak te
 tutanağı bu setten çıkarılmıştır. İlk üçü e-Okul'dan alınır; teslim takibi ise
 ekrandaki çizelgeden yürütülür, ayrıca belge üretmeye gerek yoktur.
 
+Evrak Resmî Yazışmalarda Uygulanacak Usul ve Esaslar Hakkında Yönetmelik'e
+göre düzenlenir: A4, Times New Roman 12 punto (tablolarda 9–10), 1,5 cm kenar,
+"T.C. / … KAYMAKAMLIĞI / Okul Müdürlüğü" başlığı; renk kullanılmaz.
+Gerekçe: [kararlar/0011](kararlar/0011-evrak-resmi-yazisma-bicimi.md).
+
 Belgelerde program logosu yer almaz: evrak okulun evrakıdır, yazılımın tanıtımı
-değildir. İmza bloğu "Düzenleyen" ve müdür "OLUR" makamından oluşur.
+değildir. İmza bloğu "Düzenleyen" (ad ve unvan kurum ayarlarından) ile müdürün
+"OLUR"undan (tarih satırı, ad, "Okul Müdürü") oluşur.
 
 Görev sayacı raporu kesinleşmemiş plandan da üretilir; görev yükünü onaydan
 önce görmek gerekir. Taslak dönem varsa belgeye uyarı düşülür.
@@ -116,8 +128,10 @@ Bir öğretim yılında üç sınav dönemi vardır: **Eylül** (birinci dönemi
 haftası), **Şubat** (ikinci dönemin ilk iki haftası) ve **Haziran** (ikinci
 dönemin son iki haftası). Görev sayaçları
 dönemler arasında taşınır: ikinci dönem planlanırken birinci dönemde çok görev
-almış öğretmen geri plana düşer. Görev sayacı raporu her dönemin dökümünü ayrı
-sütunda gösterir.
+almış öğretmen geri plana düşer. Bir dönem yeniden planlanırken o dönemin eski
+planı sayılmaz. Görev sayacı raporu her dönemin dökümünü ayrı sütunda
+gösterir; her dönemden yalnız geçerli plan (kesinleşmiş, yoksa son taslak)
+sayılır.
 
 Dengeleme branş arzının izin verdiği ölçüde çalışır. Bir branşta az öğretmen
 varken o branşın çok sınavı olursa yük kaçınılmaz olarak birikir; rapor bunu
@@ -133,21 +147,35 @@ Plan üretmeden önce üç şey sorulur:
 
 - **Hafta sonu kullanılsın mı?** Kullanılabilir seçilse bile hafta içi
   tükenmeden hafta sonuna geçilmez (OKY md.58/2-ç).
-- **Öğrenci günlük sınav sınırı** (varsayılan 2).
+- **Öğrenci günlük sınav sınırı** (varsayılan 2, en çok 3 — ÖDY md.5/1-k).
 - **Yazılı + uygulama tek mi ayrı mı sayılsın?** Tek sayılırsa iki aşamalı
   dersin iki oturumu öğrencinin günlük sayacına bir sınav olarak girer.
+- **Uygulama sınavının süresi** (zümre kararı; OKY md.45/1-f).
 
 Gün sayısı otomatik seçilir: öğrencilerin çoğunluğunun sığdığı en kısa program
 denenir (bir hafta → iki hafta → gereken kadar). Bu pencereye sığmayan tek tük
-öğrencinin günlük sınırı, gereken **en düşük** değere çıkarılır ve raporlanır.
-"Yükü çözümle" düğmesi her seçeneğin sonucunu plan üretilmeden önce gösterir.
+öğrencinin günlük sınırı, gereken **en düşük** değere, **en çok üçe** çıkarılır;
+ikiyi aşan her gün uyarı olarak listelenir (ikiyi geçmemesi esastır). Üç de
+yetmiyorsa program daha uzun takvime geçer. Gerekçe:
+[kararlar/0014](kararlar/0014-gunluk-sinav-siniri.md). "Yükü çözümle" düğmesi
+her seçeneğin sonucunu plan üretilmeden önce gösterir.
+
+Arama, yerleştirilecek yeri en az kalan sınavı önce yerleştirir ve her
+adımda o günün kalan yerlerini günceller; bütçesi adım sayısıyla tutulduğu
+için aynı girdi her bilgisayarda aynı programı üretir
+([kararlar/0012](kararlar/0012-planlayici-kisit-yayilimli-arama.md)).
 
 Plan üretilemezse hangi kısıtın bağladığı yazılır: salon sayısı, görevli
-kapasitesi, branş arzı ya da bir öğrencinin günlük oturum tavanı.
+kapasitesi, branş arzı, öğretmen müsaitliği ya da bir öğrencinin günlük sınav
+tavanı.
+
+İki aşamalı derste yazılı ile uygulama aynı günün ardışık saatlerine konur;
+uygulama oturumu plan ekranında tek başına başka güne taşınabilir — OKY
+md.58/2-e "farklı günlerde de yapılabilir" der.
 
 ## Uygulanan kurallar
 
-18 kural tek dosyada (`cekirdek/kurallar.py`) tanımlanır ve tek yerde
+20 kural tek dosyada (`cekirdek/kurallar.py`) tanımlanır ve tek yerde
 uygulanır. Motorun ürettiği plan da elle düzenlenen plan da aynı doğrulayıcıdan
 geçer.
 
@@ -157,21 +185,24 @@ geçer.
 | SP-02 komisyon ve gözcü | OKY md.58/2-a |
 | SP-03 gözcü sayısı = salon sayısı | OKY md.58/2-b + okul kararı |
 | SP-04 düzey birleştirme (30 sınırı) | OKY md.58/2-c |
-| SP-05 hafta sonu ve müdür onayı | OKY md.58/2-ç |
+| SP-05 hafta sonu ve müdür onayı | OKY md.58/2-ç + okul uygulaması |
 | SP-06 iki aşamalı dersler | OKY md.58/2-e |
 | SP-07 beklemeli/devamsız öğrencinin başvurusu | OKY md.58/2-d |
-| SP-10 sınav süresi | ÖDY md.5/1-l |
-| SP-11 günlük sınav sayısı | ÖDY md.5/1-k |
+| SP-08 tatil günü | 2429 sayılı Kanun; idari izin kararları |
+| SP-09 öğretmenin müsait olmadığı saat | OKY md.58/2-ç + okul kaydı |
+| SP-10 yazılı sınav süresi | ÖDY md.5/1-l; OKY md.45/1-ç |
+| SP-11 günlük sınav sayısı (2 esas, 3 tavan) | ÖDY md.5/1-k |
 | SP-15 Şubat/Haziran için güncel liste | Okul uygulaması |
-| EK-03 aynı sınavda çifte rol yok | Karar md.12/2-b |
+| EK-03 aynı sınavda çifte rol yok | OKY md.58/2-a; Karar md.12/2-b |
 | EK-04 yönetici görevi ücretsizdir | Karar md.12/2-c |
-| EK-05 yıllık görev sayacı | Karar md.12/2-a |
+| EK-05 yıllık görev sayacı | Karar md.12/2-a; 7. ve 8. Dönem Toplu Sözleşme |
 | SG-05, SG-06 sorumluluk kaynağı | OKY md.58/1 |
 | TS-01…03 evrak teslim takibi | Okul uygulaması |
 
 Bazı kurallar mevzuat değil **okul kararıdır** ve kod içinde böyle
-etiketlenmiştir: salon başına bir gözcü sayılması, gözcünün sınav branşından
-farklı seçilmesi, müdür ve rehber öğretmene sınav görevi verilmemesi.
+etiketlenmiştir: bir salona en çok 30 öğrenci konması ve salon başına bir gözcü
+sayılması, gözcünün sınav branşından farklı seçilmesi, müdür ve rehber
+öğretmene sınav görevi verilmemesi, hafta sonu oturumuna gerekçe yazılması.
 
 ## Veri ve gizlilik
 
@@ -179,15 +210,24 @@ Veritabanı Windows'ta `%LOCALAPPDATA%\SorumlulukSinavi\plan`, Pardus/Linux'ta
 `~/.local/share/sorumluluk-sinavi/plan` altındadır. T.C. kimlik numarası okunmaz ve
 saklanmaz. Denetim izi yalnız tablo adı, kayıt kimliği ve işlem türü tutar;
 öğrenci adı veya numarası yazılmaz. Günlük dosyası kişisel veri içermez.
+Müsaitlik ve görevli değişikliği açıklamalarına sağlık bilgisi yazılmaz;
+ekranlar bunu hatırlatır.
 
-Veritabanını e-posta, kişisel bulut veya herkese açık depoya koymayın.
+Kurum Ayarları'ndaki **Yedek al** düğmesi veritabanının tam yedeğini (WAL
+dâhil) seçilen klasöre alır. Veritabanını e-posta, kişisel bulut veya herkese
+açık depoya koymayın.
 
 ## Bilinmesi gerekenler
 
-- **8. Dönem Toplu Sözleşme md.4** gereği 2025-2026 ve 2026-2027 öğretim
-  yıllarında 12/15 sınırları uygulanmaz. Bu iki yıl `cekirdek/kurallar.py`
-  içindeki `SINIRSIZ_OGRETIM_YILLARI` sabitindedir; 2027-2028'de yeni toplu
-  sözleşmeye göre güncellenmelidir.
+- **Toplu sözleşme askısı:** Karar md.12/2-a'daki 12/15 sınırları, 8. Dönem
+  Toplu Sözleşme eğitim hizmet kolu md.4 (RG 27.08.2025) gereği
+  **01.01.2026 – 31.12.2027** tarihleri arasındaki sınav görevlerinde
+  uygulanmaz; 7. Dönemde (2024–2025) de aynı hüküm vardı. Askı takvim yılına
+  bağlıdır, öğretim yılına değil: aralık `cekirdek/kurallar.py` içindeki
+  `SINIR_ASKILARI` sabitindedir ve 9. Dönem toplu sözleşmesi yayımlanınca
+  güncellenmelidir ([kararlar/0013](kararlar/0013-ucret-siniri-askisi-tarihe-bagli.md)).
+- **Tatil günleri** koda gömülü değildir; her öğretim yılı Kurum Ayarları'ndan
+  girilir.
 - e-Okul rapor biçimi değişirse sorumluluk raporu ayrıştırıcısı güncellenmelidir.
   Ayrıştırıcı sessizce yanlış okumaz, anlaşılır hata verir.
 - Personel raporunda kurum sicil numarası sütunu yoksa aynı adlı iki öğretmen

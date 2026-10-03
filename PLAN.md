@@ -5,10 +5,19 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.09.2026 (sürüm 0.5.0).
+Son gözden geçirme: 03.10.2026 (ayrıntılı tarama; sonuçlar CHANGELOG
+"Yayımlanmamış" başlığında).
 
 ## Şimdi
 
+- [ ] **Sürüm 0.6.0 yayımı.** "Yayımlanmamış" değişiklikler şema göçü (008)
+      getirir. Sıra KURULUM.md → "Sürüm yükseltmek"te; numarayı yerinde
+      değiştirmeyin (0.3.0 ve 0.4.0 aynı numarayla iki kez derlendi).
+      Yayımla birlikte okulapp.org `/sorumluluk-sinavi/**` sayfaları da
+      güncellenmeli: tarih biçimi, iki aşamalı dersin ayrı güne taşınması,
+      tatil günleri, müsaitlik, görevli değişikliği, tek ders sınavı, evrak
+      biçimi, günlük sınav sınırı (bkz. `../okulapp.org/CLAUDE.md` → "Ortak
+      çalışma düzeni").
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.09.2026: yayımlanan sürüm 0.5.0;
       okul makineleri bekliyor.
@@ -17,17 +26,36 @@ Son gözden geçirme: 04.09.2026 (sürüm 0.5.0).
       kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23 makinesinde
       kurulup menüden açılması, e-Okul raporu içe aktarılması ve evrak
       üretilmesi denenmeli; ilk gerçek deneme sonucu buraya yazılsın.
-- [ ] **Sürüm numarasını bir daha yerinde değiştirme.** 0.3.0 ve 0.4.0'ın
-      ikisi de aynı numarayla iki kez derlendi; hangi kurulumun ne taşıdığı
-      SHA-256'ya bakmadan anlaşılmıyor. Sonraki değişiklik görsel bile olsa
-      numarayı yükseltin.
+- [ ] **Tatil günlerini gir.** 2026-2027 için Kurum Ayarları'na resmî tatil
+      ve idari izin günleri girilmeli; özellikle sınav pencerelerine düşenler.
 
 ## Takvime bağlı
 
-- [ ] **2027-2028 öğretim yılı öncesi:** `cekirdek/kurallar.py` içindeki
-      `SINIRSIZ_OGRETIM_YILLARI` sabiti güncellenmeli. 8. Dönem Toplu
-      Sözleşme md.4 gereği 12/15 görev sınırları 2025-2026 ve 2026-2027'de
-      uygulanmıyor; yeni toplu sözleşme çıkınca bu liste gözden geçirilecek.
+- [ ] **9. Dönem Toplu Sözleşme (Ağustos 2027):** `cekirdek/kurallar.py`
+      içindeki `SINIR_ASKILARI` güncellenmeli. 8. Dönem eğitim hizmet kolu
+      md.4 gereği 12/15 görev sınırları 01.01.2026 – 31.12.2027 arasındaki
+      görevlerde uygulanmıyor; 01.01.2028 sonrası görevler için yeni metne
+      bakılacak (bkz. `kararlar/0013`).
+- [ ] **7. Dönem madde numarası:** 7. Dönem (2024–2025) toplu sözleşmede
+      aynı hükmün varlığı haber kaynağından bilinir; resmî metinden madde
+      numarası teyit edilip `SINIR_ASKILARI` dayanağına yazılmalı.
+
+## Bilinen borçlar
+
+- **`veri/hizmet.py` büyük** (~2 400 satır): personel, başvuru, plan,
+  görevli değişikliği, evrak sorguları ve tek ders aynı dosyada. Konulara göre
+  bölünmeli; `testler/test_kurallar.py::test_her_kural_ya_denetlenir_ya_bilgidir`
+  dosya yolunu okuduğu için birlikte güncellenmeli.
+- **Belge onayı işlemiyor:** `belge_surumu.onaylandi_mi` hiçbir yerde
+  doldurulmuyor, bu yüzden "onaylanmış belge değişti" föyü hiç oluşmuyor.
+  Plan kesinleşmesine bağlanabilir.
+- **Ölü şema:** `kural_karari` tablosu ve `v_gorev_sayaci` görünümü
+  kullanılmıyor (sayaçlar artık `etkin_planlar` üzerinden).
+- **SG-05 nakil kaynağı okunmuyor:** OOK12001R010 ayrıştırıcısı kaydın
+  nakil/geçiş kaynaklı olup olmadığını okumuyor; raporda böyle bir sütun var
+  mı, gerçek bir dosyada bakılmalı.
+- **Uzun uygulama sınavı:** uygulama süresi bir slot saatinden uzunsa
+  planlayıcı yine tek slot ayırır; ardışık slot kullanımı yok.
 
 ## İzlenen kırılganlıklar
 
@@ -43,14 +71,19 @@ sağlanmıştır.
 - **Inno Setup sürüm ayrıştırması.** `SURUM = "x.y.z"` satırının biçimi
   betik tarafından metin olarak okunur; `testler/test_surum.py` koruyor
   (bkz. `kararlar/0007-surum-tek-kaynakta.md`).
+- **Planlayıcı bütçesi.** Düğüm bütçesi gerçekçi uydurma okullarla ayarlandı
+  (`kararlar/0012`); çok daha büyük bir okulda son gün sayısı denemesi
+  bütçeye takılırsa plan "üretilemedi" der. Gerçek veriyle süre gözlenmeli.
 
 ## Kapsam dışı
 
 Bunlar bilinçli olarak yapılmıyor. Yeniden gündeme gelirse karar kaydı
 yazılarak gelsin.
 
-- Sınav sonrası işlemler: sonuç ve puan girişi, itiraz, telafi, ek sınav,
-  diploma tarihi, disiplin. Bunlar e-Okul'da yürütülür.
+- Sınav sonrası işlemler: sonuç ve puan girişi, itiraz, telafi, diploma
+  tarihi, disiplin. Bunlar e-Okul'da yürütülür. (Tek ders sınavının —
+  OKY md.58/6 — **planı** 03.10.2026'dan beri kapsamdadır, sonucu yine
+  e-Okul'dadır; bkz. `kararlar/0010`.)
 - Ek ders ücreti hesabı. Uygulama yalnız Karar md.12/2-a'daki 12 komisyon /
   15 gözcülük sınırı için görev sayacı tutar; tutar hesabı MYS'de yapılır.
 - Ağ, bulut, telemetri, çevrimiçi güncelleme (bkz.

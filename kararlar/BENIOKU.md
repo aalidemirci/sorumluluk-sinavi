@@ -22,3 +22,8 @@ Durum, Bağlam, Karar, Gerekçe, Sonuçlar.
 | [0007](0007-surum-tek-kaynakta.md) | Sürüm tek kaynakta tutulur | Kabul |
 | [0008](0008-kurulum-kullanici-basina.md) | Kurulum kullanıcı başınadır | Kabul |
 | [0009](0009-pardus-paketi-pyinstaller-ile.md) | Pardus paketi bütünleşiktir | Kabul |
+| [0010](0010-tek-ders-sinavi-kapsamda.md) | Tek ders sınavı (OKY md.58/6) planlanır | Kabul |
+| [0011](0011-evrak-resmi-yazisma-bicimi.md) | Evrak Resmî Yazışma Yönetmeliği biçimindedir | Kabul |
+| [0012](0012-planlayici-kisit-yayilimli-arama.md) | Planlayıcı kısıt yayılımıyla arar, bütçe düğümle tutulur | Kabul |
+| [0013](0013-ucret-siniri-askisi-tarihe-bagli.md) | Ücret sınırı askısı görev tarihine bağlıdır | Kabul |
+| [0014](0014-gunluk-sinav-siniri.md) | Günlük sınav sınırı: kısa takvim, mevzuat ölçüsü görünür | Kabul |

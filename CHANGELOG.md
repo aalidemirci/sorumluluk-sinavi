@@ -30,11 +30,94 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+03.10.2026 tarihli ayrıntılı gözden geçirmenin (mevzuat, mimari, arayüz,
+evrak) sonucu. Mevzuat atıfları resmî metinlerden yeniden doğrulandı.
+Şema göçü: `008_takvim_musaitlik_tek_ders.sql`.
+
+### Eklendi
+- **Tatil ve idari izin günleri** (SP-08): Kurum Ayarları'ndan girilir. Plan
+  bu günlere sınav koymaz; başvurudaki 5 iş günü (OKY md.58/2-d) ve evrak
+  teslim süresi bu günleri iş günü saymaz. Eski sürüm tatil listesini hiç
+  kullanmıyordu.
+- **Öğretmen müsaitliği** (SP-09, OKY md.58/2-ç "dersleri aksatmayacak
+  şekilde"): haftalık dolu saatler ve tarih aralıklı izin/görev. Planlayıcı
+  bu saatlere görev vermez; elle verilen görev engel görünür.
+- **Görevliyi elle değiştirme**: sınav kartına tıklayınca görevliler görünür;
+  uygun adaylar gerekçeleriyle listelenir. Taslakta geri alınabilir;
+  kesinleşmiş planda müdür onay numarası ve gerekçeyle kaydedilir ve
+  görevlendirme çizelgesinde listelenir. İki aşamalı derste değişiklik eş
+  oturuma da uygulanır (OKY md.58/2-e).
+- **Tek ders sınavı (OKY md.58/6)**: olağan plandaki 12. sınıf öğrencilerinden
+  tek dersi seçilen için takip eden haftaya ayrı plan. Gerekçe:
+  [kararlar/0010](kararlar/0010-tek-ders-sinavi-kapsamda.md).
+- **Kişi bazlı görev çizelgesi**: her görevlinin kendi görev dökümü ve
+  tebellüğ imzası.
+- Gözcü–salon eşleşmesi: hangi gözcünün hangi salonda olduğu kaydedilir ve
+  evrakta yazılır; ilan çizelgesinde öğrencinin kendi salonu görünür.
+- Uygulama sınavı süresi ayrı girilir (OKY md.45/1-f: zümre belirler).
+- **Yedek al** düğmesi (Kurum Ayarları).
+- Yardım sayfasına kısaltmalar ve dayanaklar, tek ders sınavı ve evrak biçimi
+  bölümleri.
+
 ### Değiştirildi
+- **Planlama motoru**: kısıt yayılımlı arama (en dar alanlı birim önce, ileri
+  denetim); bütçe süreyle değil düğümle. Eski arama gerçekçi ölçekte uydurma
+  okullarda on dakikada bile plan bulamıyordu; aynı girdi yavaş makinede farklı
+  plan üretebiliyordu. Gerekçe:
+  [kararlar/0012](kararlar/0012-planlayici-kisit-yayilimli-arama.md).
+- **Günlük sınav sınırı (ÖDY md.5/1-k)**: kısa takvim korunur ama ikiyi aşan
+  gün uyarı, üçü aşan gün engeldir; kişisel sınır en çok üçe yükseltilir,
+  ekrandaki sınır 1–3. Eski sürüm sınırı tavansız yükseltiyor ve uyarı
+  vermiyordu. Gerekçe: [kararlar/0014](kararlar/0014-gunluk-sinav-siniri.md).
+- **İki aşamalı dersler**: uygulama oturumu plan ekranında tek başına başka
+  güne taşınabilir (OKY md.58/2-e son cümle, RG 22.02.2025); yazılı taşınınca
+  uygulama saat farkıyla gelir.
+- **SP-10** yalnız yazılı oturumu denetler; uygulamalı sınavın süresini zümre
+  belirler.
+- **EK-05 ücret sınırı**: toplu sözleşme askısı öğretim yılına değil görev
+  tarihine bağlandı (01.01.2024 – 31.12.2027); yıllık sayaç tek planı değil
+  yılın bütün geçerli planlarını sayar. Gerekçe:
+  [kararlar/0013](kararlar/0013-ucret-siniri-askisi-tarihe-bagli.md).
+- **Evrak Resmî Yazışma Yönetmeliği biçiminde**: "T.C. / … KAYMAKAMLIĞI /
+  Okul Müdürlüğü" başlığı, Times New Roman, 1,5 cm kenar, siyah-beyaz;
+  imza bloğunda düzenleyenin adı ve unvanı, OLUR tarih satırı ve "Okul
+  Müdürü". Gerekçe: [kararlar/0011](kararlar/0011-evrak-resmi-yazisma-bicimi.md).
+- Tarihler arayüzde gg.aa.yyyy yazılır (eski YYYY-AA-GG de kabul edilir).
+- Ekranlar dönemi bugüne göre seçerek açılır; evrak ekranı başlamış son dönemle.
+- Başvuru işaretinin konduğu öğretim yılı tutulur; önceki yıldan kalan
+  işaretler gözden geçirilmek üzere bildirilir.
+- Kurulum sihirbazı Türkçe (`Turkish.isl`).
+- İki aşamalı ders önerisi Almanca, Fransızca vb. yabancı dilleri de tanır.
 - İş akışları yalnız belge değiştiren itmelerde koşmuyor (`paths-ignore`:
   `**.md`, `LICENSE`, `NOTICE`). Pardus paketinin yayıma eklenmesi artık
   etiket itmesine değil **yayımın açılmasına** (`release: published`) bağlı;
   süzgeç `push` olayına takılı olduğu için etiket itmesi sessizce atlanırdı.
+
+### Düzeltildi
+- Kesinleşmiş planın üstüne aynı dönem için yeni taslak kaydedilebiliyordu;
+  ekran ve evrak taslağı gösteriyor, görev sayaçları iki planı birden
+  sayıyordu.
+- Yeni plan üretilirken aynı dönemin eski planı "önceki dönem" sayılıyor,
+  görev dengesi bozuluyordu.
+- Plan seçimi öğretim yılına bakmıyordu: yeni yılda Eylül ekranı geçen yılın
+  planını açıyor, yeni plan geçen yılın taslağını siliyordu.
+- Plan ekranında dönem değiştirilince o dönemin planı yüklenmiyordu;
+  "kesinleştir" ekranda kalan başka dönemin planını kesinleştirebiliyordu.
+- Kaydedilmemiş plan başka sayfaya gidip dönünce kayboluyordu.
+- Başvuru ekranında seçili öğrencinin işaretleri kutulara gelmiyordu;
+  "İşaretlemeyi kaydet" öbür bayrağı sessizce silebiliyor, öğrenci başvurusuz
+  plana giriyordu. Durum kutusu "basvurdu/basvurmadi" kodlarını gösteriyordu.
+- Öğrenciler salonlara kapasiteye bakılmadan sırayla dağıtılıyordu.
+- Takvimde bir hücreye üçten fazla oturum düşünce fazlası çizilmiyordu.
+- Ders/branş ekranı "yabancı dil" bayrağını iki aşamalı kutusundan
+  kopyalıyordu.
+- Dayanak metinleri: salon ekranındaki "en çok 30 öğrenci — OKY md.58/2-b"
+  (30 okul kararıdır), SP-05 gerekçe şartı (okul uygulamasıdır), EK-03
+  (OKY md.58/2-a + Karar md.12/2-b), diploma tarihi atfı (OKY md.69/2-b,
+  md.43 değil), SG-05 (nakil kaynağı okunmuyor) düzeltildi.
+
+### Kaldırıldı
+- Kullanılmayan PyYAML bağımlılığı.
 
 ## [0.5.0] — 29.08.2026
 

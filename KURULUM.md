@@ -114,30 +114,45 @@ set SORUMLULUK_VERI_KLASORU=C:\Users\%USERNAME%\Desktop\sorumluluk-deneme
 
 Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir.
 
-1. **Kurum Ayarları** — okul bilgileri ve üç dönem tarihi. Sınav pencereleri
-   (P1/P2/P3) bu tarihlerden hesaplanır ve ekranın altında gösterilir.
+1. **Kurum Ayarları** — okul bilgileri ve üç dönem tarihi (gg.aa.yyyy). Sınav
+   pencereleri (Eylül/Şubat/Haziran) bu tarihlerden hesaplanır ve ekranın
+   altında gösterilir. Evrak anteti (boşsa ilçeden türetilir) ile düzenleyenin
+   adı ve unvanı da buradadır. Aynı ekranda **tatil ve idari izin günlerini**
+   girin ve **Yedek al** düğmesiyle veritabanını yedekleyin.
 2. **Öğretmen Listesi** — e-Okul'dan `OOK01001R1` raporunu alın (aşağıdaki
    indirme yönergesine uyun). Önce **önizleme** açılır; onaylamadan hiçbir
    kayıt değişmez. Branş havuzu bu rapordan kurulur. Rapora yansımamış bir
    kişiyi elle ekleyebilir, ayrılan kişiyi pasife alabilirsiniz; görevi olan
-   kişi silinemez.
+   kişi silinemez. Seçili öğretmenin dersi, izni ya da başka görevi olan
+   saatlerini **Müsaitlik…** penceresine girin; planlayıcı bu saatlere görev
+   vermez (OKY md.58/2-ç). Açıklamaya sağlık bilgisi yazmayın.
 3. **Salonlar** — sınav salonlarını ve kapasitelerini girin. Salon sayısı,
    aynı saatte kaç sınav yapılabileceğini belirler.
 4. **e-Okul Sorumluluk** — `OOK12001R010` raporunu seçin. Rapor okulun
    tamamını kapsıyorsa "tam listedir" işaretli kalsın; kısmi bir liste
    aktarıyorsanız işareti kaldırın, yoksa dosyada olmayan kayıtlar pasife
    alınır.
-5. **Ders / Branş** — her dersi bir branşa eşleyin. Türk dili ve edebiyatı ile
+5. **Başvuru** — beklemeli ve devamsız öğrencileri işaretleyin, duyuruyu
+   kaydedin, başvuru kararlarını girin (OKY md.58/2-d). Tablodan öğrenci
+   seçince mevcut işaretleri ve başvurusu kutulara gelir. Önceki öğretim
+   yılından kalan işaretler sarı görünür; gözden geçirip yeniden kaydedin.
+6. **Ders / Branş** — her dersi bir branşa eşleyin. Türk dili ve edebiyatı ile
    yabancı dil derslerini **iki aşamalı** işaretleyin (OKY md.58/2-e); uygulama
    ders adına bakarak öneri getirir ama kararı siz verirsiniz. Birleşik
    derslerde (ör. Görsel Sanatlar/Müzik) ikinci alanı da seçin. Okulda
    öğretmeni olmayan bir branş gerekiyorsa branş havuzuna elle ekleyin.
-6. **Sınav Planı** — parametreleri seçin, isterseniz önce **Yükü çözümle** ile
-   gün seçeneklerinin sonucunu görün, sonra **Planı üret**.
-7. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
+7. **Sınav Planı** — dönemi ve parametreleri seçin, isterseniz önce **Yükü
+   çözümle** ile gün seçeneklerinin sonucunu görün, sonra **Planı üret**.
+8. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
    sonra geri alınan evrakı teslim çizelgesine işleyin.
-8. **Yardım** — mevzuat hükümleri, kullanım ve çalışma mantığı bu sayfadadır.
-9. **Lisans** — program bilgisi, geliştirici ve kullanım koşulları.
+9. **Yardım** — mevzuat hükümleri, kullanım ve çalışma mantığı bu sayfadadır.
+10. **Lisans** — program bilgisi, geliştirici ve kullanım koşulları.
+
+Tek ders sınavı (OKY md.58/6): olağan sınavların sonucu e-Okul'a girildikten
+sonra Sınav Planı ekranında dönem kutusundan "… — tek ders (58/6)" seçeneğini
+seçin, **Tek ders öğrencileri…** penceresinde öğrencinin başarısız kaldığı tek
+dersi işaretleyin ve planı üretin. Plan, olağan plandaki son sınavın haftasından
+sonraki haftaya kurulur.
 
 ## e-Okul raporlarını indirme
 
@@ -160,14 +175,24 @@ Aynı yönerge ilgili ekranların üstünde ve Yardım sayfasında da yazılıd�
 
 ## Plan ekranı
 
+- Dönem kutusu açılışta bugüne göre seçilir (içinde bulunulan ya da sıradaki
+  dönem). Dönem değiştirilince o dönemin kayıtlı planı açılır.
 - Kartı başka bir gün/saat hücresine **sürükleyip bırakın.** Öğrenci,
   öğretmen ve salon çakışmaları ayrı ayrı denetlenir; engel doğuran taşıma
   otomatik geri alınır ve kimin çakıştığı yazılır.
-- İki aşamalı dersin yazılı ve uygulama oturumu birlikte taşınır.
-- **Geri Al / İleri Al** ile adım adım gezinebilirsiniz.
+- İki aşamalı derste yazılı kartı taşınınca uygulama da aynı gün ve saat
+  farkıyla gelir; uygulama kartı ise tek başına başka bir güne taşınabilir
+  (OKY md.58/2-e: farklı günlerde de yapılabilir).
+- Karta **tıklayınca** sınavın görevlileri alttaki şeritte görünür.
+  **Görevliyi değiştir…** penceresinde değiştirilecek kişiyi ve yerine gelecek
+  kişiyi seçersiniz; uygun olmayanlar nedeniyle listelenir. Taslak planda
+  değişiklik bellekte kalır, kesinleşmiş planda müdür onay numarası ve
+  gerekçeyle hemen kaydedilir ve görevlendirme çizelgesinde listelenir.
+- **Geri Al / İleri Al** ile adım adım gezinebilirsiniz (görevli değişikliği
+  dâhil). Kaydedilmemiş plan başka sayfaya gidip dönünce kaybolmaz.
 - Plan **Kaydet** denene kadar veritabanına yazılmaz.
-- **Müdür onayıyla kesinleştir** planı kilitler; kesinleşmiş oturum taşınamaz
-  ve kesinleşmiş plan silinemez.
+- **Müdür onayıyla kesinleştir** planı kilitler; kesinleşmiş oturum taşınamaz,
+  kesinleşmiş plan silinemez ve yerine yeni plan kaydedilemez.
 
 Alt paneldeki liste kural ihlallerini gösterir: kırmızı satırlar engel,
 sarı satırlar uyarıdır. Engelli plan taslak olarak kaydedilebilir ama
@@ -183,21 +208,31 @@ Listedeki **İLAN** başlıklı iki belge okul web sayfasında yayımlanmak içi
 Bunları üretmeden önce aynı sekmedeki **öğrenci gösterimi** seçeneğini gözden
 geçirin; öğrencinin açık adı hiçbir seçenekte yayımlanmaz.
 
-**Görevlendirme çizelgesi** komisyon bazlıdır: her satır bir sınav komisyonudur.
-İkinci sayfasında görevli her personelin tarih yazıp imzalayacağı
-tebliğ-tebellüğ tablosu vardır; çizelge yatay A4 olarak üretilir.
+**Görevlendirme çizelgesi** komisyon bazlıdır: her satır bir sınav komisyonudur,
+gözcüler salonlarıyla yazılır. İkinci sayfasında görevli her personelin tarih
+yazıp imzalayacağı tebliğ-tebellüğ tablosu vardır; çizelge yatay A4 olarak
+üretilir. **Kişi bazlı görev çizelgesi** her görevlinin kendi görevlerini
+(tarih, saat, sınav, görev, salon) ve tebellüğ imzasını tek satırda toplar.
+
+Evrak Resmî Yazışma Yönetmeliği biçimindedir (T.C. başlığı, Times New Roman,
+siyah-beyaz). Antetin ikinci satırı ve düzenleyen bilgisi Kurum Ayarları'ndan
+gelir.
 
 **Teslim çizelgesi** sekmesinde her oturum için beklenen evrak listelenir.
-Bir satırı seçip teslim eden ile teslim alan görevliyi ve varsa adedi girerek
-**Seçili evrakı teslim al** düğmesine basın. Teslim eden ile alan aynı kişi
-olamaz. Yeşil satır teslim alınmış, kırmızı satır süresinde gelmemiş evrakı
-gösterir; teslim süresi sınav tarihini izleyen ilk iş günüdür.
+Bir satırı seçip teslim eden ile teslim alan görevliyi, varsa adedi ve teslim
+tarihini (varsayılan bugün) girerek **Seçili evrakı teslim al** düğmesine
+basın. Teslim eden ile alan aynı kişi olamaz. Yeşil satır teslim alınmış,
+kırmızı satır süresinde gelmemiş evrakı gösterir; teslim süresi sınav tarihini
+izleyen ilk iş günüdür (tatil günleri iş günü sayılmaz).
 
 ## Yedekleme
 
-Uygulamayı kapatın ve veri klasöründeki `sorumluluk.db` dosyasını kurumun
-yedek ortamına kopyalayın. Şema yükseltmelerinde uygulama göç öncesi
-otomatik yedek alır (`.yedek` uzantılı); bu yedek WAL içeriğini de kapsar.
+Kurum Ayarları ekranındaki **Yedek al…** düğmesi veritabanının tam yedeğini
+(WAL dâhil) seçtiğiniz klasöre `sorumluluk-yedek-<tarih>.db` adıyla alır;
+uygulamayı kapatmanız gerekmez. Elle yedeklemek isterseniz uygulamayı kapatıp
+veri klasöründeki `sorumluluk.db` dosyasını kurumun yedek ortamına kopyalayın.
+Şema yükseltmelerinde uygulama göç öncesi otomatik yedek alır (`.yedek`
+uzantılı); bu yedek WAL içeriğini de kapsar.
 
 Gerçek veriyi e-posta, kişisel bulut veya Git deposuna koymayın.
 
