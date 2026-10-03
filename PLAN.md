@@ -42,8 +42,6 @@ CHANGELOG 0.6.0 başlığında).
   `nakil_gecis` yapmalı (veritabanı alanı hazır); yoksa madde kapsam dışına
   alınır. Program 3/6 sayacını hesaplamadığı için bugün hiçbir sonucu
   etkilemez.
-- **Uzun uygulama sınavı:** uygulama süresi bir slot saatinden uzunsa
-  planlayıcı yine tek slot ayırır; ardışık slot kullanımı yok.
 - **Toplu sözleşme md.17 dayanak olarak yazılmadı:** 7. ve 8. Dönem eğitim
   hizmet kolu md.17, sorumluluk sınavlarında yabancı dil "yazılı ve sözlü"
   sınav komisyon üyeliklerinin ayrı ayrı değerlendirileceğini söyler (RG

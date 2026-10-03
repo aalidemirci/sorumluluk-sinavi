@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, time
 
-from cekirdek.kurallar import musait_degil_mi
+from cekirdek.kurallar import musait_degil_mi, oturumlar_cakisir_mi
 from cekirdek.metin import esitle, siralama_anahtari
 from cekirdek.modeller import Gorevlendirme, GorevRolu, Ihlal, OturumTuru, Plan, PlanTuru
 from ..veritabani import Veritabani, simdi
@@ -159,11 +159,11 @@ def gorevli_adaylari(vt: Veritabani, plan: Plan, oturum_anahtari: str, rol: Gore
     musaitsizlikler = musaitsizlikleri_getir(vt)
     alan = {esitle(b) for b in oturum.alan_branslari if b}
     bu_oturumdakiler = {g.personel_kimligi for g in plan.oturum_gorevleri(oturum_anahtari)}
-    ayni_saattekiler = {
+    # Saat eşitliği yetmez: uzun uygulama sınavı sonraki oturum saatine taşar.
+    ayni_andakiler = {
         g.personel_kimligi for g in plan.gorevlendirmeler
         for o in [plan.oturum_bul(g.oturum_anahtari)]
-        if o is not None and o.anahtar != oturum_anahtari
-        and o.tarih == oturum.tarih and o.saat == oturum.saat}
+        if o is not None and o.anahtar != oturum_anahtari and oturumlar_cakisir_mi(o, oturum)}
     plandaki_yuk: dict[int, int] = {}
     for g in plan.gorevlendirmeler:
         plandaki_yuk[g.personel_kimligi] = plandaki_yuk.get(g.personel_kimligi, 0) + 1
@@ -178,8 +178,8 @@ def gorevli_adaylari(vt: Veritabani, plan: Plan, oturum_anahtari: str, rol: Gore
             neden = "müdür veya rehber öğretmen"
         elif kisi.kimlik in bu_oturumdakiler:
             neden = "bu sınavda zaten görevli"
-        elif kisi.kimlik in ayni_saattekiler:
-            neden = "aynı saatte başka sınavda görevli"
+        elif kisi.kimlik in ayni_andakiler:
+            neden = "aynı anda başka sınavda görevli"
         elif musait_degil_mi(musaitsizlikler.get(kisi.kimlik, ()), oturum.tarih, oturum.saat,
                              oturum.sure_dakika):
             neden = "müsait değil olarak işaretli"

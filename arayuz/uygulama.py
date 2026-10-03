@@ -23,7 +23,7 @@ from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 
 from arayuz.palet import RENK
 from cekirdek.kaynak import varlik_yolu
-from cekirdek.kurallar import GUNLUK_SINAV_TAVANI
+from cekirdek.kurallar import GUNLUK_SINAV_TAVANI, oturum_araligi
 from cekirdek.modeller import GorevRolu, IkiAsamaliSayim, PlanParametreleri, PlanTuru
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
 from cekirdek.surum import SURUM
@@ -1328,10 +1328,22 @@ class Uygulama:
         gunler = sorted(set(gunler) | {o.tarih for o in plan.oturumlar})
         saatler = sorted({o.saat for o in plan.oturumlar}
                          | set(plan.parametreler.slot_saatleri))
+
+        def kart_basligi(oturum) -> str:
+            baslik = "/".join(str(d) for d in oturum.duzeyler) + " " + oturum.ders_adi
+            if oturum.oturum_turu.value != "uygulama":
+                return baslik
+            # Kart yalnız başladığı satırda durur; sonraki oturum saatine taşan
+            # uzun uygulama bitişiyle yazılır ki o hücre boş sanılmasın.
+            bitis = oturum_araligi(oturum)[1].time()
+            sonraki = next((s for s in saatler if s > oturum.saat), None)
+            if sonraki is not None and sonraki < bitis:
+                return baslik + f" (uyg. –{bitis:%H:%M})"
+            return baslik + " (uyg.)"
+
         kartlar = [{
             "anahtar": o.anahtar,
-            "baslik": ("/".join(str(d) for d in o.duzeyler) + " " + o.ders_adi
-                       + (" (uyg.)" if o.oturum_turu.value == "uygulama" else "")),
+            "baslik": kart_basligi(o),
             "tarih": o.tarih, "saat": o.saat, "tur": o.oturum_turu.value,
             "kilitli": o.kilitli_mi,
         } for o in plan.oturumlar]

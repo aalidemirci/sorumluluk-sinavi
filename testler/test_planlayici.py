@@ -6,12 +6,14 @@ from datetime import date, time
 
 import pytest
 
-from cekirdek.kurallar import engelleri_ayikla
+from cekirdek.kurallar import engelleri_ayikla, oturumlar_cakisir_mi
 from cekirdek.modeller import (
     DersAyari, GorevRolu, IkiAsamaliSayim, OturumTuru, Personel, PlanParametreleri, Salon,
     SorumlulukKaydi,
 )
-from cekirdek.planlayici import PlanlamaBasarisiz, plan_uret, sinir_onizlemesi
+from cekirdek.planlayici import (
+    PlanlamaBasarisiz, plan_uret, sinir_onizlemesi, yerlesim_desenleri,
+)
 from cekirdek.takvim import gunleri_listele, sinav_pencereleri
 from cekirdek.talep import birimleri_olustur, yuk_ozeti
 
@@ -372,6 +374,108 @@ def test_uygulama_suresi_ayri_verilir() -> None:
     sureler = {o.oturum_turu: o.sure_dakika for o in sonuc.plan.oturumlar}
     assert sureler == {OturumTuru.YAZILI: 40, OturumTuru.UYGULAMA: 55}
     assert engelleri_ayikla(sonuc.ihlaller) == []
+
+
+# ------------------------------------------------------ uzun uygulama sınavı
+#
+# Uygulamalı sınavın süresini zümre belirler (OKY md.45/1-f). Eski planlayıcı
+# her oturuma tek slot ayırıyordu: 90 dakikalık uygulama sonraki slota taşar,
+# oraya konan sınavla öğrenci, görevli ya da salon çakışırdı.
+
+UC_SLOT = (time(9, 0), time(10, 0), time(11, 0))
+
+
+def _iki_asamali_birim():
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE")]
+    ayar = {"İNGİLİZCE": DersAyari("İngilizce", iki_asamali_mi=True, yabanci_dil_mi=True)}
+    return birimleri_olustur(kayitlar, ayar, SALONLAR)[0]
+
+
+def test_uzun_uygulama_sonraki_slotlari_da_tutar() -> None:
+    """Varsayılan saatler 08:00, 09:00, 10:00, 11:00, 13:30, 14:30."""
+    desenler = yerlesim_desenleri(
+        _iki_asamali_birim(), PlanParametreleri(pencere_kodu="P1", uygulama_suresi_dakika=90))
+    assert desenler[0] == ((0, 1), (0, 1, 2))      # uygulama 09:00–10:30, 10:00'ı da tutar
+    assert desenler[3] == ((3, 4), (3, 4, 5))      # 11:00 yazılısından sonra 13:30
+    assert desenler[4] == ((4, 5), (4, 5))         # 14:30 günün son saati
+    assert desenler[5] is None                     # uygulamaya saat kalmaz
+
+
+def test_kisa_uygulama_eskisi_gibi_tek_slot_tutar() -> None:
+    """Olumsuz senaryo: süre bir sonraki saate taşmıyorsa desen değişmez."""
+    desenler = yerlesim_desenleri(_iki_asamali_birim(), PlanParametreleri(pencere_kodu="P1"))
+    assert desenler[:5] == [((s, s + 1), (s, s + 1)) for s in range(5)]
+    assert desenler[5] is None
+
+
+def _tek_gunluk(kayitlar, ayarlar, personel, uygulama_suresi, **ek):
+    parametreler = PlanParametreleri(pencere_kodu="P1", hedef_gun_sayisi=1,
+                                     slot_saatleri=UC_SLOT,
+                                     uygulama_suresi_dakika=uygulama_suresi)
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    return plan_uret(birimleri_olustur(kayitlar, ayarlar, SALONLAR), parametreler, gunler,
+                     personel, SALONLAR, PENCERE, ogretim_yili="2026-2027", **ek)
+
+
+IKI_DERS = {"İNGİLİZCE": DersAyari("İngilizce", iki_asamali_mi=True, yabanci_dil_mi=True),
+            "MATEMATİK": DersAyari("Matematik")}
+
+
+def test_uzun_uygulama_surerken_ogrencinin_sinavi_baslamaz() -> None:
+    """Eski planlayıcı yazılıyı 09:00'a, uygulamayı 10:00'a, matematiği 11:00'e
+    koyuyordu; öğrenci 11:30'a kadar uygulamadaydı."""
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE"), kayit("101", "9/A", 9, "MATEMATİK")]
+    personel = personel_kadrosu({"İngilizce": 2, "Matematik": 2, "Tarih": 2})
+    sonuc = _tek_gunluk(kayitlar, IKI_DERS, personel, 90)
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+    oturumlar = sonuc.plan.oturumlar
+    assert {o.oturum_turu: o.sure_dakika for o in oturumlar if o.ders_adi == "İNGİLİZCE"} == {
+        OturumTuru.YAZILI: 40, OturumTuru.UYGULAMA: 90}
+    assert not any(oturumlar_cakisir_mi(a, b)
+                   for i, a in enumerate(oturumlar) for b in oturumlar[i + 1:])
+
+
+def test_kisa_uygulamada_ogrencinin_sinavi_sonraki_saatte_baslar() -> None:
+    """Olumsuz senaryo: 40 dakikalık uygulama 10:40'ta biter, 11:00 boş kalmaz."""
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE"), kayit("101", "9/A", 9, "MATEMATİK")]
+    personel = personel_kadrosu({"İngilizce": 2, "Matematik": 2, "Tarih": 2})
+    sonuc = _tek_gunluk(kayitlar, IKI_DERS, personel, 40)
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+    saatler = {(o.ders_adi, o.oturum_turu): o.saat for o in sonuc.plan.oturumlar}
+    assert saatler == {("İNGİLİZCE", OturumTuru.YAZILI): time(9, 0),
+                       ("İNGİLİZCE", OturumTuru.UYGULAMA): time(10, 0),
+                       ("MATEMATİK", OturumTuru.YAZILI): time(11, 0)}
+
+
+def test_uzun_uygulamanin_gorevlisi_ve_salonu_sonraki_sinava_verilmez() -> None:
+    """Matematikçiler 10:40'a kadar derste: matematik ancak 11:00'de başlar,
+    o sırada başka öğrencinin uygulaması sürüyor. Gözcülüğü az olan İngilizce
+    öğretmeni ve ilk salon boş sayılsaydı matematiğe onlar verilirdi."""
+    from cekirdek.modeller import Musaitsizlik
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE"), kayit("201", "9/B", 9, "MATEMATİK")]
+    personel = personel_kadrosu({"İngilizce": 2, "Matematik": 2, "Tarih": 1, "Kimya": 1})
+    derste = {k: (Musaitsizlik(k, bas_saat=time(9, 0), bit_saat=time(10, 40)),) for k in (3, 4)}
+    sonuc = _tek_gunluk(kayitlar, IKI_DERS, personel, 90, musaitsizlikler=derste)
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+    uygulama = next(o for o in sonuc.plan.oturumlar if o.oturum_turu is OturumTuru.UYGULAMA)
+    matematik = next(o for o in sonuc.plan.oturumlar if o.ders_adi == "MATEMATİK")
+    assert (uygulama.saat, matematik.saat) == (time(10, 0), time(11, 0))   # senaryo önkoşulu
+
+    def gorevliler(oturum):
+        return {g.personel_kimligi for g in sonuc.plan.oturum_gorevleri(oturum.anahtar)}
+
+    assert not gorevliler(uygulama) & gorevliler(matematik)
+    assert not set(uygulama.salon_kimlikleri) & set(matematik.salon_kimlikleri)
+
+
+def test_uygulamaya_saat_kalmayan_gun_teshis_edilir() -> None:
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE")]
+    personel = personel_kadrosu({"İngilizce": 2, "Tarih": 2})
+    parametreler = PlanParametreleri(pencere_kodu="P1", slot_saatleri=(time(9, 0),))
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    with pytest.raises(PlanlamaBasarisiz, match="art arda"):
+        plan_uret(birimleri_olustur(kayitlar, IKI_DERS, SALONLAR), parametreler, gunler,
+                  personel, SALONLAR, PENCERE)
 
 
 def test_gunluk_sinir_ucu_asamaz() -> None:

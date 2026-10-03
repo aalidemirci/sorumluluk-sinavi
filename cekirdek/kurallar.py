@@ -308,6 +308,24 @@ def musait_degil_mi(musaitsizlikler: Iterable[Musaitsizlik], tarih: date, saat: 
     return any(m.kapsar_mi(tarih, saat, bitis) for m in musaitsizlikler)
 
 
+def oturum_araligi(oturum: Oturum) -> tuple[datetime, datetime]:
+    """Oturumun başladığı ve bittiği an.
+
+    Çakışma denetimi yalnız başlangıç saatine bakarsa, süresini zümrenin
+    belirlediği uzun bir uygulama sınavının (OKY md.45/1-f) sonraki oturum
+    saatine taştığını göremez.
+    """
+    baslangic = datetime.combine(oturum.tarih, oturum.saat)
+    return baslangic, baslangic + timedelta(minutes=oturum.sure_dakika)
+
+
+def oturumlar_cakisir_mi(birinci: Oturum, ikinci: Oturum) -> bool:
+    """İki oturumun süreleri kesişiyor mu; uç uca gelmek çakışma sayılmaz."""
+    bas1, bit1 = oturum_araligi(birinci)
+    bas2, bit2 = oturum_araligi(ikinci)
+    return bas1 < bit2 and bas2 < bit1
+
+
 # ============================================================== doğrulayıcı
 
 @dataclass
@@ -473,13 +491,51 @@ def _sp11_gunluk_yuk(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
     return ihlaller
 
 
+def _surerken_baslayanlar(oturumlar: Iterable[Oturum]
+                          ) -> list[tuple[date, time, list[Oturum], list[Oturum]]]:
+    """Başka bir oturum sürerken başlayan oturumlar: (gün, saat, başlayanlar, sürenler).
+
+    Aynı saatte başlayan oturumlar çağıran kuralda saat bazında ayrıca
+    bildirilir; burada yalnız daha önce başlamış ve henüz bitmemiş oturumlar
+    aranır. Uç uca gelen oturumlar (09:00–09:40 ile 09:40) çakışmaz.
+    """
+    gunluk: dict[date, list[Oturum]] = defaultdict(list)
+    for oturum in oturumlar:
+        gunluk[oturum.tarih].append(oturum)
+    sonuc = []
+    for gun in sorted(gunluk):
+        for saat in sorted({o.saat for o in gunluk[gun]}):
+            an = datetime.combine(gun, saat)
+            surenler = [o for o in gunluk[gun] if o.saat < saat and oturum_araligi(o)[1] > an]
+            if surenler:
+                sonuc.append((gun, saat, [o for o in gunluk[gun] if o.saat == saat], surenler))
+    return sonuc
+
+
+def _surerken_metni(baslayanlar: list[Oturum], surenler: list[Oturum]) -> str:
+    """İleti biçimi: MATEMATİK başlarken İNGİLİZCE (08:00–09:30) sürüyor."""
+    def aralikli(oturum: Oturum) -> str:
+        bas, bit = oturum_araligi(oturum)
+        return f"{oturum.ders_adi} ({bas:%H:%M}–{bit:%H:%M})"
+    return (", ".join(sorted(o.ders_adi for o in baslayanlar)) + " başlarken "
+            + ", ".join(aralikli(o) for o in sorted(surenler, key=lambda o: (o.saat, o.ders_adi)))
+            + " sürüyor")
+
+
 def _ogrenci_slot_cakismasi(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
-    """Bir öğrenci aynı tarih ve saatte iki sınavda olamaz."""
+    """Bir öğrenci aynı anda iki sınavda olamaz.
+
+    Aynı saatte başlayan sınavlar ile bir sınav sürerken başlayan sınav ayrı
+    iletiyle bildirilir; ikincisi süresi sonraki oturum saatine taşan uzun
+    uygulama sınavında ortaya çıkar.
+    """
     yerlesim: dict[tuple[str, date, object], list[Oturum]] = defaultdict(list)
+    ogrenci_oturumlari: dict[str, list[Oturum]] = defaultdict(list)
     for oturum in plan.oturumlar:
         for ogrenci in oturum.ogrenci_anahtarlari:
             yerlesim[(ogrenci, oturum.tarih, oturum.saat)].append(oturum)
-    return [
+            ogrenci_oturumlari[ogrenci].append(oturum)
+    ihlaller = [
         ihlal("SP-11", f"{ogrenci}:{gun.isoformat()}:{saat}",
               f"{baglam.ogrenci_etiketi(ogrenci)} — {gun.strftime('%d.%m.%Y')} "
               f"{saat.strftime('%H:%M')} saatinde aynı anda iki sınavda: "
@@ -488,6 +544,15 @@ def _ogrenci_slot_cakismasi(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]
         for (ogrenci, gun, saat), oturumlar in sorted(yerlesim.items(), key=lambda x: str(x[0]))
         if len(oturumlar) > 1
     ]
+    for ogrenci in sorted(ogrenci_oturumlari):
+        for gun, saat, baslayanlar, surenler in _surerken_baslayanlar(ogrenci_oturumlari[ogrenci]):
+            ihlaller.append(ihlal(
+                "SP-11", f"{ogrenci}:{gun.isoformat()}:{saat}:suren",
+                f"{baglam.ogrenci_etiketi(ogrenci)} — {gun.strftime('%d.%m.%Y')} "
+                f"{saat.strftime('%H:%M')} saatinde aynı anda iki sınavda: "
+                + _surerken_metni(baslayanlar, surenler),
+                Ciddiyet.ENGEL))
+    return ihlaller
 
 
 def _sp04_birlestirme(plan: Plan) -> list[Ihlal]:
@@ -595,13 +660,15 @@ def _sp02_sp03_gorevlendirme(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal
 
 
 def _personel_slot_cakismasi(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
-    """Bir görevli aynı tarih ve saatte iki oturumda görevli olamaz."""
+    """Bir görevli aynı anda iki oturumda görevli olamaz; süre aralığına bakılır."""
     oturumlar = {o.anahtar: o for o in plan.oturumlar}
     yerlesim: dict[tuple[int, date, object], list[str]] = defaultdict(list)
+    kisi_oturumlari: dict[int, dict[str, Oturum]] = defaultdict(dict)
     for gorev in plan.gorevlendirmeler:
         oturum = oturumlar.get(gorev.oturum_anahtari)
         if oturum is not None:
             yerlesim[(gorev.personel_kimligi, oturum.tarih, oturum.saat)].append(oturum.ders_adi)
+            kisi_oturumlari[gorev.personel_kimligi][oturum.anahtar] = oturum
     ihlaller = []
     for (kimlik, gun, saat), dersler in sorted(yerlesim.items(), key=lambda x: str(x[0])):
         if len(dersler) > 1:
@@ -611,14 +678,26 @@ def _personel_slot_cakismasi(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal
                 f"{kisi.ad if kisi else kimlik} — {gun.strftime('%d.%m.%Y')} "
                 f"{saat.strftime('%H:%M')} saatinde aynı anda iki sınavda görevli: "
                 + ", ".join(sorted(dersler))))
+    for kimlik in sorted(kisi_oturumlari):
+        kisi = baglam.personel.get(kimlik)
+        for gun, saat, baslayanlar, surenler in _surerken_baslayanlar(
+                kisi_oturumlari[kimlik].values()):
+            ihlaller.append(ihlal(
+                "SP-02", f"{kimlik}:{gun.isoformat()}:{saat}:suren",
+                f"{kisi.ad if kisi else kimlik} — {gun.strftime('%d.%m.%Y')} "
+                f"{saat.strftime('%H:%M')} saatinde aynı anda iki sınavda görevli: "
+                + _surerken_metni(baslayanlar, surenler)))
     return ihlaller
 
 
 def _salon_cakismasi(plan: Plan, salonlar: dict[int, Salon]) -> list[Ihlal]:
+    """Bir salon aynı anda iki sınava ayrılamaz; süre aralığına bakılır."""
     yerlesim: dict[tuple[int, date, object], list[str]] = defaultdict(list)
+    salon_oturumlari: dict[int, dict[str, Oturum]] = defaultdict(dict)
     for oturum in plan.oturumlar:
         for salon_id in oturum.salon_kimlikleri:
             yerlesim[(salon_id, oturum.tarih, oturum.saat)].append(oturum.ders_adi)
+            salon_oturumlari[salon_id][oturum.anahtar] = oturum
     ihlaller = []
     for (salon_id, gun, saat), dersler in sorted(yerlesim.items(), key=lambda x: str(x[0])):
         if len(dersler) > 1:
@@ -628,6 +707,16 @@ def _salon_cakismasi(plan: Plan, salonlar: dict[int, Salon]) -> list[Ihlal]:
                 f"{salon.ad if salon else salon_id} salonu {gun.strftime('%d.%m.%Y')} "
                 f"{saat.strftime('%H:%M')} saatinde iki sınava birden ayrılmış: "
                 + ", ".join(sorted(dersler)),
+                Ciddiyet.ENGEL))
+    for salon_id in sorted(salon_oturumlari):
+        salon = salonlar.get(salon_id)
+        for gun, saat, baslayanlar, surenler in _surerken_baslayanlar(
+                salon_oturumlari[salon_id].values()):
+            ihlaller.append(ihlal(
+                "SP-03", f"salon{salon_id}:{gun.isoformat()}:{saat}:suren",
+                f"{salon.ad if salon else salon_id} salonu {gun.strftime('%d.%m.%Y')} "
+                f"{saat.strftime('%H:%M')} saatinde iki sınava birden ayrılmış: "
+                + _surerken_metni(baslayanlar, surenler),
                 Ciddiyet.ENGEL))
     return ihlaller
 

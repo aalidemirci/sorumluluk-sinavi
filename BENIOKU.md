@@ -166,12 +166,19 @@ için aynı girdi her bilgisayarda aynı programı üretir
 ([kararlar/0012](kararlar/0012-planlayici-kisit-yayilimli-arama.md)).
 
 Plan üretilemezse hangi kısıtın bağladığı yazılır: salon sayısı, görevli
-kapasitesi, branş arzı, öğretmen müsaitliği ya da bir öğrencinin günlük sınav
-tavanı.
+kapasitesi, branş arzı, öğretmen müsaitliği, bir öğrencinin günlük sınav
+tavanı ya da iki aşamalı derste uygulamaya günün saatlerinin yetmemesi.
 
-İki aşamalı derste yazılı ile uygulama aynı günün ardışık saatlerine konur;
-uygulama oturumu plan ekranında tek başına başka güne taşınabilir — OKY
-md.58/2-e "farklı günlerde de yapılabilir" der.
+İki aşamalı derste yazılı ile uygulama aynı günün ardışık saatlerine konur:
+uygulama, yazılı bittikten sonraki ilk oturum saatinde başlar. Uygulama
+oturumu plan ekranında tek başına başka güne taşınabilir — OKY md.58/2-e
+"farklı günlerde de yapılabilir" der.
+
+Uygulamanın süresi bir sonraki oturum saatine taşıyorsa (ör. 60 dakika arayla
+dizilmiş saatlerde 90 dakikalık uygulama) o saat de bu sınava ayrılır:
+öğrencisi, görevlileri ve salonu uygulama bitene kadar başka sınava verilmez.
+Çakışma denetimi başlangıç saatine değil sürelere bakar; takvimde böyle bir
+uygulamanın kartında bitiş saati yazar.
 
 ## Uygulanan kurallar
 

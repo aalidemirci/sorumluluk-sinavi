@@ -400,6 +400,56 @@ def test_ayni_salon_ayni_saatte_iki_sinava_ayrilamaz() -> None:
     assert any("A-101 salonu" in i.aciklama for i in sonuc)
 
 
+# ------------------------------------------- uzun oturum: süre aralığı çakışması
+#
+# Uygulamalı sınavın süresini zümre belirler (OKY md.45/1-f); 90 dakikalık
+# uygulama 09:00'da başlarsa 10:00 sınavı o bitmeden başlar. Eski doğrulayıcı
+# yalnız başlangıç saatlerini karşılaştırdığı için bunu görmüyordu.
+
+def _uygulama(sure: int, salonlar: tuple[int, ...] = (1,)):
+    return oturum("u", "İNGİLİZCE", ["101|9/A"], saat=(9, 0), brans="İngilizce",
+                  tur=OturumTuru.UYGULAMA, sure=sure, salonlar=salonlar)
+
+
+def test_ogrenci_uzun_uygulama_surerken_baska_sinava_giremez() -> None:
+    sonraki = oturum("m", "MATEMATİK", ["101|9/A"], saat=(10, 0), salonlar=(2,))
+    sonuc = dogrula_plan(plan([_uygulama(90), sonraki]), baglam())
+    cakisma = [i for i in sonuc if i.kural_kimligi == "SP-11" and "sürüyor" in i.aciklama]
+    assert len(cakisma) == 1 and cakisma[0].engel_mi
+    assert ("10:00 saatinde aynı anda iki sınavda: MATEMATİK başlarken "
+            "İNGİLİZCE (09:00–10:30) sürüyor") in cakisma[0].aciklama
+
+
+def test_biten_ya_da_uc_uca_gelen_sinav_cakismaz() -> None:
+    """Olumsuz senaryo: 40 dakikalık uygulama 09:40'ta, 60 dakikalık 10:00'da biter."""
+    sonraki = oturum("m", "MATEMATİK", ["101|9/A"], saat=(10, 0), salonlar=(2,))
+    for sure in (40, 60):
+        sonuc = dogrula_plan(plan([_uygulama(sure), sonraki]), baglam())
+        assert not any("aynı anda" in i.aciklama for i in sonuc), sure
+
+
+def test_gorevli_uzun_uygulama_surerken_baska_sinavda_gorev_alamaz() -> None:
+    sonraki = oturum("m", "MATEMATİK", ["201|9/B"], saat=(10, 0), salonlar=(2,))
+    atamalar = gorevler("u", komisyon=(4, 5), gozcu=(3,)) + gorevler("m", komisyon=(1, 2),
+                                                                     gozcu=(3,))
+    sonuc = dogrula_plan(plan([_uygulama(90), sonraki], atamalar), baglam())
+    assert any(i.kural_kimligi == "SP-02" and i.engel_mi and i.aciklama.startswith(
+        "Uydurma Fizikçi — 14.09.2026 10:00 saatinde aynı anda iki sınavda görevli: "
+        "MATEMATİK başlarken İNGİLİZCE (09:00–10:30) sürüyor") for i in sonuc)
+    kisa = dogrula_plan(plan([_uygulama(40), sonraki], atamalar), baglam())
+    assert not any("aynı anda iki sınavda görevli" in i.aciklama for i in kisa)
+
+
+def test_salon_uzun_uygulama_surerken_baska_sinava_ayrilamaz() -> None:
+    sonraki = oturum("m", "MATEMATİK", ["201|9/B"], saat=(10, 0), salonlar=(1,))
+    sonuc = dogrula_plan(plan([_uygulama(90), sonraki]), baglam(), SALONLAR)
+    assert any(i.kural_kimligi == "SP-03" and i.engel_mi and i.aciklama.startswith(
+        "A-101 salonu 14.09.2026 10:00 saatinde iki sınava birden ayrılmış: MATEMATİK "
+        "başlarken İNGİLİZCE (09:00–10:30) sürüyor") for i in sonuc)
+    kisa = dogrula_plan(plan([_uygulama(40), sonraki]), baglam(), SALONLAR)
+    assert not any("A-101 salonu" in i.aciklama for i in kisa)
+
+
 # ------------------------------------------------------------- EK-05 sayaç
 
 K, G = GorevRolu.KOMISYON_UYESI, GorevRolu.GOZCU

@@ -126,6 +126,50 @@ def sinir_onizlemesi(ozet: YukOzeti, gun_secenekleri: list[int],
 # adayıyla çalışır. Bu yüzden durum sözlük yerine düz tamsayı dizilerinde
 # tutulur, öğrenciler bir kez indekslenir ve uygunluk kontrolü erken çıkar.
 
+# Birim bir slotta başlarsa: (oturumların başladığı slotlar, kapladığı slotlar).
+Desen = tuple[tuple[int, ...], tuple[int, ...]]
+
+
+def _dakika(saat: time) -> int:
+    return saat.hour * 60 + saat.minute
+
+
+def yerlesim_desenleri(birim: SinavBirimi, parametreler: PlanParametreleri
+                       ) -> list[Desen | None]:
+    """Birim her slotta başlarsa oturumların başladığı ve kapladığı slotlar.
+
+    Bir oturum, başlangıcı kendi süresi içine düşen bütün slotları kaplar:
+    60 dakika arayla dizilmiş slotlarda 90 dakikalık uygulama iki slot tutar.
+    Eski sürüm her oturuma tek slot ayırıyordu; zümrenin belirlediği uzun
+    uygulama sınavı (OKY md.45/1-f) sonraki slota taşar, oraya konan başka
+    sınavla öğrenci, görevli ya da salon çakışırdı.
+
+    İkinci oturum (iki aşamalı derste uygulama) birincinin bittiği andan
+    sonraki ilk slotta başlar; varsayılan saatlerde bu, eskisi gibi bir
+    sonraki slottur. Oturumlardan biri günün slotlarına sığmıyorsa o
+    başlangıç için None döner.
+    """
+    dakikalar = [_dakika(s) for s in parametreler.slot_saatleri]
+    adet = len(dakikalar)
+    desenler: list[Desen | None] = []
+    for ilk in range(adet):
+        baslangiclar: list[int] = []
+        kapsam: set[int] = set()
+        sira, bitis = ilk, None
+        for tur in birim.oturum_turleri:
+            if bitis is not None:
+                while sira < adet and dakikalar[sira] < bitis:
+                    sira += 1
+            if sira >= adet:
+                desenler.append(None)
+                break
+            bitis = dakikalar[sira] + parametreler.oturum_suresi(tur)
+            baslangiclar.append(sira)
+            kapsam.update(j for j in range(sira, adet) if dakikalar[j] < bitis)
+        else:
+            desenler.append((tuple(baslangiclar), tuple(sorted(kapsam))))
+    return desenler
+
 
 @dataclass
 class _Izgara:
@@ -142,8 +186,13 @@ class _Izgara:
     yer_brans_arzi: dict[frozenset[str], list[int]]  # imza -> yer -> alan öğretmeni
 
     def hazirla(self, birimler: list[SinavBirimi], yuk_fn: Callable[[SinavBirimi], int],
-                sinir_fn: Callable[[str], int]) -> None:
-        """Birimleri ve öğrencileri tamsayı indekslere çevirir."""
+                sinir_fn: Callable[[str], int],
+                kapsamlar: list[list[tuple[int, ...] | None]]) -> None:
+        """Birimleri ve öğrencileri tamsayı indekslere çevirir.
+
+        `kapsamlar[b][s]`: b. birim s. slotta başlarsa kapladığı slotlar
+        (bkz. `yerlesim_desenleri`); sığmıyorsa None.
+        """
         ogrenciler = sorted({o for b in birimler for o in b.ogrenci_anahtarlari})
         self._ogrenci_indisi = {o: i for i, o in enumerate(ogrenciler)}
         self._ogrenci_sayisi = len(ogrenciler)
@@ -164,7 +213,7 @@ class _Izgara:
             tuple(self._ogrenci_indisi[o] for o in b.ogrenci_anahtarlari) for b in birimler]
         self.birim_imzasi = [self._imza_indisi[_brans_imzasi(b)] for b in birimler]
         self.birim_yuku = [yuk_fn(b) for b in birimler]
-        self.birim_slotu = [b.slot_ihtiyaci for b in birimler]
+        self.birim_kapsami = kapsamlar
         self.birim_salonu = [b.salon_sayisi for b in birimler]
         self.birim_gorevlisi = [b.gorevli_ihtiyaci for b in birimler]
 
@@ -176,14 +225,14 @@ class _Izgara:
         self.ogrenci_slot = bytearray(self._ogrenci_sayisi * yer_sayisi)
 
     def sigar_mi(self, birim_no: int, gun: int, ilk_slot: int) -> bool:
-        adet = self.birim_slotu[birim_no]
-        if ilk_slot + adet > self.slot_sayisi:
+        kapsam = self.birim_kapsami[birim_no][ilk_slot]
+        if kapsam is None:
             return False
         salon, gorevli = self.birim_salonu[birim_no], self.birim_gorevlisi[birim_no]
         imza = self.birim_imzasi[birim_no]
-        taban = gun * self.slot_sayisi + ilk_slot
-        for k in range(adet):
-            yer = taban + k
+        taban = gun * self.slot_sayisi
+        for slot in kapsam:
+            yer = taban + slot
             if self.slot_salon[yer] + salon > self.salon_adedi:
                 return False
             if self.slot_gorevli[yer] + gorevli > self.yer_gorevli[yer]:
@@ -196,27 +245,27 @@ class _Izgara:
             if self.ogrenci_gun[ogrenci * self.gun_sayisi + gun] + yuk > self._ogrenci_siniri[ogrenci]:
                 return False
             satir = ogrenci * self.gun_sayisi * self.slot_sayisi
-            for k in range(adet):
-                if self.ogrenci_slot[satir + taban + k]:
+            for slot in kapsam:
+                if self.ogrenci_slot[satir + taban + slot]:
                     return False
         return True
 
     def _uygula(self, birim_no: int, gun: int, ilk_slot: int, isaret: int) -> None:
-        adet = self.birim_slotu[birim_no]
+        kapsam = self.birim_kapsami[birim_no][ilk_slot]
         salon, gorevli = self.birim_salonu[birim_no], self.birim_gorevlisi[birim_no]
         imza, yuk = self.birim_imzasi[birim_no], self.birim_yuku[birim_no]
-        taban = gun * self.slot_sayisi + ilk_slot
-        for k in range(adet):
-            yer = taban + k
+        taban = gun * self.slot_sayisi
+        for slot in kapsam:
+            yer = taban + slot
             self.slot_salon[yer] += salon * isaret
             self.slot_gorevli[yer] += gorevli * isaret
             self.slot_brans[yer * self.imza_sayisi + imza] += isaret
-        self.gun_yuku[gun] += adet * isaret
+        self.gun_yuku[gun] += len(kapsam) * isaret
         for ogrenci in self.birim_ogrencileri[birim_no]:
             self.ogrenci_gun[ogrenci * self.gun_sayisi + gun] += yuk * isaret
             satir = ogrenci * self.gun_sayisi * self.slot_sayisi
-            for k in range(adet):
-                self.ogrenci_slot[satir + taban + k] = 1 if isaret > 0 else 0
+            for slot in kapsam:
+                self.ogrenci_slot[satir + taban + slot] = 1 if isaret > 0 else 0
 
     def yerlestir(self, birim_no: int, gun: int, ilk_slot: int) -> None:
         self._uygula(birim_no, gun, ilk_slot, 1)
@@ -322,9 +371,21 @@ def _yerlestirme_ara(birimler: list[SinavBirimi], izgara: _Izgara, sira: list[in
 
 def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara | None, ozet: YukOzeti,
                  gun_sayisi: int, slot_sayisi: int, salon_adedi: int, gorevli_adedi: int,
-                 brans_arzi: dict[frozenset[str], int], etiketler: dict[str, str]) -> list[str]:
-    """Plan üretilemediğinde hangi kısıtın bağladığını anlatır."""
+                 brans_arzi: dict[frozenset[str], int], etiketler: dict[str, str],
+                 slot_ihtiyaclari: list[int]) -> list[str]:
+    """Plan üretilemediğinde hangi kısıtın bağladığını anlatır.
+
+    `slot_ihtiyaclari[b]`: b. birimin en az kaç slot tuttuğu (uzun uygulama
+    sınavı birden çok slot tutar); 0 ise birim günün hiçbir saatine sığmaz.
+    """
     teshis: list[str] = []
+
+    for birim, ihtiyac in zip(birimler, slot_ihtiyaclari):
+        if not ihtiyac:
+            teshis.append(
+                f"{birim.etiket()}: program yazılı ve uygulama oturumlarını aynı gün art arda "
+                "planlar; yazılı bittikten sonra başlayan bir oturum saati yok. Oturum saati "
+                "ekleyin ya da sürelerini kısaltın.")
 
     en_buyuk_salon_ihtiyaci = max((b.salon_sayisi for b in birimler), default=0)
     if en_buyuk_salon_ihtiyaci > salon_adedi:
@@ -335,7 +396,7 @@ def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara | None, ozet: YukO
             f"{salon_adedi}. Salon ekleyin ya da salon üst sınırını yükseltin.")
 
     salon_kapasitesi = gun_sayisi * slot_sayisi * salon_adedi
-    gereken_salon_slotu = sum(b.salon_sayisi * b.slot_ihtiyaci for b in birimler)
+    gereken_salon_slotu = sum(b.salon_sayisi * i for b, i in zip(birimler, slot_ihtiyaclari))
     if gereken_salon_slotu > salon_kapasitesi:
         teshis.append(
             f"Toplam salon-slot ihtiyacı {gereken_salon_slotu}, {gun_sayisi} gün × "
@@ -343,7 +404,7 @@ def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara | None, ozet: YukO
             "Gün sayısını, günlük slot sayısını veya salon sayısını artırın.")
 
     gorevli_kapasitesi = sum(izgara.yer_gorevli) if izgara else gun_sayisi * slot_sayisi * gorevli_adedi
-    gereken_gorevli_slotu = sum(b.gorevli_ihtiyaci * b.slot_ihtiyaci for b in birimler)
+    gereken_gorevli_slotu = sum(b.gorevli_ihtiyaci * i for b, i in zip(birimler, slot_ihtiyaclari))
     if gereken_gorevli_slotu > gorevli_kapasitesi:
         teshis.append(
             f"Toplam görevli-slot ihtiyacı {gereken_gorevli_slotu}, {gun_sayisi} günde müsait "
@@ -354,9 +415,9 @@ def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara | None, ozet: YukO
     # kadar sınav yapılabilir (her sınav en az bir alan öğretmeni ister).
     brans_ihtiyaci: dict[frozenset[str], int] = defaultdict(int)
     brans_adi: dict[frozenset[str], str] = {}
-    for birim in birimler:
+    for birim, slot_ihtiyaci in zip(birimler, slot_ihtiyaclari):
         imza = _brans_imzasi(birim)
-        brans_ihtiyaci[imza] += birim.slot_ihtiyaci
+        brans_ihtiyaci[imza] += slot_ihtiyaci
         brans_adi[imza] = " / ".join(birim.alan_branslari)
     for anahtar, ihtiyac in sorted(brans_ihtiyaci.items(), key=lambda x: brans_adi[x[0]]):
         arz = brans_arzi.get(anahtar, 0)
@@ -604,6 +665,8 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
     imzalar = {_brans_imzasi(b) for b in birimler}
     brans_arzi = {imza: sum(1 for p in uygun_personel if esitle(p.brans) in imza)
                   for imza in imzalar}
+    desenler = [yerlesim_desenleri(b, parametreler) for b in birimler]
+    kapsamlar = [[d[1] if d else None for d in birim_desenleri] for birim_desenleri in desenler]
 
     # Görev alabilecek kişiler (gün, saat) başına bir kez hesaplanır. Izgara
     # için temkinli olunur: iki oturum türünün uzun süreliği esas alınır.
@@ -623,7 +686,7 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
             yer_brans_arzi={imza: [len(k & kisiler) for k in yer_kumeleri]
                             for imza, kisiler in brans_kimlikleri.items()})
         izgara.hazirla(birimler, lambda b: b.sinav_yuku(parametreler.iki_asamali_sayim),
-                       sinir_fn)
+                       sinir_fn, kapsamlar)
         return izgara
 
     # Gün sayısı kademeli artırılır: en kısa program hedeflenir, sığmazsa bir
@@ -654,7 +717,8 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
         raise PlanlamaBasarisiz(
             "Sınav planı verilen kısıtlarla üretilemedi.",
             _teshis_uret(birimler, izgara, ozet, ust_gun, slot_sayisi, len(salonlar),
-                         len(uygun_personel), brans_arzi, etiketler))
+                         len(uygun_personel), brans_arzi, etiketler,
+                         [min((len(k) for k in kapsam if k), default=0) for kapsam in kapsamlar]))
 
     plan = Plan(parametreler)
     notlar: list[str] = []
@@ -665,17 +729,23 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
     slot_birimleri: dict[tuple[int, int], list[tuple[SinavBirimi, OturumTuru, int]]] = defaultdict(list)
     for birim_no, (gun, ilk_slot) in enumerate(yerlesim):
         birim = birimler[birim_no]
-        for adim, tur in enumerate(birim.oturum_turleri):
-            slot_birimleri[(gun, ilk_slot + adim)].append((birim, tur, adim))
+        baslangiclar = desenler[birim_no][ilk_slot][0]
+        for adim, (tur, slot) in enumerate(zip(birim.oturum_turleri, baslangiclar)):
+            slot_birimleri[(gun, slot)].append((birim, tur, adim))
 
     birim_komisyonu: dict[str, frozenset[int]] = {}
     birim_gozcusu: dict[str, frozenset[int]] = {}
+    # Süresi sonraki slotlara taşan oturumun salonu ve görevlileri o slotlarda
+    # başka sınava verilmez; ızgara bu yerleri zaten saymıştır.
+    dakikalar = [_dakika(s) for s in parametreler.slot_saatleri]
+    suren_salonlar: dict[tuple[int, int], set[int]] = defaultdict(set)
+    suren_kisiler: dict[tuple[int, int], set[int]] = defaultdict(set)
 
     for (gun, slot) in sorted(slot_birimleri):
         tarih = gunler[gun]
         saat = parametreler.slot_saatleri[slot]
-        kalan_salonlar = list(salon_sirasi)
-        slotta_secilen: set[int] = set()
+        kalan_salonlar = [s for s in salon_sirasi if s.kimlik not in suren_salonlar[(gun, slot)]]
+        slotta_secilen: set[int] = set(suren_kisiler[(gun, slot)])
         # Salon ihtiyacı çok olan ve branşı kıt olan sınav önce doyurulur.
         sirali = sorted(slot_birimleri[(gun, slot)], key=lambda x: (
             -x[0].salon_sayisi,
@@ -721,6 +791,11 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
                 birim_gozcusu[birim.anahtar] = frozenset(
                     g.personel_kimligi for g in gorevler if g.rol is GorevRolu.GOZCU)
             slotta_secilen.update(g.personel_kimligi for g in gorevler)
+            for sonraki in range(slot + 1, slot_sayisi):
+                if dakikalar[sonraki] >= dakikalar[slot] + sure:
+                    break
+                suren_salonlar[(gun, sonraki)].update(secili_salonlar)
+                suren_kisiler[(gun, sonraki)].update(g.personel_kimligi for g in gorevler)
             plan.oturumlar.append(oturum)
             plan.gorevlendirmeler.extend(gorevler)
             notlar.extend(gorev_notlari)

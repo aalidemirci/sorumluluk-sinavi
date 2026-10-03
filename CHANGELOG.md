@@ -47,6 +47,16 @@ derlenir.
   "python-docx", oluşturma 2013, program "Microsoft Macintosh Word"). Artık
   yazar ve program uygulamanın adı ve sürümü, başlık belgenin adı, tarih
   üretim zamanıdır; kişi adı yazılmaz.
+- **Uzun uygulama sınavı sonraki saatle çakışıyordu.** Planlayıcı her
+  oturuma tek oturum saati ayırıyordu; süresi bir sonraki saate taşan
+  uygulama sınavının (ör. 60 dakika arayla dizilmiş saatlerde 90 dakika)
+  sürdüğü saate aynı öğrencinin başka sınavı, aynı görevli ya da aynı salon
+  verilebiliyordu. Doğrulayıcı da yalnız başlangıç saatlerini karşılaştırdığı
+  için bunu görmüyordu. Artık uygulama sürdüğü bütün saatleri tutar, çakışma
+  denetimi sürelere bakar ("MATEMATİK başlarken İNGİLİZCE (09:00–10:30)
+  sürüyor"), görevli değiştirme penceresi o sırada başka sınavda olanı aday
+  göstermez ve takvim kartında bitiş saati yazar. Varsayılan 40 dakikalık
+  sürede program eskisiyle aynı planı üretir.
 
 ### Değiştirildi
 - Servis katmanı (`veri/hizmet.py`, ~2 400 satır) konu modüllerine bölündü

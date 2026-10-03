@@ -151,6 +151,50 @@ def test_yazili_tasininca_uygulama_saat_farkiyla_gelir(vt, tmp_path: Path) -> No
     assert (uygulama.tarih, uygulama.saat) == (hedef, time(10, 0))
 
 
+# ===================================================== uzun uygulama sınavı
+
+def test_uzun_uygulama_surerken_ogrencinin_sinavi_baslayamaz(vt, tmp_path: Path) -> None:
+    """OKY md.45/1-f: uygulama süresini zümre belirler. 09:00'da başlayan 90
+    dakikalık uygulama 10:00 sınavı başlarken sürer; eski doğrulayıcı yalnız
+    başlangıç saatlerine baktığı için bu taşımaya izin veriyordu. 40 dakikalık
+    uygulamada aynı taşıma geçerlidir (olumsuz senaryo)."""
+    _kur(vt, tmp_path)
+    for sure, izinli in ((90, False), (40, True)):
+        sonuc = hizmet.plan_hazirla(
+            vt, PlanParametreleri(pencere_kodu="P1", uygulama_suresi_dakika=sure))
+        _, uygulama = _iki_asamali(sonuc)
+        ogrenci = uygulama.ogrenci_anahtarlari[0]
+        matematik = next(o for o in sonuc.plan.oturumlar
+                         if o.ders_adi == "MATEMATİK" and ogrenci in o.ogrenci_anahtarlari)
+        hedef = _bos_gun(sonuc)
+        assert hizmet.oturum_tasi(vt, sonuc.plan, matematik.anahtar, hedef, time(10, 0),
+                                  sonuc.yukseltilen_sinirlar).uygulandi
+        tasima = hizmet.oturum_tasi(vt, sonuc.plan, uygulama.anahtar, hedef, time(9, 0),
+                                    sonuc.yukseltilen_sinirlar)
+        assert tasima.uygulandi is izinli, tasima.mesaj()
+        if not izinli:
+            assert any("İNGİLİZCE (09:00–10:30) sürüyor" in i.aciklama
+                       for i in tasima.ogrenci_engelleri)
+
+
+def test_uzun_uygulamadaki_gorevli_sonraki_sinava_aday_olamaz(vt, tmp_path: Path) -> None:
+    from testler.yardimci import gorevler, oturum, plan as plan_kur
+    _kur(vt, tmp_path)
+    kisiler = [p.kimlik for p in hizmet.personelleri_getir(vt) if p.gorev_alabilir_mi]
+    suren, degisen, *komisyon = kisiler[:6]
+    for sure, uygun_mu in ((90, False), (40, True)):
+        plan = plan_kur(
+            [oturum("u", "İNGİLİZCE", ["102|9/A"], saat=(9, 0), brans="İngilizce",
+                    tur=OturumTuru.UYGULAMA, sure=sure),
+             oturum("m", "MATEMATİK", ["201|10/B"], saat=(10, 0), salonlar=(2,))],
+            gorevler("u", komisyon=tuple(komisyon[:2]), gozcu=(suren,))
+            + gorevler("m", komisyon=tuple(komisyon[2:]), gozcu=(degisen,)))
+        aday = next(a for a in hizmet.gorevli_adaylari(vt, plan, "m", GorevRolu.GOZCU, degisen)
+                    if a["kimlik"] == suren)
+        assert aday["uygun_mu"] is uygun_mu, sure
+        assert aday["neden"] == ("" if uygun_mu else "aynı anda başka sınavda görevli")
+
+
 # ===================================================== görevli değişikliği
 
 def test_taslakta_gorevli_degistirilir_ve_geri_alinabilir(vt, tmp_path: Path) -> None:

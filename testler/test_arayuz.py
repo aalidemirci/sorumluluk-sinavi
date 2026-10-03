@@ -181,6 +181,26 @@ def test_geri_al_ve_ileri_al_calisir(uygulama) -> None:
     assert plan.oturum_bul(oturum.anahtar).tarih == hedef
 
 
+@pytest.mark.parametrize("sure, beklenen", [("90", "(uyg. –09:30)"), ("40", "(uyg.)")])
+def test_sonraki_saate_tasan_uygulama_karti_bitisini_gosterir(uygulama, sure, beklenen) -> None:
+    """Kart yalnız başladığı satırda çizilir; 08:00'de başlayan 90 dakikalık
+    uygulama bitişiyle yazılmazsa 09:00 hücresi boş sanılır. 40 dakikada
+    (olumsuz senaryo) kart eskisi gibidir."""
+    from datetime import time as saat, timedelta
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    uygulama.uygulama_suresi.set(sure)
+    uygulama._plan_uret()
+    plan = uygulama.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if o.oturum_turu.value == "uygulama")
+    hedef = max(o.tarih for o in plan.oturumlar) + timedelta(days=1)
+    while hedef.weekday() >= 5:
+        hedef += timedelta(days=1)
+    uygulama._kart_birakildi(oturum.anahtar, hedef, saat(8, 0))
+    assert (oturum.tarih, oturum.saat) == (hedef, saat(8, 0))
+    kart = next(k for k in uygulama.takvim.kartlar if k["anahtar"] == oturum.anahtar)
+    assert kart["baslik"].endswith(beklenen)
+
+
 def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, monkeypatch) -> None:
     """Aynı öğrencinin iki sınavı aynı saate getirilemez."""
     uygulama._sayfa_goster(sayfa("Sınav Planı"))

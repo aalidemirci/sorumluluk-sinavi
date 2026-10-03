@@ -107,7 +107,9 @@ BOLUMLER = [
             "hesaplarken bu günleri iş günü saymaz.",
             "Zorunlu hâller dışında yazılı sınav süresi bir ders saatini aşamaz (ÖDY md.5/1-l). "
             "Uygulamalı sınavın süresini zümre belirler (OKY md.45/1-f); plan ekranında ayrıca "
-            "girilir.",
+            "girilir. Süre bir sonraki oturum saatine taşıyorsa program o saati de bu sınava "
+            "ayırır: öğrencisi, görevlileri ve salonu uygulama bitene kadar başka sınava "
+            "verilmez; takvimdeki kartta bitiş saati yazar.",
             "Bir günde yapılacak yazılı ve uygulamalı sınavların sayısının ikiyi geçmemesi "
             "esastır; zorunlu hâllerde bir sınav daha yapılabilir (ÖDY md.5/1-k). Program "
             "bu sınırı öğrenci başına uygular: ikiyi aşan gün uyarı, üçü aşan gün engel olarak "
