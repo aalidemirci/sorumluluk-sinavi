@@ -28,6 +28,15 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Eklendi
+- Site görselleri için iki yardımcı betik: `araclar/site_ornekleri.py`
+  (uydurma okul, örnek evrak ve PDF önizlemeleri) ve
+  `araclar/site_ekranlari.py` (Debian 12 kabında sanal ekrandan ekran
+  görüntüleri). Yayım sonrası indirme alanı ve site adımları KURULUM.md'ye
+  yazıldı. Programın davranışı değişmedi.
+
 ## [0.6.1] — 03.10.2026
 
 ### Düzeltildi

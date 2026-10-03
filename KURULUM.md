@@ -298,3 +298,41 @@ Inno Setup betiği `surum.py`'yi Python olarak çalıştıramaz, satırı **meti
 olarak** ayrıştırır. Bu yüzden satırın biçimi (`SURUM = "x.y.z"`, tek satır,
 çift tırnak, sonunda yorum yok) sözleşmenin parçasıdır ve
 `testler/test_surum.py` tarafından korunur.
+
+### Yayımdan sonra: indirme alanı ve site
+
+MEB ağında GitHub engelli olduğu için okullar paketi okulapp.org'dan indirir;
+dosyalar `indir.okulapp.org/sorumluluk-sinavi/` altında, Cloudflare R2'deki
+`okulapp-indirme` kovasındadır. Bu depoda R2'ye yükleyen bir iş akışı yoktur,
+yükleme elle yapılır:
+
+1. Pardus paketi yayıma eklenince `.deb`'i ve `SHA256SUMS-X.Y.Z-pardus.txt`'yi
+   indirip doğrulayın, üç paketi kapsayan `SHA256SUMS-X.Y.Z.txt`'yi yeniden
+   üretin ve yayımdaki Windows'a özel özetin yerine koyun
+   (`gh release upload vX.Y.Z … --clobber`). Kullanıcı tek paketi indirse de
+   doğrulayabilsin diye kılavuz `sha256sum -c --ignore-missing` der.
+2. Dört dosyayı yükleyin (bu makinedeki `wrangler login` oturumuyla):
+
+   ```bash
+   npx --yes wrangler@4 r2 object put "okulapp-indirme/sorumluluk-sinavi/<ad>" --file="<dosya>" --content-type="<tür>" --remote
+   ```
+
+   İçerik türleri: `.exe` → `application/vnd.microsoft.portable-executable`,
+   `.zip` → `application/zip`, `.deb` → `application/vnd.debian.binary-package`,
+   özet → `text/plain; charset=utf-8`. Özet dosyası sürümlü adla yüklenir;
+   sabit ad eski sürümlerin özetini ezer.
+3. Canlıdan doğrulayın: dört adres 200 dönmeli, `Content-Length` yerel boyutla
+   eşleşmeli, kurulum dosyası indirilip SHA-256'sı karşılaştırılmalı.
+   **Kartı bu doğrulamadan önce güncellemeyin** — sitede kırık bağlantı olur.
+4. Site (`../okulapp.org`, önce oradaki CLAUDE.md → "Ortak çalışma düzeni"):
+   `src/data/ss-release.json` (sürüm, ad, yayım zamanı, dört bağlantı ve
+   boyut), `src/content/projects/sorumluluk-sinavi.md` içindeki `badge`, yeni
+   özellik varsa `/sorumluluk-sinavi/**` sayfaları. `npm run build`
+   `check-releases` ile sürümü GitHub'la karşılaştırır.
+
+Sitedeki ekran görüntüleri ve örnek evrak gerçek veriyle değil uydurma bir
+okulla üretilir: `araclar/site_ornekleri.py` okulu, evrakı ve PDF
+önizlemelerini; `araclar/site_ekranlari.py` Debian 12 kabında ekranları
+üretir. Komutlar betiklerin başında yazılıdır. Arayüz ya da evrak değiştiyse
+yeni sürümle birlikte yeniden üretin; dosyalar sitede
+`public/sorumluluk-sinavi/` altındadır.
