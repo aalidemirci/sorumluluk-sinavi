@@ -34,10 +34,6 @@ CHANGELOG 0.6.0 başlığında).
 
 ## Bilinen borçlar
 
-- **`veri/hizmet.py` büyük** (~2 400 satır): personel, başvuru, plan,
-  görevli değişikliği, evrak sorguları ve tek ders aynı dosyada. Konulara göre
-  bölünmeli; `testler/test_kurallar.py::test_her_kural_ya_denetlenir_ya_bilgidir`
-  dosya yolunu okuduğu için birlikte güncellenmeli.
 - **Belge onayı işlemiyor:** `belge_surumu.onaylandi_mi` hiçbir yerde
   doldurulmuyor, bu yüzden "onaylanmış belge değişti" föyü hiç oluşmuyor.
   Plan kesinleşmesine bağlanabilir.

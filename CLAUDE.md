@@ -30,7 +30,8 @@ değişiklik yanlıştır.
 
 ```
 cekirdek/   saf iş kuralları — veritabanı, dosya, arayüz görmez
-veri/       şema göçleri, servis katmanı, e-Okul rapor ayrıştırma
+veri/       şema göçleri, servis katmanı (veri/hizmet/ paketi; modül katmanları
+            __init__.py'de yazılı), e-Okul rapor ayrıştırma
 evrak/      .docx üretimi; belge düzeni koddan gelir, şablondan değil
 arayuz/     Tkinter masaüstü arayüzü
 testler/    pytest; her kural olumsuz senaryosuyla birlikte test edilir

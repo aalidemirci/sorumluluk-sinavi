@@ -511,7 +511,10 @@ def test_her_kural_ya_denetlenir_ya_bilgidir() -> None:
         and getattr(dugum.func, "id", "") == "ihlal"
         and dugum.args and isinstance(dugum.args[0], ast.Constant)
     }
-    servis = pathlib.Path("veri/hizmet.py").read_text(encoding="utf-8")
+    # Servis katmanı bir pakettir (veri/hizmet/); kuralı uygulayan modül hangisi
+    # olursa olsun bulunur.
+    servis = "".join(yol.read_text(encoding="utf-8")
+                     for yol in sorted(pathlib.Path("veri/hizmet").glob("*.py")))
     uygulanan = {k for k in KURALLAR if k in servis}
     bilgi = {k for k, t in KURALLAR.items() if t.ciddiyet is Ciddiyet.BILGI}
 

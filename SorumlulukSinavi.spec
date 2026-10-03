@@ -18,7 +18,7 @@ bağlandı; tek betik iki platformu da üretir.
 
 import sys
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 WINDOWS = sys.platform == "win32"
 
@@ -85,7 +85,9 @@ analiz = Analysis(
         "arayuz.uygulama",
         "arayuz.takvim",
         "arayuz.pencereler",
-        "veri.hizmet",
+        # Servis katmanı bir pakettir; modülleri tek tek yazılmaz ki yeni
+        # modül eklenince paket eksik kalmasın.
+        *collect_submodules("veri.hizmet"),
         "veri.rapor_okuma",
         "veri.veritabani",
         "cekirdek.planlayici",
