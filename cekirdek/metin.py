@@ -36,6 +36,19 @@ def esitle(metin: str) -> str:
     return kucult(sadelestir(metin))
 
 
+_KATLA = str.maketrans("çğıöşüâîû", "cgiosuaiu")
+
+
+def arama_anahtari(metin: str) -> str:
+    """Arama karşılaştırması: Türkçe küçültülür, sonra şapkasız ve noktasız harfe katlanır.
+
+    Ekranda arama yapan kullanıcı çoğu zaman Türkçe karakter kullanmadan yazar
+    ("ogretmen", "cigdem"); katlanmış biçimler eşleşir. Sıralama bunu kullanmaz,
+    Türk alfabesine göre yapılır (bkz. siralama_anahtari).
+    """
+    return esitle(metin).translate(_KATLA)
+
+
 def siralama_anahtari(metin: str) -> tuple[int, ...]:
     """Türk alfabesine göre sıralama anahtarı üretir."""
     return tuple(_SIRA.get(harf, 1000 + ord(harf)) for harf in kucult(metin))

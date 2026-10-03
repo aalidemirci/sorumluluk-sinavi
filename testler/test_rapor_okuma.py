@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cekirdek.metin import esitle, kucult, siralama_anahtari
+from cekirdek.metin import arama_anahtari, esitle, kucult, siralama_anahtari
 from veri.rapor_okuma import (
     RaporHatasi, personel_raporu_coz, sorumluluk_raporu_coz, sorumluluk_raporu_oku, tablo_oku,
 )
@@ -17,6 +17,15 @@ def test_turkce_kucultme_i_harfini_bozmaz() -> None:
     assert kucult("İSTANBUL") == "istanbul"
     assert kucult("IĞDIR") == "ığdır"
     assert esitle("  Müdür   Yardımcısı ") == "müdür yardımcısı"
+
+
+def test_arama_anahtari_turkce_karaktersiz_yazimi_eslestirir() -> None:
+    """Kullanıcı "cigdem" yazınca "ÇİĞDEM" bulunmalı; "IRMAK" küçülünce "ırmak"
+    olur ama aramada "irmak" ile de eşleşir."""
+    assert arama_anahtari("ÇİĞDEM Öğretmen") == "cigdem ogretmen"
+    assert arama_anahtari("IRMAK") == arama_anahtari("irmak") == "irmak"
+    # Olumsuz senaryo: farklı harf katlansa da eşleşmez.
+    assert arama_anahtari("Şule") != arama_anahtari("Sila")
 
 
 def test_turkce_siralama_c_ile_ch_arasini_ayirir() -> None:
