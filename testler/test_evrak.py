@@ -632,7 +632,35 @@ def test_plan_disi_tutanagi_bos_donemde_de_uretilir(tmp_path: Path) -> None:
     hizmet.basvuru_kaydet(vt, ogrenci_id, "P1", "basvurdu", date(2026, 9, 3), "Dilekçe")
     yol = klasor / "tutanak.docx"
     uretici.plan_disi_tutanagi(vt, "P1", yol)
-    assert "plan dışı bırakılan öğrenci bulunmamaktadır" in _metin(yol)
+    metin = _metin(yol)
+    assert "plan dışı bırakılan öğrenci bulunmamaktadır" in metin
+    assert "Toplam 0" not in metin
+
+
+def test_plan_disi_tutanagi_karar_bekleyeni_sayar(tmp_path: Path) -> None:
+    """Kararı girilmemiş öğrenci varsa tutanak kaç öğrenci olduğunu söyler."""
+    vt, _, klasor = _basvuru_hazir(tmp_path)
+    yol = klasor / "tutanak.docx"
+    uretici.plan_disi_tutanagi(vt, "P1", yol)
+    metin = _metin(yol)
+    assert "KARAR BEKLİYOR" in metin
+    assert "Bunlardan 1 öğrencinin başvuru kararı henüz girilmemiştir" in metin
+
+
+def test_plan_disi_tutanagi_karar_bekleyen_yoksa_uyari_yazmaz(tmp_path: Path) -> None:
+    """Olumsuz senaryo: bütün kararlar girilmişse eksikten söz eden cümle basılmaz.
+
+    0.6.1'e kadar cümle koşulsuz basılıyordu; kesinleşmiş dönemin tutanağı
+    olmayan bir eksikten söz ediyordu.
+    """
+    vt, ogrenci_id, klasor = _basvuru_hazir(tmp_path)
+    hizmet.basvuru_kaydet(vt, ogrenci_id, "P1", "basvurmadi")
+    yol = klasor / "tutanak.docx"
+    uretici.plan_disi_tutanagi(vt, "P1", yol)
+    metin = _metin(yol)
+    assert "Toplam 1 öğrenci plan dışında bırakılmıştır." in metin
+    assert "henüz girilmemiştir" not in metin
+    assert "Karar bekliyor" not in metin
 
 
 def test_pencere_evraki_uret_ikisini_de_uretir_ve_surumler(tmp_path: Path) -> None:

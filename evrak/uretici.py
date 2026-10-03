@@ -535,10 +535,16 @@ def plan_disi_tutanagi(vt: Veritabani, pencere_kodu: str, hedef: Path) -> str:
             [12, 30, 10, 30, 18])
     else:
         b.paragraf("Bu dönemde plan dışı bırakılan öğrenci bulunmamaktadır.", bosluk=8)
-    b.paragraf(
-        f"Toplam {len(satirlar_ham)} öğrenci plan dışında bırakılmıştır. "
-        "\"Karar bekliyor\" durumundaki öğrenciler için henüz başvuru kararı girilmemiştir; "
-        "plan üretilmeden önce bu kayıtların tamamlanması gerekir.", bosluk=8, boyut=11)
+    # Karar bekleyen yoksa uyarı cümlesi basılmaz: kesinleşmiş bir dönemin
+    # tutanağında olmayan bir eksikten söz etmesi okuyanı yanıltır.
+    if satirlar_ham:
+        bekleyen = sum(1 for s in satirlar_ham if s["ozet"] == "KARAR BEKLİYOR")
+        ozet = f"Toplam {len(satirlar_ham)} öğrenci plan dışında bırakılmıştır."
+        if bekleyen:
+            ozet += (f" Bunlardan {bekleyen} öğrencinin başvuru kararı henüz girilmemiştir "
+                     "(\"Karar bekliyor\"); plan üretilmeden önce bu kayıtların tamamlanması "
+                     "gerekir.")
+        b.paragraf(ozet, bosluk=8, boyut=11)
     b.dayanak_notu(
         "Millî Eğitim Bakanlığı Ortaöğretim Kurumları Yönetmeliği'nin 58 inci maddesinin "
         "ikinci fıkrasının (d) bendi (Ek:RG-8/9/2023-32303) uyarınca, yazılı başvurusu "
