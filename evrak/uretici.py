@@ -313,9 +313,14 @@ def gorev_sayac_raporu(vt: Veritabani, plan_id: int, hedef: Path) -> str:
             "Henüz görevlendirme yapılmamıştır. Sınav Planı adımında planı üretip "
             "kaydettikten sonra bu rapor dolacaktır.", bosluk=8)
     b.dayanak_notu(
-        "Dönem sütunlarında komisyon üyeliği + gözcülük sayısı gösterilir. "
+        "Dönem sütunlarında komisyon üyeliği + gözcülük sayısı gösterilir. Türk dili ve "
+        "edebiyatı ile yabancı dil sınavlarında yazılı ve uygulama için ayrı komisyon "
+        "kurulduğundan iki üyelik ayrı sayılmıştır (OKY md.58/2-e). "
         "Karar md.12/2-a: bir öğretim yılında bir kişiye 12'den fazla sınav komisyon "
         "üyeliği ve 15'ten fazla sınav gözcülüğü için ücret ödenmez. " + TOPLU_SOZLESME_NOTU
+        + " Aynı toplu sözleşmelerin aynı hizmet kolu md.17'si, sorumluluk sınavı "
+        "kapsamındaki yabancı dil sınavlarında yazılı ve sözlü sınav komisyon üyeliklerinin "
+        "ayrı ayrı değerlendirileceğini öngörür."
         + " Askı dışındaki görevler yıl içi sırasıyla sayılır. Karar md.12/2-c gereği "
         "yöneticilere sınav görevi için ücret ödenmez. " + ALTBILGI_NOTU)
     b.imza_blogu(_imzalar(kurum))

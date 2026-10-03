@@ -175,11 +175,15 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
        "Yöneticiler görevlendirilebilir fakat sınav görevi için ücret ödenmez. Bu program "
        "tutar hesaplamaz; yalnız görevi ücretsiz olarak işaretler."),
     _k("EK-05", "Yıllık görev sayacı",
-       "Karar md.12/2-a; 7. ve 8. Dönem Toplu Sözleşme (eğitim hizmet kolu)", Ciddiyet.UYARI,
+       "Karar md.12/2-a; OKY md.58/2-e; 7. ve 8. Dönem Toplu Sözleşme (eğitim hizmet kolu "
+       "md.4, md.17)", Ciddiyet.UYARI,
        "Bir öğretim yılında bir kişiye 12'den fazla komisyon üyeliği ve 15'ten fazla gözcülük "
        "için ücret ödenmez. Toplu sözleşme gereği 01.01.2024 – 31.12.2027 tarihleri arasındaki "
        "sınav görevlerinde bu sınırlar uygulanmaz; sayaç yine tutulur. Askı dışındaki bir "
-       "görev, aynı öğretim yılındaki bütün görevlerle birlikte sayılır."),
+       "görev, aynı öğretim yılındaki bütün görevlerle birlikte sayılır. İki aşamalı derste "
+       "yazılı ve uygulama için ayrı komisyon kurulduğundan (OKY md.58/2-e) iki üyelik ayrı "
+       "sayılır; yabancı dilde toplu sözleşme md.17 de yazılı ve sözlü sınav komisyon "
+       "üyeliklerinin ayrı ayrı değerlendirileceğini söyler."),
 
     # --- TS: evrak teslim takibi ------------------------------------------
     _k("TS-01", "Evrak teslim kaydı", "Okul uygulaması", Ciddiyet.UYARI,

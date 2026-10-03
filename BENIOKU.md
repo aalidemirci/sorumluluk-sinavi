@@ -202,7 +202,7 @@ geçer.
 | SP-15 Şubat/Haziran için güncel liste | Okul uygulaması |
 | EK-03 aynı sınavda çifte rol yok | OKY md.58/2-a; Karar md.12/2-b |
 | EK-04 yönetici görevi ücretsizdir | Karar md.12/2-c |
-| EK-05 yıllık görev sayacı | Karar md.12/2-a; 7. ve 8. Dönem Toplu Sözleşme |
+| EK-05 yıllık görev sayacı | Karar md.12/2-a; OKY md.58/2-e; 7. ve 8. Dönem Toplu Sözleşme (md.4, md.17) |
 | SG-05, SG-06 sorumluluk kaynağı | OKY md.58/1 |
 | TS-01…03 evrak teslim takibi | Okul uygulaması |
 
@@ -234,6 +234,14 @@ açık depoya koymayın.
   bağlıdır, öğretim yılına değil: aralık `cekirdek/kurallar.py` içindeki
   `SINIR_ASKILARI` sabitindedir ve 9. Dönem toplu sözleşmesi yayımlanınca
   güncellenmelidir ([kararlar/0013](kararlar/0013-ucret-siniri-askisi-tarihe-bagli.md)).
+- **İki aşamalı derste görev sayımı:** yazılı ve uygulama için ayrı komisyon
+  kurulduğundan (OKY md.58/2-e) iki üyelik görev sayacında ayrı sayılır.
+  Yabancı dil için toplu sözleşme de "yazılı ve sözlü sınav komisyon
+  üyelikleri ayrı ayrı değerlendirilir" der (7. ve 8. Dönem, eğitim hizmet
+  kolu md.17). Yürürlükteki yönetmelikte ikinci aşamanın adı "uygulama"dır ve
+  dinleme ile konuşma becerilerini de ölçer (ÖDY md.5/1-ğ); hükmün bu aşamaya
+  uygulanması programın yorumudur. Türk dili ve edebiyatı için toplu
+  sözleşmede böyle bir hüküm yoktur.
 - **Tatil günleri** koda gömülü değildir; her öğretim yılı Kurum Ayarları'ndan
   girilir.
 - e-Okul rapor biçimi değişirse sorumluluk raporu ayrıştırıcısı güncellenmelidir.

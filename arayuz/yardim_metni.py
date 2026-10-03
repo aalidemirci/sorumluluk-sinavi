@@ -164,6 +164,17 @@ BOLUMLER = [
             "Program iki aşamayı aynı günün ardışık iki saatine yerleştirir ve komisyonu "
             "korur. Plan ekranında yazılı kartını taşırsanız uygulama da birlikte gelir; "
             "uygulama kartını ise tek başına başka bir güne taşıyabilirsiniz.",
+            "Yazılı ve uygulama için ayrı komisyon kurulduğundan program iki aşamadaki "
+            "üyeliği görev sayacında iki ayrı komisyon üyeliği sayar (OKY md.58/2-e). Yabancı "
+            "dil için toplu sözleşme de bunu söyler: sorumluluk sınavı kapsamındaki yabancı dil "
+            "sınavlarında görev alanların \"yazılı ve sözlü sınav komisyon üyelikleri ayrı ayrı "
+            "değerlendirilir\" (7. ve 8. Dönem Toplu Sözleşme, eğitim hizmet kolu md.17). "
+            "Hüküm \"sözlü\" der; yürürlükteki yönetmelikler sorumluluk sınavında sözlü aşama "
+            "tanımlamaz, ikinci aşama dinleme ve konuşma becerilerini de ölçen uygulamalı "
+            "sınavdır (ÖDY md.5/1-ğ). Hükmün uygulama aşamasına uygulanması programın "
+            "yorumudur. Türk dili ve edebiyatı için toplu sözleşmede böyle bir hüküm yoktur; "
+            "oradaki sayım yalnız OKY md.58/2-e'deki ayrı komisyona dayanır. Ücret tahakkuku "
+            "programın işi değildir.",
             "Hangi dersin iki aşamalı olduğuna Ders / Branş ekranında siz karar verirsiniz. "
             "Program ders adına bakarak öneri getirir ama kararı size bırakır.",
         ],

@@ -30,7 +30,10 @@ CHANGELOG 0.6.0 başlığında).
       içindeki `SINIR_ASKILARI` güncellenmeli. 8. Dönem eğitim hizmet kolu
       md.4 gereği 12/15 görev sınırları 01.01.2026 – 31.12.2027 arasındaki
       görevlerde uygulanmıyor; 01.01.2028 sonrası görevler için yeni metne
-      bakılacak (bkz. `kararlar/0013`).
+      bakılacak (bkz. `kararlar/0013`). Aynı metinde yabancı dil yazılı ve
+      sözlü komisyon üyeliklerinin ayrı değerlendirilmesi hükmü (7. ve 8.
+      Dönemde md.17) de aranmalı; madde numarası ya da hüküm değişirse EK-05
+      dayanağı, yardım metni ve görev sayacı raporunun notu güncellenir.
 
 ## Bilinen borçlar
 
@@ -42,14 +45,6 @@ CHANGELOG 0.6.0 başlığında).
   `nakil_gecis` yapmalı (veritabanı alanı hazır); yoksa madde kapsam dışına
   alınır. Program 3/6 sayacını hesaplamadığı için bugün hiçbir sonucu
   etkilemez.
-- **Toplu sözleşme md.17 dayanak olarak yazılmadı:** 7. ve 8. Dönem eğitim
-  hizmet kolu md.17, sorumluluk sınavlarında yabancı dil "yazılı ve sözlü"
-  sınav komisyon üyeliklerinin ayrı ayrı değerlendirileceğini söyler (RG
-  03.09.2023/32298 s.9; RG 27.08.2025/32999 s.10). Program iki aşamalı her
-  oturumu zaten ayrı görev sayıyor. Hükmün "sözlü" dediği sınavın OKY
-  md.58/2-e'deki "uygulama" aşaması olduğu yorumu doğrulanırsa yardım metnine
-  ve görev sayacına dayanak olarak eklenebilir. Türk dili ve edebiyatı için
-  böyle bir hüküm yok.
 
 ## İzlenen kırılganlıklar
 

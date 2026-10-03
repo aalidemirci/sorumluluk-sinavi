@@ -151,6 +151,32 @@ def test_yazili_tasininca_uygulama_saat_farkiyla_gelir(vt, tmp_path: Path) -> No
     assert (uygulama.tarih, uygulama.saat) == (hedef, time(10, 0))
 
 
+def test_iki_asamali_derste_iki_komisyon_uyeligi_ayri_sayilir(vt, tmp_path: Path) -> None:
+    """OKY md.58/2-e: yazılı ve uygulama için ayrı komisyon kurulur, komisyonların
+    aynı üyelerden oluşması esastır. Yabancı dilde 7. ve 8. Dönem Toplu Sözleşme
+    eğitim hizmet kolu md.17 de yazılı ve sözlü sınav komisyon üyeliklerinin ayrı
+    ayrı değerlendirileceğini söyler. Aynı kişi iki aşamada iki üyelik alır."""
+    _kur(vt, tmp_path)
+    sonuc = _plan(vt)
+    hizmet.plan_kaydet(vt, sonuc)
+    yazili, uygulama = _iki_asamali(sonuc)
+
+    def komisyon(oturum) -> set[int]:
+        return {g.personel_kimligi for g in sonuc.plan.oturum_gorevleri(oturum.anahtar)
+                if g.rol is GorevRolu.KOMISYON_UYESI}
+
+    ortak = komisyon(yazili) & komisyon(uygulama)
+    assert len(ortak) == 2
+    sayac = {k["kimlik"]: k["komisyon"] for k in hizmet.gorev_havuzu_ozeti(vt)}
+    for kimlik in ortak:
+        oturumlari = [o for o in sonuc.plan.oturumlar if kimlik in komisyon(o)]
+        assert sayac[kimlik] == len(oturumlari) >= 2
+    # Olumsuz senaryo: tek aşamalı derste bir oturum tek üyeliktir.
+    tek = next(o for o in sonuc.plan.oturumlar if not o.birim_anahtari)
+    for kimlik in komisyon(tek) - ortak:
+        assert sayac[kimlik] == sum(1 for o in sonuc.plan.oturumlar if kimlik in komisyon(o))
+
+
 # ===================================================== uzun uygulama sınavı
 
 def test_uzun_uygulama_surerken_ogrencinin_sinavi_baslayamaz(vt, tmp_path: Path) -> None:

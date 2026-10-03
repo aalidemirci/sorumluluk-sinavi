@@ -34,6 +34,14 @@ derlenir.
 - Sorumluluk raporu önizlemesi, programın okumadığı sütun başlıklarını
   gösterir. Raporda nakil/geçiş kaynağını gösteren bir sütun olup olmadığı
   (SG-05) ilk gerçek aktarımda görülsün diye; yalnız başlık adı gösterilir.
+- İki aşamalı derste yazılı ve uygulama komisyon üyeliklerinin görev
+  sayacında ayrı sayılmasının dayanağı yazıldı: OKY md.58/2-e (ayrı
+  komisyon) ve yabancı dil için 7. ve 8. Dönem Toplu Sözleşme eğitim hizmet
+  kolu md.17 ("yazılı ve sözlü sınav komisyon üyelikleri ayrı ayrı
+  değerlendirilir"). Hükmün "sözlü" dediği aşamanın bugünkü uygulama sınavı
+  sayılması yardım metninde programın yorumu olarak belirtilir. Sayım
+  değişmedi; yardım metni, görev sayacı raporunun notu ve EK-05 dayanağı
+  güncellendi.
 
 ### Düzeltildi
 - **Onaylı belge değişince uyarı.** Belge sürümleri hiçbir zaman "onaylı"
