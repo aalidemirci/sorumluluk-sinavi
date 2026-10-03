@@ -36,6 +36,14 @@ IZINLI_IKILI_DOSYALAR = {
     "varliklar/logo.ico",
 }
 
+# Üçüncü taraf lisans metinleri: FSF'nin değiştirilmemiş GPL/LGPL metinleri.
+# Qt/PySide6 LGPL-3.0 ile dağıtıldığı için pakete girerler (karar 0016).
+# .txt genel olarak izinli değildir; yalnız bu yollar.
+IZINLI_LISANS_METINLERI = {
+    "LICENSES/GPL-3.0-only.txt",
+    "LICENSES/LGPL-3.0-only.txt",
+}
+
 # .gitignore'da bulunması şart olan kurallar.
 ZORUNLU_YOKSAYMA = (
     "*.xlsx", "*.xls", "*.csv", "*.docx", "*.pdf", "*.db", "*.log",
@@ -58,6 +66,7 @@ def test_izlenen_dosyalarin_uzantilari_izinli() -> None:
     """Bir .xlsx ya da .docx izlenmeye başlarsa test kırılır."""
     yabanci = [y for y in _izlenen_dosyalar()
                if y not in IZINLI_IKILI_DOSYALAR
+               and y not in IZINLI_LISANS_METINLERI
                and Path(y).name not in IZINLI_DOSYALAR
                and Path(y).suffix not in IZINLI_UZANTILAR]
     assert yabanci == [], f"izinsiz uzantılı izlenen dosyalar: {yabanci}"

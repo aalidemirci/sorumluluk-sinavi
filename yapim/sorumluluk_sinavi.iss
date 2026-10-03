@@ -84,8 +84,17 @@ Name: "masaustu"; Description: "{cm:KisayolOlustur}"; GroupDescription: "{cm:Add
 Source: "{#Kaynak}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
+; Qt/PySide6 LGPL-3.0 ile dağıtılır; LGPL ve GPL metinleri her kopyayla verilir.
+Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 Source: "..\BENIOKU.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\KURULUM.md"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Yükseltmede eski sürümün kitaplıkları önce silinir. [Files] yalnız üzerine
+; yazar, artık kullanılmayan dosyayı kaldırmaz: arayüz Tk'den Qt'ye geçince
+; (karar 0016) eski Tcl/Tk dosyaları _internal altında kalıyordu. Veritabanı
+; bu klasörde değildir, %LOCALAPPDATA%\SorumlulukSinavi\plan altındadır.
+Type: filesandordirs; Name: "{app}\_internal"
 
 [Icons]
 Name: "{group}\{#Ad}"; Filename: "{app}\{#ExeAdi}"

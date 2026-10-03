@@ -33,13 +33,19 @@ jobs:
     steps:
       # libpython3.11: Debian'ın python3 paketi paylaşımlı kitaplığı
       # (libpython3.11.so.1.0) taşımaz, PyInstaller onsuz derleyemez.
-      # xauth: xvfb-run onsuz "xauth command not found" der.
+      # libgl1 … libxcb-xkb1: Qt'nin X11 eklentisinin kitaplıkları. Kapta
+      # kurulu olanlar pakete girer; eksik olanı yapim/deb_paketi.py yakalar
+      # ve derlemeyi durdurur. Liste o betiğin belgesindekiyle aynıdır.
       - name: Kap bağımlılıkları
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git ca-certificates python3 python3-venv python3-tk libpython3.11 \
-            dpkg-dev binutils xvfb xauth tzdata
+            git ca-certificates python3 python3-venv libpython3.11 \
+            dpkg-dev binutils tzdata \
+            libgl1 libegl1 libfontconfig1 libdbus-1-3 libglib2.0-0 libxkbcommon0 \
+            libxkbcommon-x11-0 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-xkb1
 
       - uses: actions/checkout@v7
 
@@ -57,32 +63,47 @@ jobs:
           dpkg-deb --info dist-kurulum/*.deb
           dpkg-deb --contents dist-kurulum/*.deb | grep -v '/opt/sorumluluk-sinavi/_internal/'
 
-      # Kurulum denemesi bağımlılıkların gerçekten çözüldüğünü gösterir;
-      # eksik bir Depends satırı ancak burada ortaya çıkar.
-      - name: Kur ve aç
-        run: |
-          apt-get install -y ./dist-kurulum/*.deb
-          test -x /usr/bin/sorumluluk-sinavi
-          test -f /usr/share/applications/sorumluluk-sinavi.desktop
-          # Uygulama penceresi açıp beklediği için normal çıkışı yoktur:
-          # 124 (timeout) beklenen sonuçtur, başka her kod açılış hatasıdır.
-          set +e
-          SORUMLULUK_VERI_KLASORU=/tmp/ss-deneme \
-            timeout 30 xvfb-run -a /usr/bin/sorumluluk-sinavi
-          durum=$?
-          set -e
-          test "$durum" -eq 124 || { echo "uygulama açılamadı (çıkış $durum)"; exit 1; }
-          test -f /tmp/ss-deneme/sorumluluk.db
-
       - uses: actions/upload-artifact@v7
         with:
           name: pardus-deb
           path: dist-kurulum/*
           retention-days: 30
 
+  # Kurulum denemesi TEMİZ kapta yapılır: derleme kabında Qt'nin bütün
+  # kitaplıkları kurulu olduğu için eksik bir Depends satırı orada görünmez.
+  # Burada yalnız paket ve sanal ekran kurulur; Depends'i apt çeker.
+  deneme:
+    name: Temiz Debian 12'de kur ve aç
+    needs: paket
+    runs-on: ubuntu-latest
+    container: debian:12
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: pardus-deb
+          path: paket
+
+      # xauth: xvfb-run onsuz "xauth command not found" der.
+      - name: Kur ve aç
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ./paket/*.deb xvfb xauth
+          test -x /usr/bin/sorumluluk-sinavi
+          test -f /usr/share/applications/sorumluluk-sinavi.desktop
+          # Uygulama penceresi açıp beklediği için normal çıkışı yoktur:
+          # 124 (timeout) beklenen sonuçtur, başka her kod açılış hatasıdır
+          # (ör. Qt'nin X11 eklentisi yüklenemezse 134).
+          set +e
+          SORUMLULUK_VERI_KLASORU=/tmp/ss-deneme SORUMLULUK_GUNCELLEME_DENETIMI=0 \
+            timeout 30 xvfb-run -a /usr/bin/sorumluluk-sinavi
+          durum=$?
+          set -e
+          test "$durum" -eq 124 || { echo "uygulama açılamadı (çıkış $durum)"; exit 1; }
+          test -f /tmp/ss-deneme/sorumluluk.db
+
   yayim:
     name: Sürüm yayımına ekle
-    needs: paket
+    needs: [paket, deneme]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:

@@ -58,3 +58,16 @@ görünür. Debian 12'de derlenen paket ise Debian 12 ve üzerinin tamamında
   denetlenir: paket üretilir, kaba kurulur ve xvfb altında açılıp
   açılmadığına bakılır. Yayıma ekleme `release: published` olayına bağlıdır
   (etiket itmesi `paths-ignore` süzgecine takılacağı için).
+
+## Ek — 03.10.2026: Qt'ye geçiş
+
+Karar değişmedi; içeriği değişti (bkz. [0016](0016-arayuz-qt.md)). Pakette
+Tcl/Tk yerine Qt ve onun X11 eklentisi vardır. `Depends` artık
+`libc6 (>= 2.36), libgl1, libegl1, libxcb1, libfontconfig1`'dir: PyInstaller
+glibc'yi ve grafik yığınını bilerek pakete koymaz, xcb'nin öbür
+kitaplıklarını ise koyar — derleme kabında kuruluysa. Kurulu değilse yalnız
+uyarır; bu yüzden `yapim/deb_paketi.py` paketteki her ELF dosyasının
+bağımlılığını denetler ve ne pakette ne `Depends`'te olan bir kitaplık
+görürse derlemeyi durdurur. Kurulum denemesi de derleme kabında değil temiz
+bir Debian 12 kabında yapılır; derleme kabında her şey kurulu olduğu için
+eksik bir `Depends` satırı orada görünmez.

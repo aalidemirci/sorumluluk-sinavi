@@ -14,5 +14,27 @@ kendi dağıtımlarındadır:
 - python-docx (MIT) — .docx üretimi
 - tzdata (Apache-2.0) — IANA saat dilimi verisi
 
-Uygulama simgesi ve evrak düzeni bu projeye aittir; üçüncü taraf görsel
-varlık içermez.
+Qt ve Qt for Python
+-------------------
+
+Arayüz Qt 6.11.2 ve Qt for Python 6.11.2 (PySide6-Essentials, Shiboken6)
+ile çalışır. Bu kitaplıkların telif hakkı The Qt Company Ltd. ve Qt
+katkıcılarına aittir; bu programda GNU Lesser General Public License,
+sürüm 3 (LGPL-3.0-only) koşullarıyla kullanılırlar. Lisans metinleri
+LICENSES klasöründedir: LGPL-3.0-only.txt ve onun tamamladığı
+GPL-3.0-only.txt.
+
+Qt kitaplıkları değiştirilmeden, ayrı paylaşımlı kitaplık dosyaları olarak
+dağıtılır: kurulum klasöründeki _internal/PySide6 ve _internal/shiboken6
+altındaki dosyalar uyumlu bir sürümle değiştirilebilir. Dağıtılan sürümün
+kaynak kodu:
+
+- Qt 6.11.2
+  https://download.qt.io/official_releases/qt/6.11/6.11.2/single/
+  (qt-everywhere-src-6.11.2.tar.xz)
+- Qt for Python 6.11.2
+  https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-6.11.2-src/
+  (pyside-setup-everywhere-src-6.11.2.tar.xz)
+
+Uygulama simgesi, evrak logosu, arayüz simgeleri ve evrak düzeni bu projeye
+aittir; üçüncü taraf görsel varlık içermez.
