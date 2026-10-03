@@ -9,7 +9,7 @@ birden fazla sınav planlanabilir ve program az sayıda güne sığar.
 Fazlar:
     0  Sınav birimleri (bkz. talep.py)
     1  Parametre çözümleme: gün sayısı ve kişisel günlük sınırlar
-    2  Yerleştirme: (gün, slot) ızgarasına geri izlemeli arama
+    2  Yerleştirme: (gün, slot) ızgarasına kısıt yayılımlı arama
     3  Salon dağıtımı ve görevlendirme
     4  Bağımsız doğrulama
 """
@@ -18,29 +18,35 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, time
 from hashlib import sha256
 from time import perf_counter
 from typing import Callable
 
-from .kurallar import DogrulamaBaglami, KOMISYON_UYE_SAYISI, dogrula_plan
+from .kurallar import DogrulamaBaglami, GUNLUK_SINAV_TAVANI, dogrula_plan, musait_degil_mi
 from .metin import esitle, siralama_anahtari
 from .modeller import (
-    Gorevlendirme, GorevRolu, Ihlal, Oturum, OturumTuru, Personel, Plan,
+    GorevRolu, Gorevlendirme, Ihlal, Musaitsizlik, Oturum, OturumTuru, Personel, Plan,
     PlanParametreleri, Salon,
 )
 from .talep import SinavBirimi, YukOzeti, yuk_ozeti
 
 
-# Arama bütçeleri: arayüz hiçbir koşulda kilitlenmemeli. Bütçe dolarsa plan
-# üretilemez ve kullanıcıya hangi kısıtın bağladığı söylenir.
-ARAMA_DUGUM_BUTCESI = 300_000
-ARAMA_SURE_BUTCESI_SN = 20.0
-# Tek bir gün sayısı denemesine ayrılan süre. Uygun bir gün sayısı bulunduğunda
-# çözüm saniyenin altında gelir; sığmayan gün sayısında ise arama uzar. Deneme
-# başına küçük bir bütçe, toplam bütçeyi ilk birkaç imkânsız denemede tüketmek
-# yerine uygun gün sayısına hızla ulaşmayı sağlar.
-DENEME_SURE_BUTCESI_SN = 2.0
+# Arama bütçesi DÜĞÜM sayısıyla tutulur, süreyle değil. Süre bütçesi makineye
+# bağlıdır: aynı girdi hızlı makinede bir gün sayısında çözülür, yavaş okul
+# bilgisayarında bütçe dolup bir sonraki gün sayısına geçilir ve başka bir
+# plan çıkardı. Düğüm bütçesiyle "aynı girdi aynı programı üretir" sözü her
+# makinede tutar. Ölçümde çözülebilen gün sayıları 2 bin düğümün altında
+# çözüldü; sığmayan gün sayısını kanıtlamak ise bütçeyi tüketir, bu yüzden
+# deneme başına bütçe küçük tutulur.
+DENEME_DUGUM_BUTCESI = 6_000
+# Geri çekilecek yeri olmayan denemelere geniş bütçe verilir: kullanıcının
+# istediği tek gün sayısı, hafta içinin son gün sayısı (sığmazsa hafta sonuna
+# taşılır; OKY md.58/2-ç hafta sonunu ancak "gerektiğinde" açar) ve pencerenin
+# son gün sayısı (sığmazsa plan yok).
+HEDEF_GUN_DUGUM_BUTCESI = 40_000
+# Yalnız güvenlik sınırı: arayüz hiçbir koşulda kilitlenmemeli.
+ARAMA_SURE_BUTCESI_SN = 60.0
 
 
 def _brans_imzasi(birim: SinavBirimi) -> frozenset[str]:
@@ -89,15 +95,20 @@ class SinirOnizlemesi:
 
     @property
     def uygulanabilir_mi(self) -> bool:
-        """Günde slot sayısından fazla sınav gereken öğrenci varsa seçenek
-        matematiksel olarak imkânsızdır."""
-        return self.en_yuksek_sinir <= self.slot_sayisi
+        """Günde üçten (ÖDY md.5/1-k) ya da slot sayısından fazla sınav gereken
+        öğrenci varsa seçenek uygulanamaz."""
+        return self.en_yuksek_sinir <= YukOzeti.gunluk_tavan(self.slot_sayisi)
 
     def ozet(self) -> str:
         if not self.yukseltilen:
             return f"{self.gun_sayisi} gün: kimsenin günlük sınırı yükselmez."
         sinirlar = ", ".join(str(s) for s in sorted(self.yukseltilen.values(), reverse=True))
-        durum = "" if self.uygulanabilir_mi else "  — GÜNLÜK OTURUM SAATİ YETMİYOR"
+        if self.uygulanabilir_mi:
+            durum = ""
+        elif self.en_yuksek_sinir > GUNLUK_SINAV_TAVANI:
+            durum = f"  — GÜNDE {GUNLUK_SINAV_TAVANI} SINAV TAVANI AŞILIR (ÖDY md.5/1-k)"
+        else:
+            durum = "  — GÜNLÜK OTURUM SAATİ YETMİYOR"
         return (f"{self.gun_sayisi} gün: {self.etkilenen_ogrenci_sayisi} öğrencinin günlük "
                 f"sınırı {sinirlar} olur.{durum}")
 
@@ -118,13 +129,17 @@ def sinir_onizlemesi(ozet: YukOzeti, gun_secenekleri: list[int],
 
 @dataclass
 class _Izgara:
-    """Yerleştirme sırasında tutulan durum."""
+    """Yerleştirme sırasında tutulan durum.
+
+    Görevli ve branş arzı (gün, slot) başınadır: öğretmen müsaitliği
+    (OKY md.58/2-ç) bir saatte görev alabilecek kişi sayısını değiştirir.
+    """
 
     gun_sayisi: int
     slot_sayisi: int
     salon_adedi: int
-    gorevli_adedi: int
-    brans_arzi: dict[frozenset[str], int]
+    yer_gorevli: list[int]                       # yer -> görev alabilecek kişi
+    yer_brans_arzi: dict[frozenset[str], list[int]]  # imza -> yer -> alan öğretmeni
 
     def hazirla(self, birimler: list[SinavBirimi], yuk_fn: Callable[[SinavBirimi], int],
                 sinir_fn: Callable[[str], int]) -> None:
@@ -136,7 +151,14 @@ class _Izgara:
 
         imzalar = sorted({_brans_imzasi(b) for b in birimler}, key=lambda k: sorted(k))
         self._imza_indisi = {imza: i for i, imza in enumerate(imzalar)}
-        self._imza_arzi = [self.brans_arzi.get(imza, 0) for imza in imzalar]
+        self.imza_sayisi = len(imzalar)
+        yer_sayisi = self.gun_sayisi * self.slot_sayisi
+        bos = [0] * yer_sayisi
+        self._yer_arz = [0] * (yer_sayisi * self.imza_sayisi)
+        for imza, sira in self._imza_indisi.items():
+            arz = self.yer_brans_arzi.get(imza, bos)
+            for yer in range(yer_sayisi):
+                self._yer_arz[yer * self.imza_sayisi + sira] = arz[yer]
 
         self.birim_ogrencileri = [
             tuple(self._ogrenci_indisi[o] for o in b.ogrenci_anahtarlari) for b in birimler]
@@ -146,12 +168,10 @@ class _Izgara:
         self.birim_salonu = [b.salon_sayisi for b in birimler]
         self.birim_gorevlisi = [b.gorevli_ihtiyaci for b in birimler]
 
-        yer_sayisi = self.gun_sayisi * self.slot_sayisi
         self.slot_salon = [0] * yer_sayisi
         self.slot_gorevli = [0] * yer_sayisi
         self.gun_yuku = [0] * self.gun_sayisi
-        self.slot_brans = [0] * (yer_sayisi * len(imzalar))
-        self.imza_sayisi = len(imzalar)
+        self.slot_brans = [0] * (yer_sayisi * self.imza_sayisi)
         self.ogrenci_gun = [0] * (self._ogrenci_sayisi * self.gun_sayisi)
         self.ogrenci_slot = bytearray(self._ogrenci_sayisi * yer_sayisi)
 
@@ -160,21 +180,20 @@ class _Izgara:
         if ilk_slot + adet > self.slot_sayisi:
             return False
         salon, gorevli = self.birim_salonu[birim_no], self.birim_gorevlisi[birim_no]
-        imza, arz = self.birim_imzasi[birim_no], self._imza_arzi[self.birim_imzasi[birim_no]]
+        imza = self.birim_imzasi[birim_no]
         taban = gun * self.slot_sayisi + ilk_slot
         for k in range(adet):
             yer = taban + k
             if self.slot_salon[yer] + salon > self.salon_adedi:
                 return False
-            if self.slot_gorevli[yer] + gorevli > self.gorevli_adedi:
+            if self.slot_gorevli[yer] + gorevli > self.yer_gorevli[yer]:
                 return False
-            if self.slot_brans[yer * self.imza_sayisi + imza] + 1 > arz:
+            hucre = yer * self.imza_sayisi + imza
+            if self.slot_brans[hucre] + 1 > self._yer_arz[hucre]:
                 return False
         yuk = self.birim_yuku[birim_no]
-        gun_taban = gun
         for ogrenci in self.birim_ogrencileri[birim_no]:
-            if (self.ogrenci_gun[ogrenci * self.gun_sayisi + gun_taban] + yuk
-                    > self._ogrenci_siniri[ogrenci]):
+            if self.ogrenci_gun[ogrenci * self.gun_sayisi + gun] + yuk > self._ogrenci_siniri[ogrenci]:
                 return False
             satir = ogrenci * self.gun_sayisi * self.slot_sayisi
             for k in range(adet):
@@ -207,7 +226,7 @@ class _Izgara:
 
 
 def _zorluk_sirasi(birimler: list[SinavBirimi], brans_arzi: dict[frozenset[str], int]) -> list[int]:
-    """En kısıtlı birim önce denenir.
+    """Statik zorluk sırası; aramada eşitlik bozucu olarak kullanılır.
 
     Sıra: branşı kıt olan, çok salon isteyen, iki aşamalı, çok öğrencili.
     Kalan alanlar yalnız belirlenimliliği güvenceye almak için.
@@ -223,16 +242,28 @@ def _zorluk_sirasi(birimler: list[SinavBirimi], brans_arzi: dict[frozenset[str],
 
 
 def _yerlestirme_ara(birimler: list[SinavBirimi], izgara: _Izgara, sira: list[int],
-                     dugum_butcesi: int, sure_butcesi: float) -> list[tuple[int, int]] | None:
-    """Sabit sıralı geri izlemeli arama.
+                     dugum_butcesi: int, bitis_zamani: float) -> list[tuple[int, int]] | None:
+    """İleriye dönük denetimli, en dar alanlı birimi önce seçen arama.
 
-    Birimler zorluk sırasına göre denenir; her birim için adaylar erken
-    gün/erken slot önceliğiyle gezilir, böylece plan az güne sıkışır. Düğüm
-    ve süre bütçesi arayüzün donmasını engeller.
+    Eski sürüm birimleri sabit sırayla deneyip kör geri izliyordu: bir birim
+    hiçbir yere sığmadığında yalnız bir önceki birimi oynatıyor, asıl çakışma
+    çok gerideyse bütçeyi boşa harcıyordu. Gerçekçi ölçekte (870 kayıt, 270
+    öğrenci) on dakikada bile plan bulamadığı görüldü.
+
+    Burada her birimin hâlâ konabileceği (gün, slot) kümesi tutulur. Her adımda
+    kümesi en dar birim yerleştirilir (eşitlikte statik zorluk sırası); bir
+    yerleştirme yalnız kendi gününün yerlerini etkilediği için — öğrenci
+    çakışması, günlük yük ve slot kapasitesi aynı güne aittir — her adımdan
+    sonra yalnız o günün yerleri yeniden denetlenir. Kümesi boşalan birim
+    olursa dal hemen kesilir.
     """
-    atama: list[tuple[int, int]] = [(-1, -1)] * len(sira)
+    n = len(birimler)
+    oncelik = {birim_no: rank for rank, birim_no in enumerate(sira)}
     yerler = [(g, s) for g in range(izgara.gun_sayisi) for s in range(izgara.slot_sayisi)]
-    bitis = perf_counter() + sure_butcesi
+    alan = [{y for y in yerler if izgara.sigar_mi(b, *y)} for b in range(n)]
+    if any(not a for a in alan):
+        return None
+    atama: dict[int, tuple[int, int]] = {}
     dugum = 0
 
     def aday_anahtari(yer: tuple[int, int]) -> tuple[int, int, int, int]:
@@ -248,63 +279,76 @@ def _yerlestirme_ara(birimler: list[SinavBirimi], izgara: _Izgara, sira: list[in
                 izgara.slot_gorevli[gun * izgara.slot_sayisi + slot],
                 gun, slot)
 
-    def ara(derinlik: int) -> bool:
+    def ara() -> bool:
         nonlocal dugum
-        if derinlik == len(sira):
+        if len(atama) == n:
             return True
         dugum += 1
-        if dugum > dugum_butcesi or perf_counter() > bitis:
+        if dugum > dugum_butcesi or perf_counter() > bitis_zamani:
             return False
-        birim_no = sira[derinlik]
-        for gun, slot in sorted(yerler, key=aday_anahtari):
-            if not izgara.sigar_mi(birim_no, gun, slot):
-                continue
-            izgara.yerlestir(birim_no, gun, slot)
-            atama[derinlik] = (gun, slot)
-            if ara(derinlik + 1):
+        secilen = min((b for b in range(n) if b not in atama),
+                      key=lambda b: (len(alan[b]), oncelik[b]))
+        for gun, slot in sorted(alan[secilen], key=aday_anahtari):
+            izgara.yerlestir(secilen, gun, slot)
+            atama[secilen] = (gun, slot)
+            silinen: list[tuple[int, tuple[int, int]]] = []
+            cikmaz = False
+            for diger in range(n):
+                if diger in atama:
+                    continue
+                for yer in [y for y in alan[diger] if y[0] == gun]:
+                    if not izgara.sigar_mi(diger, *yer):
+                        alan[diger].discard(yer)
+                        silinen.append((diger, yer))
+                if not alan[diger]:
+                    cikmaz = True
+                    break
+            if not cikmaz and ara():
                 return True
-            izgara.geri_al(birim_no, gun, slot)
-            atama[derinlik] = (-1, -1)
+            for diger, yer in silinen:
+                alan[diger].add(yer)
+            del atama[secilen]
+            izgara.geri_al(secilen, gun, slot)
+            if dugum > dugum_butcesi or perf_counter() > bitis_zamani:
+                return False
         return False
 
-    if not ara(0):
+    if not ara():
         return None
-    sonuc: list[tuple[int, int]] = [(-1, -1)] * len(birimler)
-    for derinlik, birim_no in enumerate(sira):
-        sonuc[birim_no] = atama[derinlik]
-    return sonuc
+    return [atama[b] for b in range(n)]
 
 
 # =========================================== Faz 2 — çözümsüzlük teşhisi
 
-def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara, ozet: YukOzeti,
-                 gun_sayisi: int, slot_sayisi: int, gunluk_sinir: int) -> list[str]:
+def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara | None, ozet: YukOzeti,
+                 gun_sayisi: int, slot_sayisi: int, salon_adedi: int, gorevli_adedi: int,
+                 brans_arzi: dict[frozenset[str], int], etiketler: dict[str, str]) -> list[str]:
     """Plan üretilemediğinde hangi kısıtın bağladığını anlatır."""
     teshis: list[str] = []
 
     en_buyuk_salon_ihtiyaci = max((b.salon_sayisi for b in birimler), default=0)
-    if en_buyuk_salon_ihtiyaci > izgara.salon_adedi:
+    if en_buyuk_salon_ihtiyaci > salon_adedi:
         darbogaz = max(birimler, key=lambda b: b.salon_sayisi)
         teshis.append(
             f"{darbogaz.etiket()} sınavı {darbogaz.ogrenci_sayisi} öğrenciyle "
             f"{darbogaz.salon_sayisi} salon gerektiriyor; tanımlı salon sayısı "
-            f"{izgara.salon_adedi}. Salon ekleyin ya da salon üst sınırını yükseltin.")
+            f"{salon_adedi}. Salon ekleyin ya da salon üst sınırını yükseltin.")
 
-    salon_kapasitesi = gun_sayisi * slot_sayisi * izgara.salon_adedi
+    salon_kapasitesi = gun_sayisi * slot_sayisi * salon_adedi
     gereken_salon_slotu = sum(b.salon_sayisi * b.slot_ihtiyaci for b in birimler)
     if gereken_salon_slotu > salon_kapasitesi:
         teshis.append(
             f"Toplam salon-slot ihtiyacı {gereken_salon_slotu}, {gun_sayisi} gün × "
-            f"{slot_sayisi} slot × {izgara.salon_adedi} salon = {salon_kapasitesi} kapasite. "
+            f"{slot_sayisi} slot × {salon_adedi} salon = {salon_kapasitesi} kapasite. "
             "Gün sayısını, günlük slot sayısını veya salon sayısını artırın.")
 
-    gorevli_kapasitesi = gun_sayisi * slot_sayisi * izgara.gorevli_adedi
+    gorevli_kapasitesi = sum(izgara.yer_gorevli) if izgara else gun_sayisi * slot_sayisi * gorevli_adedi
     gereken_gorevli_slotu = sum(b.gorevli_ihtiyaci * b.slot_ihtiyaci for b in birimler)
     if gereken_gorevli_slotu > gorevli_kapasitesi:
         teshis.append(
-            f"Toplam görevli-slot ihtiyacı {gereken_gorevli_slotu}, {gun_sayisi} gün × "
-            f"{slot_sayisi} slot × {izgara.gorevli_adedi} görevli = {gorevli_kapasitesi} "
-            "kapasite. Gün sayısını veya günlük oturum saatini artırın.")
+            f"Toplam görevli-slot ihtiyacı {gereken_gorevli_slotu}, {gun_sayisi} günde müsait "
+            f"görevli-slot kapasitesi {gorevli_kapasitesi}. Gün sayısını veya günlük oturum "
+            "saatini artırın; müsaitlik kayıtlarını gözden geçirin.")
 
     # Branş darboğazı: bir slotta aynı branştan en çok o branşın öğretmeni
     # kadar sınav yapılabilir (her sınav en az bir alan öğretmeni ister).
@@ -315,25 +359,28 @@ def _teshis_uret(birimler: list[SinavBirimi], izgara: _Izgara, ozet: YukOzeti,
         brans_ihtiyaci[imza] += birim.slot_ihtiyaci
         brans_adi[imza] = " / ".join(birim.alan_branslari)
     for anahtar, ihtiyac in sorted(brans_ihtiyaci.items(), key=lambda x: brans_adi[x[0]]):
-        arz = izgara.brans_arzi.get(anahtar, 0)
+        arz = brans_arzi.get(anahtar, 0)
+        musait_kapasite = (sum(izgara.yer_brans_arzi.get(anahtar, ())) if izgara
+                           else arz * gun_sayisi * slot_sayisi)
         if arz == 0:
             teshis.append(
                 f"{brans_adi[anahtar]} branşında görev alabilecek öğretmen yok; "
                 "ders/branş eşlemesini gözden geçirin veya İlçe MEM'den öğretmen isteyin.")
-        elif ihtiyac > arz * gun_sayisi * slot_sayisi:
+        elif ihtiyac > musait_kapasite:
             teshis.append(
                 f"{brans_adi[anahtar]} branşı {ihtiyac} oturum-slot istiyor ama "
-                f"{arz} öğretmenle {gun_sayisi} günde en çok "
-                f"{arz * gun_sayisi * slot_sayisi} oturum yapılabilir.")
+                f"{arz} öğretmenin {gun_sayisi} günde müsait olduğu oturum-slot sayısı "
+                f"{musait_kapasite}.")
 
-    # Kişisel sınırı yükseltilen öğrenciler engel değildir; yalnız günde slot
-    # sayısından fazla sınav gerekenler planı imkânsız kılar.
+    # Kişisel sınırı yükseltilen öğrenciler engel değildir; yalnız günlük
+    # tavanı aşması gerekenler planı imkânsız kılar.
+    tavan = YukOzeti.gunluk_tavan(slot_sayisi)
     for ogrenci, sinir in sorted(ozet.kisisel_sinirlar(gun_sayisi).items()):
-        if sinir > slot_sayisi:
+        if sinir > tavan:
             teshis.append(
-                f"{ogrenci} öğrencisinin {ozet.ogrenci_yukleri[ogrenci]} sınavı "
-                f"{gun_sayisi} güne sığmak için günde {sinir} oturum ister; günde "
-                f"{slot_sayisi} oturum saati tanımlı.")
+                f"{etiketler.get(ogrenci, ogrenci)}: {ozet.ogrenci_yukleri[ogrenci]} sınavın "
+                f"{gun_sayisi} güne sığması günde {sinir} sınav ister; günde en çok {tavan} "
+                "sınav olabilir (ÖDY md.5/1-k).")
 
     if not teshis:
         teshis.append(
@@ -390,6 +437,10 @@ def _aday_sirala(adaylar: list[Personel], sayac: _GorevSayaci, rol: GorevRolu,
     ))
 
 
+YONETICI_GEREKCESI = ("Yeterli uygun öğretmen bulunamadığından yönetici görevlendirildi; "
+                      "Karar md.12/2-c gereği ücretlendirilmez.")
+
+
 def _gorevlendir(oturum: Oturum, birim: SinavBirimi, uygun: list[Personel],
                  sayac: _GorevSayaci, tercih_komisyon: frozenset[int],
                  tercih_gozcu: frozenset[int],
@@ -399,6 +450,8 @@ def _gorevlendir(oturum: Oturum, birim: SinavBirimi, uygun: list[Personel],
     SP-02: iki sınav öğretmeni, en az biri alan öğretmeni. İkinci alan
     öğretmeni yoksa gerekçe üretilir. Gözcünün sınav branşından farklı
     olması okul kararıdır; sağlanamazsa engel değil, gerekçeli not olur.
+    Gözcüler salonlara sırayla eşlenir (OKY md.58/2-b: her salon için bir
+    gözcü).
     """
     alan_kumesi = _brans_imzasi(birim)
     secilen: set[int] = set()
@@ -452,9 +505,7 @@ def _gorevlendir(oturum: Oturum, birim: SinavBirimi, uygun: list[Personel],
         secilen.add(uye.kimlik)
         ek = gerekce
         if uye.yonetici_mi:
-            ek = (ek + " " if ek else "") + (
-                "Yeterli uygun öğretmen bulunamadığından yönetici görevlendirildi; "
-                "Karar md.12/2-c gereği ücretlendirilmez.")
+            ek = (ek + " " if ek else "") + YONETICI_GEREKCESI
         gorevler.append(Gorevlendirme(oturum.anahtar, uye.kimlik,
                                       GorevRolu.KOMISYON_UYESI, ek.strip()))
         sayac.ekle(uye.kimlik, GorevRolu.KOMISYON_UYESI)
@@ -476,11 +527,12 @@ def _gorevlendir(oturum: Oturum, birim: SinavBirimi, uygun: list[Personel],
             f"{birim.etiket()} sınavı {birim.salon_sayisi} salonda yapılıyor ama "
             f"{oturum.tarih.strftime('%d.%m.%Y')} {oturum.saat.strftime('%H:%M')} saatinde "
             f"yalnız {len(havuz)} gözcü uygun.")
-    for gozcu in havuz[:birim.salon_sayisi]:
+    salonlar = list(oturum.salon_kimlikleri) + [None] * birim.salon_sayisi
+    for sira, gozcu in enumerate(havuz[:birim.salon_sayisi]):
         secilen.add(gozcu.kimlik)
-        ek = ("Yeterli uygun öğretmen bulunamadığından yönetici görevlendirildi; "
-              "Karar md.12/2-c gereği ücretlendirilmez." if gozcu.yonetici_mi else "")
-        gorevler.append(Gorevlendirme(oturum.anahtar, gozcu.kimlik, GorevRolu.GOZCU, ek))
+        ek = YONETICI_GEREKCESI if gozcu.yonetici_mi else ""
+        gorevler.append(Gorevlendirme(oturum.anahtar, gozcu.kimlik, GorevRolu.GOZCU, ek,
+                                      salon_kimligi=salonlar[sira]))
         sayac.ekle(gozcu.kimlik, GorevRolu.GOZCU)
     return gorevler, notlar
 
@@ -491,20 +543,36 @@ def _oturum_anahtari(birim: SinavBirimi, tur: OturumTuru) -> str:
     return sha256(f"{birim.anahtar}|{tur.value}".encode("utf-8")).hexdigest()[:16]
 
 
+def _musait_kume(personel: list[Personel], musaitsizlikler: dict[int, tuple[Musaitsizlik, ...]],
+                 tarih: date, saat: time, sure: int) -> frozenset[int]:
+    return frozenset(p.kimlik for p in personel
+                     if not musait_degil_mi(musaitsizlikler.get(p.kimlik, ()), tarih, saat, sure))
+
+
 def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
               gunler: list[date], personel: list[Personel], salonlar: list[Salon],
               pencere: tuple[date, date], ogretim_yili: str = "",
               ogrenci_adlari: dict[str, str] | None = None,
               baslangic_sayaclari: dict[int, tuple[int, int]] | None = None,
               gozcu_farkli_brans: bool = True,
-              dugum_butcesi: int = ARAMA_DUGUM_BUTCESI,
+              musaitsizlikler: dict[int, tuple[Musaitsizlik, ...]] | None = None,
+              tatiller: frozenset[date] = frozenset(),
+              onceki_gorevler: tuple[tuple[int, GorevRolu, date], ...] = (),
+              dugum_butcesi: int | None = None,
               sure_butcesi: float = ARAMA_SURE_BUTCESI_SN) -> PlanlamaSonucu:
-    """Sınav birimlerinden yerleşmiş ve görevlendirilmiş bir plan üretir."""
+    """Sınav birimlerinden yerleşmiş ve görevlendirilmiş bir plan üretir.
+
+    `gunler` tatilleri zaten dışlamış olmalıdır; `tatiller` yalnız bağımsız
+    doğrulamaya geçer. `musaitsizlikler` hem yerleştirmeyi (o saatte kaç kişi
+    görev alabilir) hem görevlendirmeyi (kim alabilir) bağlar.
+    """
     parametreler.dogrula()
     if not birimler:
         raise PlanlamaBasarisiz("Planlanacak aktif sorumluluk kaydı yok.")
     if not salonlar:
         raise PlanlamaBasarisiz("Plan üretmeden önce en az bir sınav salonu tanımlanmalıdır.")
+    musaitsizlikler = musaitsizlikler or {}
+    etiketler = ogrenci_adlari or {}
 
     uygun_personel = sorted((p for p in personel if p.gorev_alabilir_mi),
                             key=lambda p: p.kimlik)
@@ -526,42 +594,58 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
     if gun_sayisi <= 0:
         raise PlanlamaBasarisiz("Seçilen pencerede planlanabilir gün yok.")
     try:
-        kisisel_sinirlar = ozet.kisisel_sinirlar(gun_sayisi, slot_sayisi)
+        kisisel_sinirlar = ozet.kisisel_sinirlar(gun_sayisi, slot_sayisi, etiketler)
     except ValueError as hata:
-        raise PlanlamaBasarisiz("Sınav planı verilen kısıtlarla üretilemedi.",
-                                [str(hata)]) from hata
-
-    def sinir_fn(ogrenci: str) -> int:
-        return kisisel_sinirlar.get(ogrenci, parametreler.ogrenci_gunluk_sinav_siniri)
+        if parametreler.hedef_gun_sayisi or gun_sayisi >= len(gunler):
+            raise PlanlamaBasarisiz("Sınav planı verilen kısıtlarla üretilemedi.",
+                                    [str(hata)]) from hata
+        kisisel_sinirlar = {}
 
     imzalar = {_brans_imzasi(b) for b in birimler}
     brans_arzi = {imza: sum(1 for p in uygun_personel if esitle(p.brans) in imza)
                   for imza in imzalar}
+
+    # Görev alabilecek kişiler (gün, saat) başına bir kez hesaplanır. Izgara
+    # için temkinli olunur: iki oturum türünün uzun süreliği esas alınır.
+    izgara_suresi = max(parametreler.oturum_suresi_dakika, parametreler.uygulama_suresi_dakika)
+    musait: dict[tuple[date, time], frozenset[int]] = {
+        (gun, saat): _musait_kume(uygun_personel, musaitsizlikler, gun, saat, izgara_suresi)
+        for gun in gunler for saat in parametreler.slot_saatleri}
+
+    def izgara_kur(deneme_gun: int, sinir_fn: Callable[[str], int]) -> _Izgara:
+        yer_kumeleri = [musait[(gunler[g], parametreler.slot_saatleri[s])]
+                        for g in range(deneme_gun) for s in range(slot_sayisi)]
+        brans_kimlikleri = {imza: frozenset(p.kimlik for p in uygun_personel
+                                            if esitle(p.brans) in imza) for imza in imzalar}
+        izgara = _Izgara(
+            gun_sayisi=deneme_gun, slot_sayisi=slot_sayisi, salon_adedi=len(salonlar),
+            yer_gorevli=[len(k) for k in yer_kumeleri],
+            yer_brans_arzi={imza: [len(k & kisiler) for k in yer_kumeleri]
+                            for imza, kisiler in brans_kimlikleri.items()})
+        izgara.hazirla(birimler, lambda b: b.sinav_yuku(parametreler.iki_asamali_sayim),
+                       sinir_fn)
+        return izgara
 
     # Gün sayısı kademeli artırılır: en kısa program hedeflenir, sığmazsa bir
     # gün eklenip yeniden denenir. Kullanıcı sabit bir hedef verdiyse yalnız o
     # denenir.
     sira = _zorluk_sirasi(birimler, brans_arzi)
     ust_gun = gun_sayisi if parametreler.hedef_gun_sayisi else len(gunler)
+    hafta_ici_gun = sum(1 for g in gunler if g.weekday() < 5)
     bitis = perf_counter() + sure_butcesi
-    yerlesim = None
+    yerlesim, izgara = None, None
     for deneme_gun in range(gun_sayisi, ust_gun + 1):
-        kalan_sure = bitis - perf_counter()
-        if kalan_sure <= 0:
+        if perf_counter() > bitis:
             break
         try:
-            deneme_sinirlar = ozet.kisisel_sinirlar(deneme_gun, slot_sayisi)
+            deneme_sinirlar = ozet.kisisel_sinirlar(deneme_gun, slot_sayisi, etiketler)
         except ValueError:
             continue
-        izgara = _Izgara(gun_sayisi=deneme_gun, slot_sayisi=slot_sayisi,
-                         salon_adedi=len(salonlar), gorevli_adedi=len(uygun_personel),
-                         brans_arzi=brans_arzi)
-        izgara.hazirla(birimler,
-                       lambda b: b.sinav_yuku(parametreler.iki_asamali_sayim),
-                       lambda o: deneme_sinirlar.get(
-                           o, parametreler.ogrenci_gunluk_sinav_siniri))
-        yerlesim = _yerlestirme_ara(birimler, izgara, sira, dugum_butcesi,
-                                    min(kalan_sure, DENEME_SURE_BUTCESI_SN))
+        izgara = izgara_kur(deneme_gun, lambda o: deneme_sinirlar.get(
+            o, parametreler.ogrenci_gunluk_sinav_siniri))
+        genis = deneme_gun in (ust_gun, hafta_ici_gun) or parametreler.hedef_gun_sayisi
+        butce = dugum_butcesi or (HEDEF_GUN_DUGUM_BUTCESI if genis else DENEME_DUGUM_BUTCESI)
+        yerlesim = _yerlestirme_ara(birimler, izgara, sira, butce, bitis)
         if yerlesim is not None:
             gun_sayisi = deneme_gun
             kisisel_sinirlar = deneme_sinirlar
@@ -569,8 +653,8 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
     if yerlesim is None:
         raise PlanlamaBasarisiz(
             "Sınav planı verilen kısıtlarla üretilemedi.",
-            _teshis_uret(birimler, izgara, ozet, gun_sayisi, slot_sayisi,
-                         parametreler.ogrenci_gunluk_sinav_siniri))
+            _teshis_uret(birimler, izgara, ozet, ust_gun, slot_sayisi, len(salonlar),
+                         len(uygun_personel), brans_arzi, etiketler))
 
     plan = Plan(parametreler)
     notlar: list[str] = []
@@ -602,6 +686,7 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
         for birim, tur, adim in sirali:
             secili_salonlar = tuple(s.kimlik for s in kalan_salonlar[:birim.salon_sayisi])
             kalan_salonlar = kalan_salonlar[birim.salon_sayisi:]
+            sure = parametreler.oturum_suresi(tur)
             oturum = Oturum(
                 anahtar=_oturum_anahtari(birim, tur),
                 ders_adi=birim.ders_adi,
@@ -610,7 +695,7 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
                 oturum_turu=tur,
                 tarih=tarih,
                 saat=saat,
-                sure_dakika=parametreler.oturum_suresi_dakika,
+                sure_dakika=sure,
                 salon_kimlikleri=secili_salonlar,
                 alan_bransi=birim.alan_bransi,
                 esdeger_branslar=birim.esdeger_branslar,
@@ -619,7 +704,11 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
                     "Hafta içi pencere kapasitesi yetersiz kaldığı için OKY md.58/2-ç "
                     "uyarınca hafta sonuna yerleştirildi." if tarih.weekday() >= 5 else ""),
             )
-            uygun = [p for p in uygun_personel if p.kimlik not in slotta_secilen]
+            # Izgaranın saydığı kümeyle aynı küme kullanılır; aksi hâlde
+            # yerleştirmenin "sığar" dediği saatte görevli bulunamayabilirdi.
+            musait_kisiler = musait[(tarih, saat)]
+            uygun = [p for p in uygun_personel
+                     if p.kimlik not in slotta_secilen and p.kimlik in musait_kisiler]
             gorevler, gorev_notlari = _gorevlendir(
                 oturum, birim, uygun, sayac,
                 birim_komisyonu.get(birim.anahtar, frozenset()),
@@ -640,10 +729,13 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
     baglam = DogrulamaBaglami(
         pencere=pencere,
         personel={p.kimlik: p for p in personel},
-        ogrenci_adlari=ogrenci_adlari or {},
+        ogrenci_adlari=etiketler,
         iki_asamali_dersler=frozenset(b.ders_adi for b in birimler if b.iki_asamali_mi),
         ogretim_yili=ogretim_yili,
         kisisel_gunluk_sinir=kisisel_sinirlar,
+        onceki_gorevler=tuple(onceki_gorevler),
+        tatiller=frozenset(tatiller),
+        musaitsizlikler=musaitsizlikler,
     )
     ihlaller = dogrula_plan(plan, baglam, {s.kimlik: s for s in salonlar})
 
@@ -652,8 +744,9 @@ def plan_uret(birimler: list[SinavBirimi], parametreler: PlanParametreleri,
         notlar.append(f"{hafta_sonu} oturum hafta sonuna yerleştirildi.")
     if kisisel_sinirlar:
         notlar.append(
-            f"{len(kisisel_sinirlar)} öğrencinin günlük sınav sınırı yükseltildi; "
-            "ayrıntı plan ekranındaki listede.")
+            f"{len(kisisel_sinirlar)} öğrencinin günlük sınav sınırı yükseltildi (en çok "
+            f"{max(kisisel_sinirlar.values())}); ikiyi geçmemesi esastır (ÖDY md.5/1-k), "
+            "ayrıntı ihlal listesinde.")
     plan.notlar = notlar
     return PlanlamaSonucu(
         plan=plan,

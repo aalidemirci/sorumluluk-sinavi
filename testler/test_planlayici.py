@@ -118,34 +118,49 @@ def test_asiri_yuklu_azinlik_pencereyi_belirlemez() -> None:
     ozet = type(ozet)(yukler, 2)
     assert ozet.cogunluk_yuku == 5
     assert ozet.azami_yuk == 31
-    # Çoğunluk bir haftaya sığar ama 31 dersli öğrenci günde 6 slotla en az
-    # 6 gün ister; öneri bu tabanın altına inemez.
-    assert ozet.asgari_gun_sayisi(6) == 6
-    assert ozet.onerilen_gun_sayisi(6) == 6
+    # Çoğunluk bir haftaya sığar ama 31 dersli öğrenci günde en çok 3 sınavla
+    # (ÖDY md.5/1-k) en az 11 gün ister; öneri bu tabanın altına inemez.
+    assert ozet.asgari_gun_sayisi(6) == 11
+    assert ozet.onerilen_gun_sayisi(6) == 11
 
 
 def test_kisisel_sinir_yalniz_sigmayan_ogrenci_icin_yukseltilir() -> None:
     ozet = yuk_ozeti([], IkiAsamaliSayim.TEK, 2)
-    ozet = type(ozet)({"normal": 5, "agir": 31}, 2)
-    sinirlar = ozet.kisisel_sinirlar(10)
+    ozet = type(ozet)({"normal": 5, "agir": 25}, 2)
+    sinirlar = ozet.kisisel_sinirlar(10, slot_sayisi=6)
     assert "normal" not in sinirlar          # 5 sınav / 10 gün → sınır 2 yeterli
-    assert sinirlar["agir"] == 4             # 31 / 10 = 3,1 → en düşük 4
+    assert sinirlar["agir"] == 3             # 25 / 10 = 2,5 → en düşük 3
+
+
+def test_gunluk_uc_sinavi_asan_sinir_reddedilir() -> None:
+    """ÖDY md.5/1-k: zorunlu hâlde bile günde üçü aşamaz. Eski sürüm 31
+    dersli öğrencinin sınırını 10 günlük planda 4'e çıkarıyordu."""
+    ozet = yuk_ozeti([], IkiAsamaliSayim.TEK, 2)
+    ozet = type(ozet)({"agir": 31}, 2)
+    with pytest.raises(ValueError, match="ÖDY md.5/1-k"):
+        ozet.kisisel_sinirlar(10, slot_sayisi=6, etiketler={"agir": "Uydurma Öğrenci"})
+    try:
+        ozet.kisisel_sinirlar(10, slot_sayisi=6, etiketler={"agir": "Uydurma Öğrenci"})
+    except ValueError as hata:
+        assert "Uydurma Öğrenci: 31 sınav" in str(hata)
 
 
 def test_gunluk_slot_sayisini_asan_sinir_reddedilir() -> None:
     ozet = yuk_ozeti([], IkiAsamaliSayim.TEK, 2)
-    ozet = type(ozet)({"agir": 31}, 2)
+    ozet = type(ozet)({"agir": 9}, 2)
     with pytest.raises(ValueError, match="oturum saati var"):
-        ozet.kisisel_sinirlar(5, slot_sayisi=6)   # 31/5 → günde 7 gerekir
+        ozet.kisisel_sinirlar(3, slot_sayisi=2)   # 9/3 → günde 3, ama 2 slot var
 
 
 def test_sinir_onizlemesi_uygulanamayan_secenegi_isaretler() -> None:
     ozet = yuk_ozeti([], IkiAsamaliSayim.TEK, 2)
     ozet = type(ozet)({"agir": 31}, 2)
-    onizleme = {o.gun_sayisi: o for o in sinir_onizlemesi(ozet, [5, 10], 6)}
-    assert not onizleme[5].uygulanabilir_mi      # günde 7 sınav, 6 slot var
-    assert onizleme[10].uygulanabilir_mi
-    assert onizleme[10].en_yuksek_sinir == 4
+    onizleme = {o.gun_sayisi: o for o in sinir_onizlemesi(ozet, [5, 10, 14], 6)}
+    assert not onizleme[5].uygulanabilir_mi      # günde 7 sınav
+    assert not onizleme[10].uygulanabilir_mi     # günde 4 sınav: tavan 3
+    assert "TAVANI AŞILIR" in onizleme[10].ozet()
+    assert onizleme[14].uygulanabilir_mi
+    assert onizleme[14].en_yuksek_sinir == 3
 
 
 # =============================================================== plan üretme
@@ -299,6 +314,130 @@ def test_salon_yetersizliginde_teshis_salon_sayisini_soyler() -> None:
     tek_salon = [Salon(1, "D-01", 30)]
     with pytest.raises(ValueError, match="salonlar yetersiz"):
         birimleri_olustur(kayitlar, ayarlar, tek_salon)
+
+
+def test_musait_olmayan_ogretmene_gorev_verilmez() -> None:
+    """OKY md.58/2-ç: dersleri aksatmayacak şekilde. Tek matematikçi pazartesi
+    bütün gün derste; matematik sınavı pazartesiye konmaz."""
+    from cekirdek.modeller import Musaitsizlik
+    kayitlar = [kayit("101", "9/A", 9, "MATEMATİK")]
+    ayarlar = {"MATEMATİK": DersAyari("Matematik")}
+    personel = personel_kadrosu({"Matematik": 1, "Tarih": 3})
+    pazartesi = Musaitsizlik(1, hafta_gunu=0)
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    sonuc = plan_uret(birimleri_olustur(kayitlar, ayarlar, SALONLAR),
+                      PlanParametreleri(pencere_kodu="P1"), gunler, personel, SALONLAR,
+                      PENCERE, ogretim_yili="2026-2027", musaitsizlikler={1: (pazartesi,)})
+    assert all(o.tarih.weekday() != 0 for o in sonuc.plan.oturumlar)
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+
+
+def test_musaitlik_her_saati_kapatirsa_teshis_uretir() -> None:
+    from cekirdek.modeller import Musaitsizlik
+    kayitlar = [kayit("101", "9/A", 9, "MATEMATİK")]
+    ayarlar = {"MATEMATİK": DersAyari("Matematik")}
+    personel = personel_kadrosu({"Matematik": 1, "Tarih": 3})
+    hep_dolu = tuple(Musaitsizlik(1, hafta_gunu=g) for g in range(7))
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    with pytest.raises(PlanlamaBasarisiz, match="müsait olduğu oturum-slot sayısı 0"):
+        plan_uret(birimleri_olustur(kayitlar, ayarlar, SALONLAR),
+                  PlanParametreleri(pencere_kodu="P1"), gunler, personel, SALONLAR, PENCERE,
+                  musaitsizlikler={1: hep_dolu})
+
+
+def test_gozculer_salonlara_eslenir() -> None:
+    """OKY md.58/2-b: her salon için bir gözcü; hangi gözcünün hangi salonda
+    olduğu kayda geçer."""
+    kayitlar = [kayit(f"{i:03d}", "9/A", 9, "MATEMATİK") for i in range(45)]
+    ayarlar = {"MATEMATİK": DersAyari("Matematik")}
+    personel = personel_kadrosu({"Matematik": 2, "Tarih": 3})
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    sonuc = plan_uret(birimleri_olustur(kayitlar, ayarlar, SALONLAR),
+                      PlanParametreleri(pencere_kodu="P1"), gunler, personel, SALONLAR,
+                      PENCERE, ogretim_yili="2026-2027")
+    oturum = sonuc.plan.oturumlar[0]
+    gozcu_salonlari = [g.salon_kimligi for g in sonuc.plan.oturum_gorevleri(oturum.anahtar)
+                       if g.rol is GorevRolu.GOZCU]
+    assert sorted(gozcu_salonlari) == sorted(oturum.salon_kimlikleri)
+
+
+def test_uygulama_suresi_ayri_verilir() -> None:
+    kayitlar = [kayit("101", "9/A", 9, "İNGİLİZCE")]
+    ayarlar = {"İNGİLİZCE": DersAyari("İngilizce", iki_asamali_mi=True)}
+    personel = personel_kadrosu({"İngilizce": 2, "Tarih": 2})
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    sonuc = plan_uret(birimleri_olustur(kayitlar, ayarlar, SALONLAR),
+                      PlanParametreleri(pencere_kodu="P1", uygulama_suresi_dakika=55),
+                      gunler, personel, SALONLAR, PENCERE, ogretim_yili="2026-2027")
+    sureler = {o.oturum_turu: o.sure_dakika for o in sonuc.plan.oturumlar}
+    assert sureler == {OturumTuru.YAZILI: 40, OturumTuru.UYGULAMA: 55}
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+
+
+def test_gunluk_sinir_ucu_asamaz() -> None:
+    with pytest.raises(ValueError, match="ÖDY md.5/1-k"):
+        PlanParametreleri(pencere_kodu="P1", ogrenci_gunluk_sinav_siniri=4).dogrula()
+
+
+def _buyuk_okul(tohum: int):
+    """Uydurma ama gerçekçi ölçekte okul: ~850 kayıt, ~270 öğrenci, 15 ders.
+
+    Eski arama bu ölçekte 10 dakikalık bütçeyle bile plan bulamıyordu.
+    """
+    import random
+    rastgele = random.Random(tohum)
+    dersler = {"MATEMATİK": ("Matematik", False, 30), "FİZİK": ("Fizik", False, 18),
+               "KİMYA": ("Kimya", False, 16), "BİYOLOJİ": ("Biyoloji", False, 12),
+               "TARİH": ("Tarih", False, 8), "COĞRAFYA": ("Coğrafya", False, 7),
+               "TÜRK DİLİ VE EDEBİYATI": ("Türk Dili ve Edebiyatı", True, 14),
+               "İNGİLİZCE": ("İngilizce", True, 12), "ALMANCA": ("Almanca", True, 6),
+               "FELSEFE": ("Felsefe", False, 5)}
+    adlar, agirlik = list(dersler), [d[2] for d in dersler.values()]
+    kayitlar, no = [], 1000
+    for sinif in (10, 11, 12):
+        for sube in "ABCDEFGH":
+            for _ in range(rastgele.randint(8, 14)):
+                no += 1
+                adet = rastgele.choices([1, 2, 3, 4, 5, 6, 9, 12, 15],
+                                        [30, 25, 18, 9, 6, 4, 3, 3, 2])[0]
+                secilen: set[tuple[int, str]] = set()
+                while len(secilen) < min(adet, (sinif - 9) * len(adlar)):
+                    secilen.add((rastgele.randint(9, sinif - 1),
+                                 rastgele.choices(adlar, agirlik)[0]))
+                kayitlar += [kayit(str(no), f"{sinif}/{sube}", d, ders) for d, ders in secilen]
+    ayarlar = {ders: DersAyari(b, iki_asamali_mi=iki) for ders, (b, iki, _) in dersler.items()}
+    personel = personel_kadrosu({"Matematik": 9, "Fizik": 5, "Kimya": 4, "Biyoloji": 4,
+                                 "Tarih": 4, "Coğrafya": 4, "Türk Dili ve Edebiyatı": 8,
+                                 "İngilizce": 7, "Almanca": 2, "Felsefe": 3, "Müzik": 2})
+    salonlar = [Salon(i, f"S-{i}", 30) for i in range(1, 11)]
+    return kayitlar, ayarlar, personel, salonlar
+
+
+@pytest.mark.parametrize("tohum", [11, 15])
+def test_gercekci_olcekte_plan_uretilir(tohum) -> None:
+    """Eski arama bu iki okulda da plan üretemiyordu. 15'te pencerenin son
+    gün sayısı geniş bütçe ister; dar bütçede plan hafta sonuna taşıyordu."""
+    kayitlar, ayarlar, personel, salonlar = _buyuk_okul(tohum)
+    birimler = birimleri_olustur(kayitlar, ayarlar, salonlar)
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+    sonuc = plan_uret(birimler, PlanParametreleri(pencere_kodu="P1"), gunler, personel,
+                      salonlar, PENCERE, ogretim_yili="2026-2027")
+    assert engelleri_ayikla(sonuc.ihlaller) == []
+    assert sonuc.kullanilan_gun_sayisi <= 10
+
+
+def test_buyuk_planda_da_belirlenimlidir() -> None:
+    """Bütçe düğümle tutulduğu için sonuç makinenin hızına bağlı değildir."""
+    kayitlar, ayarlar, personel, salonlar = _buyuk_okul(11)
+    birimler = birimleri_olustur(kayitlar, ayarlar, salonlar)
+    gunler = gunleri_listele(PENCERE[0], PENCERE[1], False)
+
+    def imza():
+        sonuc = plan_uret(birimler, PlanParametreleri(pencere_kodu="P1"), gunler, personel,
+                          salonlar, PENCERE, ogretim_yili="2026-2027")
+        return [(o.anahtar, o.tarih, o.saat) for o in sonuc.plan.oturumlar]
+
+    assert imza() == imza()
 
 
 def test_birlesik_ders_iki_alandan_komisyon_kurar() -> None:
