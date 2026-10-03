@@ -102,9 +102,23 @@ def test_onceki_donem_sayaclari_toplanir(hazir) -> None:
 def test_plan_kendi_sayacini_baslangica_katmaz(hazir) -> None:
     """P1 yeniden üretilirken kendi görevleri başlangıç sayacı olmamalıdır."""
     vt, _ = hazir
-    plan_id = hizmet.plan_kaydet(vt, hizmet.plan_hazirla(
-        vt, PlanParametreleri(pencere_kodu="P1")))
-    assert hizmet.onceki_gorev_sayaclari(vt, haric_plan_id=plan_id) == {}
+    hizmet.plan_kaydet(vt, hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1")))
+    assert hizmet.onceki_gorev_sayaclari(vt, haric=("P1", "olagan")) == {}
+
+
+def test_ayni_donemi_yeniden_uretmek_ayni_gorevlendirmeyi_verir(hazir) -> None:
+    """Eski sürüm kaydedilmiş P1 planını yeni P1 için "önceki dönem" sayıyordu;
+    yeniden üretilen plan eskisinde çok görev alanı gereksiz yere geri itiyordu."""
+    vt, _ = hazir
+
+    def imza(sonuc):
+        return sorted((g.oturum_anahtari, g.personel_kimligi, g.rol.value)
+                      for g in sonuc.plan.gorevlendirmeler)
+
+    ilk = hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1"))
+    hizmet.plan_kaydet(vt, ilk)
+    yeniden = hizmet.plan_hazirla(vt, PlanParametreleri(pencere_kodu="P1"))
+    assert imza(yeniden) == imza(ilk)
 
 
 def test_ikinci_donem_ilk_donemin_yukunu_dikkate_alir(hazir) -> None:

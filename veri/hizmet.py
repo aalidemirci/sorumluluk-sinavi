@@ -14,16 +14,19 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
 
-from cekirdek.kurallar import DogrulamaBaglami, dogrula_plan
+from cekirdek.kurallar import (
+    DogrulamaBaglami, dogrula_plan, musait_degil_mi, salonlara_dagit,
+    ucretlendirilemeyen_gorevler,
+)
 from cekirdek.metin import esitle, maskele, siralama_anahtari
 from cekirdek.modeller import (
-    DersAyari, GorevRolu, Gorevlendirme, Ihlal, IkiAsamaliSayim, Oturum, OturumTuru,
-    Personel, Plan, PlanParametreleri, Salon, SorumlulukKaydi,
+    DersAyari, GorevRolu, Gorevlendirme, Ihlal, IkiAsamaliSayim, Musaitsizlik, Oturum,
+    OturumTuru, Personel, Plan, PlanParametreleri, PlanTuru, Salon, SorumlulukKaydi,
 )
 from cekirdek.planlayici import PlanlamaSonucu, plan_uret
-from cekirdek.kurallar import yillik_sayac_asildi_mi
 from cekirdek.takvim import (
-    gunleri_listele, is_gunu_ekle, is_gunu_farki, pencere_adi, sinav_pencereleri,
+    gunleri_listele, is_gunu_ekle, is_gunu_farki, pencere_adi, sinav_pencereleri, tarih_coz,
+    tek_ders_penceresi, varsayilan_pencere_kodu,
 )
 from cekirdek.talep import SinavBirimi, YukOzeti, birimleri_olustur, yuk_ozeti
 from .rapor_okuma import (
@@ -51,21 +54,29 @@ def ayarlari_getir(vt: Veritabani) -> dict[str, str]:
         return {r[0]: r[1] for r in b.execute("SELECT anahtar,deger FROM kurum_ayari")}
 
 
+DONEM_TARIHLERI = ("birinci_donem_baslangic", "ikinci_donem_baslangic", "ikinci_donem_bitis")
+
+
 def ayarlari_kaydet(vt: Veritabani, ayarlar: dict[str, str]) -> None:
+    """Kurum ayarlarını kaydeder.
+
+    Tarihler arayüzde gg.aa.yyyy yazılır; veritabanında ISO biçiminde
+    (YYYY-AA-GG) saklanır ki sıralama ve karşılaştırma metin olarak da doğru
+    çalışsın.
+    """
     eksik = [k for k in AYAR_ZORUNLU if not str(ayarlar.get(k, "")).strip()]
     if eksik:
         raise HizmetHatasi("Şu alanlar doldurulmalıdır: " + ", ".join(eksik))
     try:
-        tarihler = {k: date.fromisoformat(str(ayarlar[k]).strip())
-                    for k in ("birinci_donem_baslangic", "ikinci_donem_baslangic",
-                              "ikinci_donem_bitis")}
+        tarihler = {k: tarih_coz(str(ayarlar[k])) for k in DONEM_TARIHLERI}
     except ValueError as hata:
-        raise HizmetHatasi("Tarihler YYYY-AA-GG biçiminde girilmelidir.") from hata
+        raise HizmetHatasi(str(hata)) from hata
     if not (tarihler["birinci_donem_baslangic"] < tarihler["ikinci_donem_baslangic"]
             <= tarihler["ikinci_donem_bitis"]):
         raise HizmetHatasi(
             "Dönem tarihleri kronolojik olmalıdır: 1. dönem başlangıcı < 2. dönem "
             "başlangıcı ≤ 2. dönem bitişi.")
+    ayarlar = {**ayarlar, **{k: v.isoformat() for k, v in tarihler.items()}}
     zaman = simdi()
     with vt.baglan() as b:
         for anahtar, deger in ayarlar.items():
@@ -79,12 +90,61 @@ def ayarlari_kaydet(vt: Veritabani, ayarlar: dict[str, str]) -> None:
 
 def pencereleri_getir(vt: Veritabani) -> dict[str, tuple[date, date]]:
     ayar = ayarlari_getir(vt)
-    eksik = [k for k in ("birinci_donem_baslangic", "ikinci_donem_baslangic",
-                         "ikinci_donem_bitis") if not ayar.get(k)]
+    eksik = [k for k in DONEM_TARIHLERI if not ayar.get(k)]
     if eksik:
         raise HizmetHatasi("Sınav pencereleri için önce dönem tarihleri kaydedilmelidir.")
-    return sinav_pencereleri(*(date.fromisoformat(ayar[k]) for k in (
-        "birinci_donem_baslangic", "ikinci_donem_baslangic", "ikinci_donem_bitis")))
+    return sinav_pencereleri(*(tarih_coz(ayar[k]) for k in DONEM_TARIHLERI))
+
+
+def ogretim_yili(vt: Veritabani) -> str:
+    return ayarlari_getir(vt).get("ogretim_yili", "")
+
+
+def varsayilan_pencere(vt: Veritabani, gecmise_bak: bool = False,
+                       bugun: date | None = None) -> str:
+    """Ekranların açılışta seçeceği dönem; bkz. takvim.varsayilan_pencere_kodu."""
+    try:
+        return varsayilan_pencere_kodu(pencereleri_getir(vt), bugun or date.today(), gecmise_bak)
+    except HizmetHatasi:
+        return "P1"
+
+
+# ============================================================ tatil günleri
+
+def tatil_ekle(vt: Veritabani, tarih: date, aciklama: str = "") -> int:
+    """Resmî tatil ya da idari izin gününü kaydeder (SP-08).
+
+    Plan bu güne sınav koymaz; başvuru ve teslim süresi hesapları bu günü iş
+    günü saymaz.
+    """
+    with vt.baglan() as b:
+        mevcut = b.execute("SELECT id FROM v_tatil_gunu WHERE tarih=?",
+                           (tarih.isoformat(),)).fetchone()
+        if mevcut:
+            b.execute("UPDATE tatil_gunu SET aciklama=? WHERE id=?",
+                      (aciklama.strip(), mevcut[0]))
+            kimlik = int(mevcut[0])
+        else:
+            kimlik = int(b.execute("INSERT INTO tatil_gunu(tarih,aciklama) VALUES(?,?)",
+                                   (tarih.isoformat(), aciklama.strip())).lastrowid)
+        vt.denetim_yaz(b, "tatil_gunu", kimlik, "kaydedildi")
+        return kimlik
+
+
+def tatil_sil(vt: Veritabani, tatil_id: int) -> None:
+    with vt.baglan() as b:
+        b.execute("UPDATE tatil_gunu SET silindi_mi=1 WHERE id=?", (tatil_id,))
+        vt.denetim_yaz(b, "tatil_gunu", tatil_id, "silindi")
+
+
+def tatil_listesi(vt: Veritabani) -> list[dict]:
+    with vt.baglan() as b:
+        return [{"kimlik": r[0], "tarih": date.fromisoformat(r[1]), "aciklama": r[2]}
+                for r in b.execute("SELECT id,tarih,aciklama FROM v_tatil_gunu ORDER BY tarih")]
+
+
+def tatilleri_getir(vt: Veritabani) -> frozenset[date]:
+    return frozenset(t["tarih"] for t in tatil_listesi(vt))
 
 
 # ===================================================================== salon
@@ -283,6 +343,97 @@ def personelleri_getir(vt: Veritabani, yalniz_aktif: bool = True) -> list[Person
     with vt.baglan() as b:
         return [Personel(r[0], r[1], r[2], r[3], bool(r[4])) for r in b.execute(
             f"SELECT id,ad,brans,unvan,aktif_mi FROM v_personel{kosul} ORDER BY id")]
+
+
+# ===================================================== öğretmen müsaitliği
+
+HAFTA_GUNLERI = ("Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar")
+
+
+def musaitlik_ekle(vt: Veritabani, personel_id: int, *, hafta_gunu: int | None = None,
+                   bas_saat: time | None = None, bit_saat: time | None = None,
+                   bas_tarih: date | None = None, bit_tarih: date | None = None,
+                   aciklama: str = "") -> int:
+    """Öğretmenin sınav görevi alamayacağı zamanı kaydeder (SP-09).
+
+    OKY md.58/2-ç sınavların dersleri aksatmayacak şekilde planlanmasını
+    ister; program öğretmenin ders programını e-Okul'dan okuyamadığı için
+    dolu saatler buradan girilir. Kayıt ya haftalık bir gündür ya da tarih
+    aralığıdır; saat verilmezse bütün gün kapsanır.
+    """
+    if (hafta_gunu is None) == (bas_tarih is None):
+        raise HizmetHatasi("Müsaitlik kaydı ya haftanın bir günü ya da bir tarih aralığıdır.")
+    if hafta_gunu is not None and not 0 <= hafta_gunu <= 6:
+        raise HizmetHatasi("Geçersiz hafta günü.")
+    if (bas_saat is None) != (bit_saat is None):
+        raise HizmetHatasi("Saat aralığının başı ve sonu birlikte girilmelidir.")
+    if bas_saat is not None and bas_saat >= bit_saat:
+        raise HizmetHatasi("Saat aralığının sonu başından sonra olmalıdır.")
+    if bas_tarih is not None and bit_tarih is not None and bit_tarih < bas_tarih:
+        raise HizmetHatasi("Tarih aralığının sonu başından önce olamaz.")
+    with vt.baglan() as b:
+        if not b.execute("SELECT 1 FROM v_personel WHERE id=?", (personel_id,)).fetchone():
+            raise HizmetHatasi("Personel bulunamadı.")
+        kimlik = int(b.execute(
+            "INSERT INTO personel_musaitlik(personel_id,hafta_gunu,bas_saat,bit_saat,"
+            "bas_tarih,bit_tarih,aciklama,olusturuldu_at) VALUES(?,?,?,?,?,?,?,?)",
+            (personel_id, hafta_gunu,
+             bas_saat.strftime("%H:%M") if bas_saat else None,
+             bit_saat.strftime("%H:%M") if bit_saat else None,
+             bas_tarih.isoformat() if bas_tarih else None,
+             (bit_tarih or bas_tarih).isoformat() if bas_tarih else None,
+             aciklama.strip(), simdi())).lastrowid)
+        vt.denetim_yaz(b, "personel_musaitlik", kimlik, "eklendi")
+        return kimlik
+
+
+def musaitlik_sil(vt: Veritabani, kayit_id: int) -> None:
+    with vt.baglan() as b:
+        b.execute("UPDATE personel_musaitlik SET silindi_mi=1 WHERE id=?", (kayit_id,))
+        vt.denetim_yaz(b, "personel_musaitlik", kayit_id, "silindi")
+
+
+def _musaitsizlik(satir) -> Musaitsizlik:
+    def saat(metin):
+        return time.fromisoformat(metin) if metin else None
+
+    def tarih(metin):
+        return date.fromisoformat(metin) if metin else None
+
+    return Musaitsizlik(satir["personel_id"], satir["hafta_gunu"], saat(satir["bas_saat"]),
+                        saat(satir["bit_saat"]), tarih(satir["bas_tarih"]),
+                        tarih(satir["bit_tarih"]))
+
+
+def musaitlik_listesi(vt: Veritabani, personel_id: int) -> list[dict]:
+    """Bir öğretmenin müsaitlik kayıtları, ekranda okunacak metinle birlikte."""
+    with vt.baglan() as b:
+        satirlar = b.execute(
+            "SELECT * FROM v_personel_musaitlik WHERE personel_id=?"
+            " ORDER BY hafta_gunu IS NULL, hafta_gunu, bas_tarih, bas_saat",
+            (personel_id,)).fetchall()
+    sonuc = []
+    for satir in satirlar:
+        kayit = _musaitsizlik(satir)
+        if kayit.hafta_gunu is not None:
+            zaman = f"Her {HAFTA_GUNLERI[kayit.hafta_gunu].lower()}"
+        else:
+            zaman = kayit.bas_tarih.strftime("%d.%m.%Y")
+            if kayit.bit_tarih and kayit.bit_tarih != kayit.bas_tarih:
+                zaman += " – " + kayit.bit_tarih.strftime("%d.%m.%Y")
+        saat = (f"{kayit.bas_saat.strftime('%H:%M')}–{kayit.bit_saat.strftime('%H:%M')}"
+                if kayit.bas_saat else "bütün gün")
+        sonuc.append({"kimlik": satir["id"], "zaman": zaman, "saat": saat,
+                      "aciklama": satir["aciklama"], "kayit": kayit})
+    return sonuc
+
+
+def musaitsizlikleri_getir(vt: Veritabani) -> dict[int, tuple[Musaitsizlik, ...]]:
+    kayitlar: dict[int, list[Musaitsizlik]] = {}
+    with vt.baglan() as b:
+        for satir in b.execute("SELECT * FROM v_personel_musaitlik"):
+            kayitlar.setdefault(satir["personel_id"], []).append(_musaitsizlik(satir))
+    return {kimlik: tuple(liste) for kimlik, liste in kayitlar.items()}
 
 
 # ======================================================== sorumluluk aktarımı
@@ -570,10 +721,20 @@ def ders_ayarlari(vt: Veritabani) -> dict[str, DersAyari]:
     return ayarlar
 
 
+# e-Okul ders adlarında geçen yabancı dil adları. Eski öneri yalnız İngilizceyi
+# tanıyordu; Almanca ve diğer ikinci yabancı diller tek aşamalı kalıyordu.
+_YABANCI_DILLER = ("yabancı dil", "ingilizce", "almanca", "fransızca", "ispanyolca",
+                   "italyanca", "rusça", "arapça", "çince", "japonca", "korece", "farsça")
+
+
+def yabanci_dil_mi(ders_adi: str) -> bool:
+    ad = esitle(ders_adi)
+    return any(dil in ad for dil in _YABANCI_DILLER)
+
+
 def iki_asamali_onerisi(ders_adi: str) -> bool:
     """OKY md.58/2-e için ad temelli öneri; kullanıcı onaylar ya da değiştirir."""
-    ad = esitle(ders_adi)
-    return "yabancı dil" in ad or ad == "türk dili ve edebiyatı" or "ngilizce" in ad
+    return yabanci_dil_mi(ders_adi) or esitle(ders_adi) == "türk dili ve edebiyatı"
 
 
 # ===================================================================== plan
@@ -592,6 +753,9 @@ class PlanBaglami:
 
     basvuru_kapsami: frozenset[str] = field(default_factory=frozenset)
     gecerli_basvurular: frozenset[str] = field(default_factory=frozenset)
+    onceki_gorevler: tuple[tuple[int, GorevRolu, date], ...] = ()
+    tatiller: frozenset[date] = field(default_factory=frozenset)
+    musaitsizlikler: dict[int, tuple[Musaitsizlik, ...]] = field(default_factory=dict)
 
     def dogrulama_baglami(self) -> DogrulamaBaglami:
         return DogrulamaBaglami(
@@ -603,6 +767,9 @@ class PlanBaglami:
             kisisel_gunluk_sinir=self.kisisel_sinirlar,
             basvuru_kapsami=self.basvuru_kapsami,
             gecerli_basvurular=self.gecerli_basvurular,
+            onceki_gorevler=self.onceki_gorevler,
+            tatiller=self.tatiller,
+            musaitsizlikler=self.musaitsizlikler,
         )
 
     def personel_adi(self, kimlik: int) -> str:
@@ -615,22 +782,55 @@ class PlanBaglami:
 
 
 def plan_baglami(vt: Veritabani, pencere_kodu: str,
-                 kisisel_sinirlar: dict[str, int] | None = None) -> PlanBaglami:
+                 kisisel_sinirlar: dict[str, int] | None = None,
+                 tur: PlanTuru | str = PlanTuru.OLAGAN) -> PlanBaglami:
+    """Bir planı doğrulamak için gereken her şey.
+
+    Tek ders planında (OKY md.58/6) başvuru kapısı uygulanmaz: o öğrenciler
+    olağan plandan elle seçilir, kapıdan zaten geçmişlerdir.
+    """
+    tur = PlanTuru(tur)
     ayar = ayarlari_getir(vt)
     with vt.baglan() as b:
         iki_asamali = frozenset(
             r[0] for r in b.execute("SELECT ad FROM v_ders WHERE iki_asamali_mi=1"))
+    olagan = tur is PlanTuru.OLAGAN
     return PlanBaglami(
-        pencere=pencereleri_getir(vt)[pencere_kodu],
+        pencere=pencere_araligi(vt, pencere_kodu, tur),
         personel={p.kimlik: p for p in personelleri_getir(vt, yalniz_aktif=False)},
         salonlar={s.kimlik: s for s in salonlari_getir(vt)},
         ogrenci_adlari=ogrenci_etiketleri(vt),
         iki_asamali_dersler=iki_asamali,
         ogretim_yili=ayar.get("ogretim_yili", ""),
         kisisel_sinirlar=kisisel_sinirlar or {},
-        basvuru_kapsami=frozenset(basvuru_kapsamindaki_ogrenciler(vt)),
-        gecerli_basvurular=gecerli_basvurular(vt, pencere_kodu),
+        basvuru_kapsami=frozenset(basvuru_kapsamindaki_ogrenciler(vt)) if olagan else frozenset(),
+        gecerli_basvurular=gecerli_basvurular(vt, pencere_kodu) if olagan else frozenset(),
+        onceki_gorevler=onceki_gorev_kayitlari(vt, haric=(pencere_kodu, tur.value)),
+        tatiller=tatilleri_getir(vt),
+        musaitsizlikler=musaitsizlikleri_getir(vt),
     )
+
+
+def pencere_araligi(vt: Veritabani, pencere_kodu: str,
+                    tur: PlanTuru | str = PlanTuru.OLAGAN) -> tuple[date, date]:
+    """Planın tarih penceresi.
+
+    Olağan planda OKY md.58/2-a penceresidir. Tek ders sınavında (OKY md.58/6)
+    "takip eden hafta"dır: o dönemin olağan planındaki son sınavın haftasından
+    sonraki hafta; olağan plan yoksa pencere sonu esas alınır.
+    """
+    pencere = pencereleri_getir(vt)[pencere_kodu]
+    if PlanTuru(tur) is PlanTuru.OLAGAN:
+        return pencere
+    son_sinav = pencere[1]
+    plan_id = son_plani_getir(vt, pencere_kodu)
+    if plan_id is not None:
+        with vt.baglan() as b:
+            satir = b.execute("SELECT MAX(tarih) FROM v_oturum WHERE plan_id=?",
+                              (plan_id,)).fetchone()
+        if satir and satir[0]:
+            son_sinav = date.fromisoformat(satir[0])
+    return tek_ders_penceresi(son_sinav)
 
 
 def duyuru_kaydet(vt: Veritabani, pencere_kodu: str, duyuru_tarihi: date,
@@ -647,8 +847,9 @@ def duyuru_kaydet(vt: Veritabani, pencere_kodu: str, duyuru_tarihi: date,
     if duyuru_tarihi > basvuru_son_gunu:
         raise HizmetHatasi("Duyuru tarihi başvuru son gününden sonra olamaz.")
     pencere_bas = pencereleri_getir(vt)[pencere_kodu][0]
-    if is_gunu_farki(basvuru_son_gunu, pencere_bas) < BASVURU_IS_GUNU:
-        en_gec = is_gunu_ekle(pencere_bas, -BASVURU_IS_GUNU)
+    tatiller = tatilleri_getir(vt)
+    if is_gunu_farki(basvuru_son_gunu, pencere_bas, tatiller) < BASVURU_IS_GUNU:
+        en_gec = is_gunu_ekle(pencere_bas, -BASVURU_IS_GUNU, tatiller)
         raise HizmetHatasi(
             f"Başvuru son günü en geç {en_gec.strftime('%d.%m.%Y')} olabilir: "
             f"{pencere_adi(pencere_kodu)} penceresi {pencere_bas.strftime('%d.%m.%Y')} "
@@ -699,13 +900,43 @@ def ogrenci_bayrak_guncelle(vt: Veritabani, ogrenci_id: int, mezun_olamayan: boo
     öğrenciye aittir ve öğretim yılı boyunca kalır; başvuru ise pencere başına
     yenilenir.
     """
+    yil = ogretim_yili(vt) if (mezun_olamayan or devamsizlik_tebligati) else ""
     with vt.baglan() as b:
         if not b.execute("SELECT 1 FROM v_ogrenci WHERE id=?", (ogrenci_id,)).fetchone():
             raise HizmetHatasi("Öğrenci bulunamadı.")
-        b.execute("UPDATE ogrenci SET mezun_olamayan_mi=?,devamsizlik_tebligati_mi=?"
-                  " WHERE id=?",
-                  (int(bool(mezun_olamayan)), int(bool(devamsizlik_tebligati)), ogrenci_id))
+        b.execute("UPDATE ogrenci SET mezun_olamayan_mi=?,devamsizlik_tebligati_mi=?,"
+                  "isaret_ogretim_yili=? WHERE id=?",
+                  (int(bool(mezun_olamayan)), int(bool(devamsizlik_tebligati)), yil,
+                   ogrenci_id))
         vt.denetim_yaz(b, "ogrenci", ogrenci_id, "basvuru_bayragi_guncellendi")
+
+
+def eski_yildan_isaretler(vt: Veritabani) -> list[dict]:
+    """Önceki öğretim yılında konmuş md.58/2-d işaretleri.
+
+    Devamsızlık tebligatı o yılın durumudur; eski yılın işareti sessizce
+    taşınırsa öğrenci yeni yılda da başvurusuz plan dışı kalır. İşaret
+    silinmez (mezun olamayan öğrenci hâlâ mezun olamamış olabilir), gözden
+    geçirilmesi istenir: işaretin yeniden kaydedilmesi yılını günceller.
+    """
+    yil = ogretim_yili(vt)
+    with vt.baglan() as b:
+        return [{"ogrenci_id": r[0], "okul_no": r[1], "ad_soyad": r[2], "sube": r[3],
+                 "isaret_yili": r[4] or "bilinmiyor"}
+                for r in b.execute(
+                    "SELECT id,okul_no,ad_soyad,sube,isaret_ogretim_yili FROM v_ogrenci"
+                    " WHERE (mezun_olamayan_mi=1 OR devamsizlik_tebligati_mi=1)"
+                    " AND isaret_ogretim_yili<>? ORDER BY sube,ad_soyad", (yil,))]
+
+
+def isaret_tazeligi_uyarisi(vt: Veritabani) -> str:
+    eskiler = eski_yildan_isaretler(vt)
+    if not eskiler:
+        return ""
+    return (f"{len(eskiler)} öğrencinin beklemeli/devamsız işareti önceki öğretim yılından "
+            "kalma. Bu öğrenciler başvuru yapmadıkça plana alınmaz (OKY md.58/2-d). "
+            "Başvuru adımında işaretleri gözden geçirin; doğru olanı yeniden kaydetmek "
+            "yılını günceller, yanlış olanı kaldırın.")
 
 
 def basvuru_kaydet(vt: Veritabani, ogrenci_id: int, pencere_kodu: str, durum: str,
@@ -763,17 +994,18 @@ def basvuru_kaydet(vt: Veritabani, ogrenci_id: int, pencere_kodu: str, durum: st
 def _gec_basvuru_suresini_denetle(vt: Veritabani, ogrenci_id: int, pencere_kodu: str,
                                   basvuru_tarihi: date) -> None:
     """Geç başvuruda 5 iş günü şartı fiilî sınav tarihine göre denetlenir."""
+    plan_id = son_plani_getir(vt, pencere_kodu)
     with vt.baglan() as b:
         satir = b.execute("""
             SELECT MIN(o.tarih) FROM v_oturum o
-            JOIN v_plan p ON p.id = o.plan_id AND p.pencere_kodu = ?
             JOIN v_sorumluluk_kaydi s ON s.ders_id = o.ders_id
-                 AND s.ogrenci_id = ? AND s.durum = 'aktif'""",
-            (pencere_kodu, ogrenci_id)).fetchone()
+                 AND s.ogrenci_id = ? AND s.durum = 'aktif'
+            WHERE o.plan_id = ?""",
+            (ogrenci_id, plan_id or -1)).fetchone()
     if not satir or not satir[0]:
         return
     sinav = date.fromisoformat(satir[0])
-    if is_gunu_farki(basvuru_tarihi, sinav) < BASVURU_IS_GUNU:
+    if is_gunu_farki(basvuru_tarihi, sinav, tatilleri_getir(vt)) < BASVURU_IS_GUNU:
         raise HizmetHatasi(
             f"Geç başvuru, {sinav.strftime('%d.%m.%Y')} tarihli sınavdan en az "
             f"{BASVURU_IS_GUNU} iş günü önce yapılmış olmalıdır (OKY md.58/2-d).")
@@ -787,7 +1019,7 @@ def basvuru_tablosu(vt: Veritabani, pencere_kodu: str) -> list[dict]:
             SELECT o.id,o.okul_no,o.ad_soyad,o.sube,o.mezun_olamayan_mi,
                    o.devamsizlik_tebligati_mi, COUNT(DISTINCT s.id) AS ders_sayisi,
                    bv.durum, bv.basvuru_tarihi, bv.belge_referansi,
-                   bv.gec_basvuru_mu, bv.mudur_onay_no
+                   bv.gec_basvuru_mu, bv.mudur_onay_no, o.isaret_ogretim_yili
             FROM v_ogrenci o
             JOIN v_sorumluluk_kaydi s ON s.ogrenci_id = o.id AND s.durum = 'aktif'
             LEFT JOIN v_basvuru bv ON bv.ogrenci_id = o.id
@@ -798,11 +1030,17 @@ def basvuru_tablosu(vt: Veritabani, pencere_kodu: str) -> list[dict]:
     sonuc = []
     for r in satirlar:
         bayrakli = bool(r[4] or r[5])
+        eski = bayrakli and (r[12] or "") != ogretim_yili
+        grup = _grup_adi(r[4], r[5]) if bayrakli else "—"
         sonuc.append({
             "ogrenci_id": r[0], "okul_no": r[1], "ad_soyad": r[2], "sube": r[3],
             "mezun_olamayan_mi": bool(r[4]), "devamsizlik_tebligati_mi": bool(r[5]),
             "bayrakli_mi": bayrakli,
-            "grup": _grup_adi(r[4], r[5]) if bayrakli else "—",
+            "isaret_yili": r[12] or "", "eski_isaret_mi": eski,
+            # Tutanağa giden "grup" sade kalır; yıl uyarısı yalnız ekrandadır.
+            "grup": grup,
+            "grup_ekran": grup + (f" — işaret {r[12] or 'önceki yıl'}, gözden geçirin"
+                                  if eski else ""),
             "ders_sayisi": r[6],
             "basvuru_durumu": r[7],
             "basvuru_tarihi": date.fromisoformat(r[8]) if r[8] else None,
@@ -885,11 +1123,19 @@ def brans_eslemelerini_denetle(vt: Veritabani, dersler: set[str]) -> None:
             + "\n".join(f"  • {satir}" for satir in sorted(hatali)[:10]))
 
 
-def sinav_birimleri(vt: Veritabani, pencere_kodu: str | None = None) -> list[SinavBirimi]:
-    kayitlar = sorumluluk_kayitlari(vt, pencere_kodu)
-    if not kayitlar:
-        raise HizmetHatasi(
-            "Aktif sorumluluk kaydı yok. Önce e-Okul sorumluluk raporunu içe aktarın.")
+def sinav_birimleri(vt: Veritabani, pencere_kodu: str | None = None,
+                    tur: PlanTuru | str = PlanTuru.OLAGAN) -> list[SinavBirimi]:
+    if PlanTuru(tur) is PlanTuru.TEK_DERS:
+        kayitlar = tek_ders_kayitlari(vt, pencere_kodu or "P1")
+        if not kayitlar:
+            raise HizmetHatasi(
+                "Tek ders sınavına girecek öğrenci seçilmedi. Plan ekranındaki 'Tek ders "
+                "öğrencileri' düğmesiyle öğrenciyi ve dersini seçin (OKY md.58/6).")
+    else:
+        kayitlar = sorumluluk_kayitlari(vt, pencere_kodu)
+        if not kayitlar:
+            raise HizmetHatasi(
+                "Aktif sorumluluk kaydı yok. Önce e-Okul sorumluluk raporunu içe aktarın.")
     salonlar = salonlari_getir(vt)
     if not salonlar:
         raise HizmetHatasi("Önce en az bir sınav salonu tanımlayın.")
@@ -898,8 +1144,37 @@ def sinav_birimleri(vt: Veritabani, pencere_kodu: str | None = None) -> list[Sin
 
 
 def yuk_ozetini_getir(vt: Veritabani, sayim: IkiAsamaliSayim, gunluk_sinir: int,
-                      pencere_kodu: str | None = None) -> YukOzeti:
-    return yuk_ozeti(sinav_birimleri(vt, pencere_kodu), sayim, gunluk_sinir)
+                      pencere_kodu: str | None = None,
+                      tur: PlanTuru | str = PlanTuru.OLAGAN) -> YukOzeti:
+    return yuk_ozeti(sinav_birimleri(vt, pencere_kodu, tur), sayim, gunluk_sinir)
+
+
+def kesin_plan(vt: Veritabani, pencere_kodu: str,
+               tur: PlanTuru | str = PlanTuru.OLAGAN) -> tuple[int, str] | None:
+    """Bu öğretim yılında aynı dönem ve türde kesinleşmiş plan: (kimlik, onay no)."""
+    with vt.baglan() as b:
+        satir = b.execute(
+            "SELECT id, COALESCE(mudur_onay_no,'') FROM v_plan WHERE pencere_kodu=? AND tur=?"
+            " AND ogretim_yili=? AND durum='kesin' ORDER BY id DESC LIMIT 1",
+            (pencere_kodu, PlanTuru(tur).value, ogretim_yili(vt))).fetchone()
+    return (int(satir[0]), satir[1]) if satir else None
+
+
+def _kesin_plan_engeli(vt: Veritabani, pencere_kodu: str, tur: PlanTuru) -> None:
+    """Kesinleşmiş planın üstüne yeni plan yazılmasını engeller.
+
+    Eski sürümde aynı dönem için yeni taslak kaydedilebiliyordu: ekran ve
+    evrak taslağı gösteriyor, görev sayaçları iki planı birden sayıyordu.
+    Kesin planda değişiklik yalnız görevli değişikliğiyle ve müdür onayıyla
+    yapılır.
+    """
+    kesin = kesin_plan(vt, pencere_kodu, tur)
+    if kesin:
+        ad = pencere_adi(pencere_kodu) + (" tek ders sınavı" if tur is PlanTuru.TEK_DERS else "")
+        raise HizmetHatasi(
+            f"{ad} planı müdür onayıyla kesinleşmiştir (plan #{kesin[0]}, onay no "
+            f"{kesin[1] or '—'}). Kesin planın yerine yeni plan kaydedilemez; görevli "
+            "değişikliği için plan ekranındaki 'Görevliyi değiştir' kullanılır.")
 
 
 def plan_hazirla(vt: Veritabani, parametreler: PlanParametreleri) -> PlanlamaSonucu:
@@ -908,57 +1183,72 @@ def plan_hazirla(vt: Veritabani, parametreler: PlanParametreleri) -> PlanlamaSon
     Üretilen plan arayüzde düzenlenir (sürükle-bırak, geri al) ve ancak
     `plan_kaydet` çağrıldığında yazılır.
     """
-    pencere = pencereleri_getir(vt)[parametreler.pencere_kodu]
-    gunler = gunleri_listele(pencere[0], pencere[1], parametreler.hafta_sonu_kullan)
-    ayar = ayarlari_getir(vt)
-    # Aynı öğretim yılının diğer dönemlerindeki görevler sayaçlara başlangıç
-    # değeri olur; böylece yük üç dönem boyunca dengelenir.
+    tur = PlanTuru(parametreler.plan_turu)
+    _kesin_plan_engeli(vt, parametreler.pencere_kodu, tur)
+    pencere = pencere_araligi(vt, parametreler.pencere_kodu, tur)
+    tatiller = tatilleri_getir(vt)
+    gunler = gunleri_listele(pencere[0], pencere[1], parametreler.hafta_sonu_kullan, tatiller)
+    # Aynı öğretim yılının diğer planlarındaki görevler sayaçlara başlangıç
+    # değeri olur; böylece yük üç dönem boyunca dengelenir. Aynı dönemin eski
+    # planı sayılmaz: yeni plan onun yerine geçecektir.
+    onceki = onceki_gorev_kayitlari(vt, haric=(parametreler.pencere_kodu, tur.value))
     return plan_uret(
-        birimler=sinav_birimleri(vt, parametreler.pencere_kodu),
+        birimler=sinav_birimleri(vt, parametreler.pencere_kodu, tur),
         parametreler=parametreler,
         gunler=gunler,
         personel=personelleri_getir(vt),
         salonlar=salonlari_getir(vt),
         pencere=pencere,
-        ogretim_yili=ayar.get("ogretim_yili", ""),
+        ogretim_yili=ogretim_yili(vt),
         ogrenci_adlari=ogrenci_etiketleri(vt),
-        baslangic_sayaclari=onceki_gorev_sayaclari(vt),
+        baslangic_sayaclari=_sayaclara_cevir(onceki),
+        musaitsizlikler=musaitsizlikleri_getir(vt),
+        tatiller=tatiller,
+        onceki_gorevler=onceki,
     )
 
 
 def plani_dogrula(vt: Veritabani, plan: Plan,
                   kisisel_sinirlar: dict[str, int] | None = None) -> list[Ihlal]:
     """Elle düzenlenmiş planı da aynı kurallardan geçirir."""
-    baglam = plan_baglami(vt, plan.parametreler.pencere_kodu, kisisel_sinirlar)
+    baglam = plan_baglami(vt, plan.parametreler.pencere_kodu, kisisel_sinirlar,
+                          plan.parametreler.plan_turu)
     return dogrula_plan(plan, baglam.dogrulama_baglami(), baglam.salonlar)
 
 
 def plan_kaydet(vt: Veritabani, sonuc: PlanlamaSonucu) -> int:
-    """Planı, oturumları, öğrenci yerleşimini ve görevleri tek işlemde yazar."""
+    """Planı, oturumları, öğrenci yerleşimini ve görevleri tek işlemde yazar.
+
+    Aynı öğretim yılında aynı dönem ve türün taslağı varsa yenisi onun yerine
+    geçer. Kesinleşmiş planın yerine plan yazılmaz (bkz. `_kesin_plan_engeli`).
+    """
+    import json
     plan = sonuc.plan
     parametreler = plan.parametreler
+    tur = PlanTuru(parametreler.plan_turu)
+    _kesin_plan_engeli(vt, parametreler.pencere_kodu, tur)
+    yil = ogretim_yili(vt)
     ogrenci_kimlikleri = {}
     with vt.baglan() as b:
         for okul_no, sube, kimlik in b.execute("SELECT okul_no,sube,id FROM v_ogrenci"):
             ogrenci_kimlikleri[f"{okul_no}|{sube}"] = kimlik
         ders_kimlikleri = {r[0]: r[1] for r in b.execute("SELECT ad,id FROM v_ders")}
+        kapasiteler = {r[0]: r[1] for r in b.execute("SELECT id,kapasite FROM v_salon")}
 
-        # Aynı pencere için önceki taslak plan varsa yerine yenisi geçer;
-        # kesinleşmiş plan korunur.
-        b.execute("UPDATE plan SET silindi_mi=1 WHERE pencere_kodu=? AND durum='taslak'"
-                  " AND silindi_mi=0", (parametreler.pencere_kodu,))
+        # Eski sürüm taslağı yalnız dönem koduna bakarak siliyordu: yeni yılın
+        # Eylül planı geçen yılın Eylül taslağını da siliyordu.
+        b.execute("UPDATE plan SET silindi_mi=1 WHERE pencere_kodu=? AND tur=? AND ogretim_yili=?"
+                  " AND durum='taslak' AND silindi_mi=0",
+                  (parametreler.pencere_kodu, tur.value, yil))
         # Yükseltilmiş kişisel sınırlar planın parçasıdır; saklanmazsa
         # kaydedilen plan yeniden açıldığında varsayılan sınırla doğrulanır ve
         # kurallara uyan plan SP-11 ihlalleriyle dolu görünür.
-        import json
-        ogretim_yili = b.execute(
-            "SELECT deger FROM kurum_ayari WHERE anahtar='ogretim_yili'").fetchone()
         plan_id = int(b.execute(
             "INSERT INTO plan(pencere_kodu,parametreler_json,kisisel_sinirlar_json,"
-            "ogretim_yili,uretildi_at) VALUES(?,?,?,?,?)",
+            "ogretim_yili,uretildi_at,tur) VALUES(?,?,?,?,?,?)",
             (parametreler.pencere_kodu, _parametreleri_yaz(parametreler),
              json.dumps(sonuc.yukseltilen_sinirlar, ensure_ascii=False, sort_keys=True),
-             ogretim_yili[0] if ogretim_yili else "", simdi())).lastrowid)
+             yil, simdi(), tur.value)).lastrowid)
 
         for oturum in plan.oturumlar:
             ders_id = ders_kimlikleri.get(oturum.ders_adi)
@@ -976,38 +1266,58 @@ def plan_kaydet(vt: Veritabani, sonuc: PlanlamaSonucu) -> int:
             for sira, salon_id in enumerate(oturum.salon_kimlikleri, 1):
                 b.execute("INSERT INTO oturum_salon(oturum_id,salon_id,sira) VALUES(?,?,?)",
                           (oturum_id, salon_id, sira))
+            ogrenci_salonlari = _ogrenci_salonlari(oturum, kapasiteler)
             for sira, anahtar in enumerate(oturum.ogrenci_anahtarlari, 1):
                 ogrenci_id = ogrenci_kimlikleri.get(anahtar)
                 if ogrenci_id is None:
                     raise HizmetHatasi(f"'{anahtar}' öğrencisi veritabanında bulunamadı.")
-                salon_id = (oturum.salon_kimlikleri[(sira - 1) % len(oturum.salon_kimlikleri)]
-                            if oturum.salon_kimlikleri else None)
                 b.execute(
                     "INSERT INTO oturum_ogrenci(oturum_id,ogrenci_id,salon_id,sira)"
-                    " VALUES(?,?,?,?)", (oturum_id, ogrenci_id, salon_id, sira))
+                    " VALUES(?,?,?,?)", (oturum_id, ogrenci_id, ogrenci_salonlari[sira - 1], sira))
             for gorev in plan.oturum_gorevleri(oturum.anahtar):
-                kisi = b.execute("SELECT unvan FROM v_personel WHERE id=?",
-                                 (gorev.personel_kimligi,)).fetchone()
-                yonetici = Personel(0, "", "", kisi[0]).yonetici_mi if kisi else False
                 b.execute(
                     "INSERT INTO gorevlendirme(oturum_id,personel_id,rol,"
-                    "ucretlendirilebilir_mi,gerekce,kilitli_mi) VALUES(?,?,?,?,?,?)",
+                    "ucretlendirilebilir_mi,gerekce,kilitli_mi,salon_id) VALUES(?,?,?,?,?,?,?)",
                     (oturum_id, gorev.personel_kimligi, gorev.rol.value,
-                     int(not yonetici), gorev.gerekce, int(gorev.kilitli_mi)))
+                     int(not _yonetici_mi(b, gorev.personel_kimligi)), gorev.gerekce,
+                     int(gorev.kilitli_mi), gorev.salon_kimligi))
         vt.denetim_yaz(b, "plan", plan_id, "kaydedildi",
                        f"{len(plan.oturumlar)} oturum")
         return plan_id
 
 
+def _yonetici_mi(baglanti, personel_id: int) -> bool:
+    kisi = baglanti.execute("SELECT unvan FROM v_personel WHERE id=?", (personel_id,)).fetchone()
+    return Personel(0, "", "", kisi[0]).yonetici_mi if kisi else False
+
+
+def _ogrenci_salonlari(oturum: Oturum, kapasiteler: dict[int, int]) -> list[int | None]:
+    """Oturumdaki her öğrencinin salonu, öğrenci sırasıyla.
+
+    Öğrenciler salon kapasitesiyle orantılı bloklar hâlinde dağıtılır
+    (bkz. kurallar.salonlara_dagit); eski sürümün sırayla dağıtımı küçük
+    salona kapasitesinden fazla öğrenci yazabiliyordu.
+    """
+    if not oturum.salon_kimlikleri:
+        return [None] * oturum.ogrenci_sayisi
+    adetler = salonlara_dagit(oturum.ogrenci_sayisi,
+                              [kapasiteler.get(s, 0) for s in oturum.salon_kimlikleri])
+    salonlar: list[int | None] = []
+    for salon_id, adet in zip(oturum.salon_kimlikleri, adetler):
+        salonlar.extend([salon_id] * adet)
+    return salonlar
+
+
 def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
     """Kaydedilmiş planı bellek modeline geri okur."""
+    import json
     with vt.baglan() as b:
         satir = b.execute(
-            "SELECT pencere_kodu,parametreler_json,durum,mudur_onay_no,kisisel_sinirlar_json"
-            " FROM v_plan WHERE id=?", (plan_id,)).fetchone()
+            "SELECT pencere_kodu,parametreler_json,durum,mudur_onay_no,kisisel_sinirlar_json,"
+            "tur FROM v_plan WHERE id=?", (plan_id,)).fetchone()
         if not satir:
             raise HizmetHatasi("Plan bulunamadı.")
-        parametreler = _parametreleri_oku(satir[1], satir[0])
+        parametreler = _parametreleri_oku(satir[1], satir[0], satir[5])
         plan = Plan(parametreler)
         oturum_anahtarlari = {}
         for r in b.execute("""
@@ -1022,7 +1332,6 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
                 " WHERE oo.oturum_id=? ORDER BY oo.sira", (r[0],)))
             salonlar = tuple(x[0] for x in b.execute(
                 "SELECT salon_id FROM v_oturum_salon WHERE oturum_id=? ORDER BY sira", (r[0],)))
-            import json
             try:
                 esdeger = tuple(json.loads(r[12] or "[]"))
             except ValueError:
@@ -1037,14 +1346,13 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
                 esdeger_branslar=esdeger,
                 birim_anahtari=r[5], hafta_sonu_gerekcesi=r[9], kilitli_mi=bool(r[10])))
             oturum_anahtarlari[r[0]] = r[1]
-        for oturum_id, personel_id, rol, gerekce, kilitli in b.execute("""
-                SELECT g.oturum_id,g.personel_id,g.rol,g.gerekce,g.kilitli_mi
+        for oturum_id, personel_id, rol, gerekce, kilitli, salon_id in b.execute("""
+                SELECT g.oturum_id,g.personel_id,g.rol,g.gerekce,g.kilitli_mi,g.salon_id
                 FROM v_gorevlendirme g JOIN v_oturum o ON o.id=g.oturum_id
                 WHERE o.plan_id=? ORDER BY g.id""", (plan_id,)):
             plan.gorevlendirmeler.append(Gorevlendirme(
                 oturum_anahtarlari[oturum_id], personel_id, GorevRolu(rol),
-                gerekce or "", bool(kilitli)))
-        import json
+                gerekce or "", bool(kilitli), salon_id))
         try:
             kisisel_sinirlar = dict(json.loads(satir[4] or "{}"))
         except ValueError:
@@ -1054,12 +1362,28 @@ def plan_yukle(vt: Veritabani, plan_id: int) -> tuple[Plan, dict[str, int]]:
                       "kisisel_sinirlar": kisisel_sinirlar}
 
 
-def son_plani_getir(vt: Veritabani, pencere_kodu: str) -> int | None:
+def etkin_planlar(vt: Veritabani, ogretim_yili_: str | None = None) -> dict[tuple[str, str], int]:
+    """(dönem kodu, plan türü) -> o öğretim yılının geçerli planı.
+
+    Geçerli plan, kesinleşmiş plan varsa odur; yoksa en son kaydedilen
+    taslaktır. Ekranlar, evrak ve görev sayaçları hep bu planı esas alır;
+    eski sürüm yalnız en büyük kimliğe bakıyordu ve yıl ayırmıyordu.
+    """
+    yil = ogretim_yili(vt) if ogretim_yili_ is None else ogretim_yili_
     with vt.baglan() as b:
-        satir = b.execute(
-            "SELECT id FROM v_plan WHERE pencere_kodu=? ORDER BY id DESC LIMIT 1",
-            (pencere_kodu,)).fetchone()
-        return int(satir[0]) if satir else None
+        satirlar = b.execute(
+            "SELECT id,pencere_kodu,tur FROM v_plan WHERE ogretim_yili=?"
+            " ORDER BY (durum='kesin') DESC, id DESC", (yil,)).fetchall()
+    sonuc: dict[tuple[str, str], int] = {}
+    for kimlik, kod, tur in satirlar:
+        sonuc.setdefault((kod, tur), int(kimlik))
+    return sonuc
+
+
+def son_plani_getir(vt: Veritabani, pencere_kodu: str,
+                    tur: PlanTuru | str = PlanTuru.OLAGAN) -> int | None:
+    """Bu öğretim yılında dönemin geçerli planı (bkz. `etkin_planlar`)."""
+    return etkin_planlar(vt).get((pencere_kodu, PlanTuru(tur).value))
 
 
 def plan_kesinlestir(vt: Veritabani, plan_id: int, mudur_onay_no: str) -> None:
@@ -1067,6 +1391,8 @@ def plan_kesinlestir(vt: Veritabani, plan_id: int, mudur_onay_no: str) -> None:
     if not str(mudur_onay_no).strip():
         raise HizmetHatasi("Planı kesinleştirmek için müdür onay numarası zorunludur (SP-05).")
     plan, bilgi = plan_yukle(vt, plan_id)
+    if bilgi["kesin_mi"]:
+        raise HizmetHatasi("Bu plan zaten kesinleşmiştir.")
     engeller = [i for i in plani_dogrula(vt, plan, bilgi["kisisel_sinirlar"]) if i.engel_mi]
     if engeller:
         raise HizmetHatasi(
@@ -1102,16 +1428,20 @@ def _parametreleri_yaz(p: PlanParametreleri) -> str:
         "iki_asamali_sayim": p.iki_asamali_sayim.value,
         "slot_saatleri": [s.strftime("%H:%M") for s in p.slot_saatleri],
         "oturum_suresi_dakika": p.oturum_suresi_dakika,
+        "uygulama_suresi_dakika": p.uygulama_suresi_dakika,
         "hedef_gun_sayisi": p.hedef_gun_sayisi,
+        "plan_turu": PlanTuru(p.plan_turu).value,
     }, ensure_ascii=False, sort_keys=True)
 
 
-def _parametreleri_oku(metin: str, pencere_kodu: str) -> PlanParametreleri:
+def _parametreleri_oku(metin: str, pencere_kodu: str,
+                       tur: str = PlanTuru.OLAGAN.value) -> PlanParametreleri:
+    """Saklanan parametreleri okur; plan türünde veritabanı sütunu esastır."""
     import json
     try:
         veri = json.loads(metin)
     except ValueError:
-        return PlanParametreleri(pencere_kodu=pencere_kodu)
+        veri = {}
     return PlanParametreleri(
         pencere_kodu=veri.get("pencere_kodu", pencere_kodu),
         hafta_sonu_kullan=bool(veri.get("hafta_sonu_kullan", False)),
@@ -1121,6 +1451,9 @@ def _parametreleri_oku(metin: str, pencere_kodu: str) -> PlanParametreleri:
                             for s in veri.get("slot_saatleri", VARSAYILAN_SLOT_SAATLERI)),
         oturum_suresi_dakika=int(veri.get("oturum_suresi_dakika", 40)),
         hedef_gun_sayisi=veri.get("hedef_gun_sayisi"),
+        uygulama_suresi_dakika=int(veri.get("uygulama_suresi_dakika",
+                                            veri.get("oturum_suresi_dakika", 40))),
+        plan_turu=PlanTuru(tur or PlanTuru.OLAGAN.value),
     )
 
 
@@ -1173,7 +1506,8 @@ class TasimaSonucu:
 def _engel_turu(ihlal: Ihlal) -> str:
     """İhlali kullanıcıya ayrı ayrı gösterebilmek için sınıflandırır."""
     metin = ihlal.aciklama
-    if "aynı anda iki sınavda görevli" in metin or "sınav görevi verilemez" in metin:
+    if (ihlal.kural_kimligi == "SP-09" or "aynı anda iki sınavda görevli" in metin
+            or "sınav görevi verilemez" in metin):
         return "ogretmen"
     if "salonu" in metin and "ayrılmış" in metin:
         return "salon"
@@ -1182,39 +1516,14 @@ def _engel_turu(ihlal: Ihlal) -> str:
     return "diger"
 
 
-def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni_saat: time,
-                kisisel_sinirlar: dict[str, int] | None = None) -> TasimaSonucu:
-    """Oturumu yeni gün/saate taşır; yeni engel doğuruyorsa geri alır.
-
-    Öğrenci, öğretmen ve salon çakışmaları ayrı ayrı raporlanır. Uyarı
-    düzeyindeki ihlaller taşımayı engellemez, yalnız panelde görünür.
-    """
-    oturum = plan.oturum_bul(anahtar)
-    if oturum is None:
-        raise HizmetHatasi("Taşınacak oturum bulunamadı.")
-    if oturum.kilitli_mi:
-        raise HizmetHatasi("Kesinleşmiş veya kilitli oturum taşınamaz.")
-
-    onceki = {(i.kural_kimligi, i.etkilenen_kayit)
-              for i in plani_dogrula(vt, plan, kisisel_sinirlar) if i.engel_mi}
-    eski_tarih, eski_saat = oturum.tarih, oturum.saat
-    esler = [o for o in plan.oturumlar
-             if oturum.birim_anahtari and o.birim_anahtari == oturum.birim_anahtari]
-    # İki aşamalı dersin iki oturumu aynı günde kalmalıdır; yazılı taşınırsa
-    # uygulama da aynı gün farkıyla birlikte taşınır.
-    gun_farki = (yeni_tarih - eski_tarih)
-    eski_durum = [(o, o.tarih, o.saat) for o in esler] or [(oturum, eski_tarih, eski_saat)]
-    oturum.tarih, oturum.saat = yeni_tarih, yeni_saat
-    for es in esler:
-        if es is not oturum:
-            es.tarih = es.tarih + gun_farki
-
+def _yeni_engellere_bak(vt: Veritabani, plan: Plan, kisisel_sinirlar: dict[str, int] | None,
+                        onceki: set[tuple[str, str]], geri_al) -> TasimaSonucu:
+    """Değişiklik yeni bir engel doğurduysa geri alır ve engelleri gruplar."""
     sonrasi = plani_dogrula(vt, plan, kisisel_sinirlar)
     yeni_engeller = [i for i in sonrasi
                      if i.engel_mi and (i.kural_kimligi, i.etkilenen_kayit) not in onceki]
     if yeni_engeller:
-        for nesne, tarih, saat in eski_durum:
-            nesne.tarih, nesne.saat = tarih, saat
+        geri_al()
         gruplar: dict[str, list[Ihlal]] = {"ogrenci": [], "ogretmen": [], "salon": [], "diger": []}
         for ihlal in yeni_engeller:
             gruplar[_engel_turu(ihlal)].append(ihlal)
@@ -1223,16 +1532,239 @@ def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni
     return TasimaSonucu(True, uyarilar=[i for i in sonrasi if not i.engel_mi])
 
 
-def plan_anlik_goruntusu(plan: Plan) -> list[tuple[str, date, time, tuple[int, ...]]]:
-    """Geri al yığını için planın değişebilen durumunu kopyalar."""
-    return [(o.anahtar, o.tarih, o.saat, o.salon_kimlikleri) for o in plan.oturumlar]
+def _engel_imzalari(vt: Veritabani, plan: Plan,
+                    kisisel_sinirlar: dict[str, int] | None) -> set[tuple[str, str]]:
+    return {(i.kural_kimligi, i.etkilenen_kayit)
+            for i in plani_dogrula(vt, plan, kisisel_sinirlar) if i.engel_mi}
 
 
-def plani_geri_yukle(plan: Plan, goruntu: list[tuple[str, date, time, tuple[int, ...]]]) -> None:
-    durumlar = {anahtar: (tarih, saat, salonlar) for anahtar, tarih, saat, salonlar in goruntu}
+def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni_saat: time,
+                kisisel_sinirlar: dict[str, int] | None = None) -> TasimaSonucu:
+    """Oturumu yeni gün/saate taşır; yeni engel doğuruyorsa geri alır.
+
+    İki aşamalı derste (OKY md.58/2-e) yazılı taşınınca uygulama da aynı gün
+    ve saat farkıyla birlikte taşınır. Uygulama oturumu ise tek başına
+    taşınabilir: hüküm "yazılı sınav ve uygulama sınavları sorumluluk
+    sınavları dönemi içinde farklı günlerde de yapılabilir" der. Öğrenci,
+    öğretmen ve salon çakışmaları ayrı ayrı raporlanır; uyarı düzeyindeki
+    ihlaller taşımayı engellemez.
+    """
+    oturum = plan.oturum_bul(anahtar)
+    if oturum is None:
+        raise HizmetHatasi("Taşınacak oturum bulunamadı.")
+    if oturum.kilitli_mi:
+        raise HizmetHatasi("Kesinleşmiş veya kilitli oturum taşınamaz.")
+
+    onceki = _engel_imzalari(vt, plan, kisisel_sinirlar)
+    esler = [o for o in plan.oturumlar
+             if oturum.birim_anahtari and o.birim_anahtari == oturum.birim_anahtari
+             and o is not oturum]
+    tasinacaklar = [oturum] + (esler if oturum.oturum_turu is OturumTuru.YAZILI else [])
+    eski_durum = [(o, o.tarih, o.saat) for o in tasinacaklar]
+    saatler = list(plan.parametreler.slot_saatleri)
+    gun_farki = yeni_tarih - oturum.tarih
+    for es in tasinacaklar[1:]:
+        # Yazılı ile uygulamanın saat farkı korunur; yeni gün o saati
+        # taşımıyorsa uygulama kendi saatinde kalır.
+        if es.saat in saatler and oturum.saat in saatler and yeni_saat in saatler:
+            hedef = saatler.index(yeni_saat) + saatler.index(es.saat) - saatler.index(oturum.saat)
+            if 0 <= hedef < len(saatler):
+                es.saat = saatler[hedef]
+        es.tarih = es.tarih + gun_farki
+    oturum.tarih, oturum.saat = yeni_tarih, yeni_saat
+
+    def geri_al() -> None:
+        for nesne, tarih, saat in eski_durum:
+            nesne.tarih, nesne.saat = tarih, saat
+
+    return _yeni_engellere_bak(vt, plan, kisisel_sinirlar, onceki, geri_al)
+
+
+def plan_anlik_goruntusu(plan: Plan) -> tuple[tuple, tuple]:
+    """Geri al yığını için planın değişebilen durumunu kopyalar.
+
+    Oturumların yeri ve görevlendirmeler birlikte alınır; görevli değişikliği
+    de geri alınabilmelidir.
+    """
+    return (tuple((o.anahtar, o.tarih, o.saat, o.salon_kimlikleri) for o in plan.oturumlar),
+            tuple(plan.gorevlendirmeler))
+
+
+def plani_geri_yukle(plan: Plan, goruntu: tuple[tuple, tuple]) -> None:
+    oturumlar, gorevlendirmeler = goruntu
+    durumlar = {anahtar: (tarih, saat, salonlar) for anahtar, tarih, saat, salonlar in oturumlar}
     for oturum in plan.oturumlar:
         if oturum.anahtar in durumlar:
             oturum.tarih, oturum.saat, oturum.salon_kimlikleri = durumlar[oturum.anahtar]
+    plan.gorevlendirmeler = list(gorevlendirmeler)
+
+
+# --------------------------------------------------------- görevli değişikliği
+
+def gorevli_adaylari(vt: Veritabani, plan: Plan, oturum_anahtari: str, rol: GorevRolu,
+                     degisecek_personel_id: int) -> list[dict]:
+    """Bir görevlinin yerine geçebilecek kişiler, uygunluk ve gerekçeyle.
+
+    Komisyonda önce alan öğretmeni, gözcülükte önce sınav branşından farklı
+    öğretmen; ardından yükü az olan gelir. Uygun olmayanlar da listelenir ki
+    kullanıcı neden seçilemediğini görsün.
+    """
+    oturum = plan.oturum_bul(oturum_anahtari)
+    if oturum is None:
+        raise HizmetHatasi("Oturum bulunamadı.")
+    musaitsizlikler = musaitsizlikleri_getir(vt)
+    alan = {esitle(b) for b in oturum.alan_branslari if b}
+    bu_oturumdakiler = {g.personel_kimligi for g in plan.oturum_gorevleri(oturum_anahtari)}
+    ayni_saattekiler = {
+        g.personel_kimligi for g in plan.gorevlendirmeler
+        for o in [plan.oturum_bul(g.oturum_anahtari)]
+        if o is not None and o.anahtar != oturum_anahtari
+        and o.tarih == oturum.tarih and o.saat == oturum.saat}
+    plandaki_yuk: dict[int, int] = {}
+    for g in plan.gorevlendirmeler:
+        plandaki_yuk[g.personel_kimligi] = plandaki_yuk.get(g.personel_kimligi, 0) + 1
+    yil_yuku = _sayaclara_cevir(onceki_gorev_kayitlari(
+        vt, haric=(plan.parametreler.pencere_kodu, PlanTuru(plan.parametreler.plan_turu).value)))
+    adaylar = []
+    for kisi in personelleri_getir(vt):
+        if kisi.kimlik == degisecek_personel_id:
+            continue
+        neden = ""
+        if not kisi.gorev_alabilir_mi:
+            neden = "müdür veya rehber öğretmen"
+        elif kisi.kimlik in bu_oturumdakiler:
+            neden = "bu sınavda zaten görevli"
+        elif kisi.kimlik in ayni_saattekiler:
+            neden = "aynı saatte başka sınavda görevli"
+        elif musait_degil_mi(musaitsizlikler.get(kisi.kimlik, ()), oturum.tarih, oturum.saat,
+                             oturum.sure_dakika):
+            neden = "müsait değil olarak işaretli"
+        alanda = esitle(kisi.brans) in alan
+        onceki_k, onceki_g = yil_yuku.get(kisi.kimlik, (0, 0))
+        adaylar.append({
+            "kimlik": kisi.kimlik, "ad": kisi.ad, "brans": kisi.brans, "alan_mi": alanda,
+            "yonetici_mi": kisi.yonetici_mi, "uygun_mu": not neden, "neden": neden,
+            "gorev_sayisi": plandaki_yuk.get(kisi.kimlik, 0) + onceki_k + onceki_g,
+        })
+    tercih = (lambda a: not a["alan_mi"]) if rol is GorevRolu.KOMISYON_UYESI else (
+        lambda a: a["alan_mi"])
+    return sorted(adaylar, key=lambda a: (not a["uygun_mu"], tercih(a), a["yonetici_mi"],
+                                          a["gorev_sayisi"], siralama_anahtari(a["ad"])))
+
+
+def _gorevi_degistir(plan: Plan, oturum_anahtari: str, eski_id: int, yeni_id: int,
+                     gerekce: str, es_oturuma_da: bool) -> list[tuple[str, Gorevlendirme, Gorevlendirme]]:
+    """Bellekteki planda görevliyi değiştirir; (oturum, eski, yeni) listesi döner."""
+    oturum = plan.oturum_bul(oturum_anahtari)
+    hedefler = [oturum_anahtari]
+    if es_oturuma_da and oturum is not None and oturum.birim_anahtari:
+        # OKY md.58/2-e: yazılı ve uygulama komisyonlarının aynı üyelerden
+        # oluşturulması esastır; değişiklik eş oturuma da uygulanır.
+        hedefler += [o.anahtar for o in plan.oturumlar
+                     if o.birim_anahtari == oturum.birim_anahtari and o.anahtar != oturum_anahtari]
+    degisenler = []
+    for anahtar in hedefler:
+        for sira, gorev in enumerate(plan.gorevlendirmeler):
+            if gorev.oturum_anahtari == anahtar and gorev.personel_kimligi == eski_id:
+                yeni = Gorevlendirme(anahtar, yeni_id, gorev.rol,
+                                     gerekce.strip() or gorev.gerekce, gorev.kilitli_mi,
+                                     gorev.salon_kimligi)
+                plan.gorevlendirmeler[sira] = yeni
+                degisenler.append((anahtar, gorev, yeni))
+                break
+    if not degisenler:
+        raise HizmetHatasi("Bu oturumda değiştirilecek görevli bulunamadı.")
+    return degisenler
+
+
+def gorevli_degistir(vt: Veritabani, plan: Plan, oturum_anahtari: str, eski_personel_id: int,
+                     yeni_personel_id: int, kisisel_sinirlar: dict[str, int] | None = None,
+                     gerekce: str = "", es_oturuma_da: bool = True) -> TasimaSonucu:
+    """Taslak planda bir görevlinin yerine başkasını koyar.
+
+    Değişiklik bellekteki planda yapılır (kaydetmeye kadar veritabanına
+    yazılmaz) ve sürükle-bırak gibi yeni engel doğuruyorsa geri alınır.
+    """
+    oturum = plan.oturum_bul(oturum_anahtari)
+    if oturum is None:
+        raise HizmetHatasi("Oturum bulunamadı.")
+    if oturum.kilitli_mi:
+        raise HizmetHatasi(
+            "Kesinleşmiş planda görevli müdür onayıyla değiştirilir; 'Görevliyi değiştir' "
+            "penceresinde onay numarasını girin.")
+    onceki = _engel_imzalari(vt, plan, kisisel_sinirlar)
+    yedek = list(plan.gorevlendirmeler)
+    _gorevi_degistir(plan, oturum_anahtari, eski_personel_id, yeni_personel_id, gerekce,
+                     es_oturuma_da)
+
+    def geri_al() -> None:
+        plan.gorevlendirmeler = yedek
+
+    return _yeni_engellere_bak(vt, plan, kisisel_sinirlar, onceki, geri_al)
+
+
+def kesin_plan_gorevli_degistir(vt: Veritabani, plan_id: int, oturum_anahtari: str,
+                                eski_personel_id: int, yeni_personel_id: int,
+                                mudur_onay_no: str, gerekce: str,
+                                es_oturuma_da: bool = True) -> TasimaSonucu:
+    """Kesinleşmiş planda görevli değiştirir; müdür onayı ve gerekçe zorunludur.
+
+    Plan kesin kalır. Değişiklik yeni engel doğurmuyorsa veritabanına
+    yazılır ve eski/yeni kişi, onay numarası ve gerekçeyle saklanır; evrak
+    bu kaydı listeler.
+    """
+    if not str(mudur_onay_no).strip():
+        raise HizmetHatasi("Kesin planda görevli değişikliği müdür onay numarası ister.")
+    if not str(gerekce).strip():
+        raise HizmetHatasi("Görevli değişikliğinin gerekçesi zorunludur (sağlık bilgisi "
+                           "yazmayın; 'izinli', 'başka görevde' gibi yazın).")
+    plan, bilgi = plan_yukle(vt, plan_id)
+    if not bilgi["kesin_mi"]:
+        raise HizmetHatasi("Bu plan kesin değil; değişikliği plan ekranında yapıp kaydedin.")
+    onceki = _engel_imzalari(vt, plan, bilgi["kisisel_sinirlar"])
+    degisenler = _gorevi_degistir(plan, oturum_anahtari, eski_personel_id, yeni_personel_id,
+                                  "", es_oturuma_da)
+    sonuc = _yeni_engellere_bak(vt, plan, bilgi["kisisel_sinirlar"], onceki, lambda: None)
+    if not sonuc.uygulandi:
+        return sonuc
+    zaman = simdi()
+    with vt.baglan() as b:
+        for anahtar, eski, yeni in degisenler:
+            satir = b.execute(
+                "SELECT g.id FROM v_gorevlendirme g JOIN v_oturum o ON o.id=g.oturum_id"
+                " WHERE o.plan_id=? AND o.anahtar=? AND g.personel_id=?",
+                (plan_id, anahtar, eski.personel_kimligi)).fetchone()
+            if not satir:
+                raise HizmetHatasi("Görevlendirme kaydı bulunamadı.")
+            b.execute("UPDATE gorevlendirme SET personel_id=?,ucretlendirilebilir_mi=? WHERE id=?",
+                      (yeni.personel_kimligi, int(not _yonetici_mi(b, yeni.personel_kimligi)),
+                       satir[0]))
+            b.execute(
+                "INSERT INTO gorevli_degisikligi(gorevlendirme_id,eski_personel_id,"
+                "yeni_personel_id,mudur_onay_no,gerekce,olusturuldu_at) VALUES(?,?,?,?,?,?)",
+                (satir[0], eski.personel_kimligi, yeni.personel_kimligi,
+                 str(mudur_onay_no).strip(), str(gerekce).strip(), zaman))
+            vt.denetim_yaz(b, "gorevlendirme", int(satir[0]), "gorevli_degisti",
+                           str(mudur_onay_no).strip())
+    return sonuc
+
+
+def gorevli_degisiklikleri(vt: Veritabani, plan_id: int) -> list[dict]:
+    """Kesin planda müdür onayıyla yapılmış görevli değişiklikleri."""
+    with vt.baglan() as b:
+        return [{"tarih": date.fromisoformat(r[0]), "saat": r[1], "ders": r[2],
+                 "tur": r[3], "rol": r[4], "eski": r[5], "yeni": r[6], "onay_no": r[7],
+                 "gerekce": r[8], "degisti_at": r[9]}
+                for r in b.execute("""
+                    SELECT o.tarih, o.saat, d.ad, o.oturum_turu, g.rol, eski.ad, yeni.ad,
+                           gd.mudur_onay_no, gd.gerekce, gd.olusturuldu_at
+                    FROM gorevli_degisikligi gd
+                    JOIN gorevlendirme g ON g.id = gd.gorevlendirme_id
+                    JOIN v_oturum o ON o.id = g.oturum_id
+                    JOIN v_ders d ON d.id = o.ders_id
+                    JOIN personel eski ON eski.id = gd.eski_personel_id
+                    JOIN personel yeni ON yeni.id = gd.yeni_personel_id
+                    WHERE o.plan_id = ? ORDER BY gd.id""", (plan_id,))]
 
 
 # ============================================================ evrak teslimi
@@ -1266,6 +1798,8 @@ class TeslimSatiri:
     teslim_eden: str = ""
     teslim_alan: str = ""
     aciklama: str = ""
+    # Teslim süresi iş günüyle sayılır; tatil günleri iş günü değildir.
+    tatiller: frozenset[date] = frozenset()
 
     @property
     def evrak_adi(self) -> str:
@@ -1275,8 +1809,9 @@ class TeslimSatiri:
     def teslim_edildi_mi(self) -> bool:
         return bool(self.teslim_at)
 
-    def son_gun(self, tatiller=frozenset()) -> date:
-        return is_gunu_ekle(self.tarih, TESLIM_SURESI_IS_GUNU, tatiller)
+    def son_gun(self, tatiller=None) -> date:
+        return is_gunu_ekle(self.tarih, TESLIM_SURESI_IS_GUNU,
+                            self.tatiller if tatiller is None else tatiller)
 
     def gecikti_mi(self, bugun: date | None = None) -> bool:
         """TS-02: süresi içinde teslim edilmemiş evrak gecikmiş sayılır."""
@@ -1310,6 +1845,7 @@ def teslim_cizelgesi(vt: Veritabani, plan_id: int) -> list[TeslimSatiri]:
                 WHERE o.plan_id=?""", (plan_id,)):
             kayitli[(r[0], r[1])] = r
 
+    tatiller = tatilleri_getir(vt)
     cizelge: list[TeslimSatiri] = []
     for oturum_id, etiket, tarih_metin in oturumlar:
         tarih = date.fromisoformat(tarih_metin)
@@ -1324,7 +1860,8 @@ def teslim_cizelgesi(vt: Veritabani, plan_id: int) -> list[TeslimSatiri]:
                 teslim_at=kayit[3] if kayit else "",
                 teslim_eden=kayit[4] if kayit else "",
                 teslim_alan=kayit[5] if kayit else "",
-                aciklama=kayit[6] if kayit else ""))
+                aciklama=kayit[6] if kayit else "",
+                tatiller=tatiller))
     return cizelge
 
 
@@ -1390,10 +1927,12 @@ def plan_oturumlari(vt: Veritabani, plan_id: int) -> list[dict]:
             salonlar = [x[0] for x in b.execute(
                 "SELECT s.ad FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id"
                 " WHERE os.oturum_id=? ORDER BY os.sira", (r[0],))]
-            gorevliler = [(x[0], x[1], x[2]) for x in b.execute(
-                "SELECT p.ad, g.rol, COALESCE(p.brans,'') FROM v_gorevlendirme g"
+            # (ad, rol, branş, gözcünün salonu) — salon eski planlarda boştur.
+            gorevliler = [(x[0], x[1], x[2], x[3] or "") for x in b.execute(
+                "SELECT p.ad, g.rol, COALESCE(p.brans,''), s.ad FROM v_gorevlendirme g"
                 " JOIN v_personel p ON p.id=g.personel_id"
-                " WHERE g.oturum_id=? ORDER BY g.rol DESC, p.ad", (r[0],))]
+                " LEFT JOIN v_salon s ON s.id=g.salon_id"
+                " WHERE g.oturum_id=? ORDER BY g.rol DESC, s.ad, p.ad", (r[0],))]
             ogrenci_sayisi = b.execute(
                 "SELECT count(*) FROM v_oturum_ogrenci WHERE oturum_id=?",
                 (r[0],)).fetchone()[0]
@@ -1519,13 +2058,17 @@ def ilan_ogrenci_cizelgesi(vt: Veritabani, plan_id: int,
     """Öğrenci başına sınav listesi; ad maskelenmiş olarak döner.
 
     Öğrenci kendi satırını okul numarasından bulur; açık ad yayımlanmaz.
+    Birden çok salonlu sınavda öğrencinin kendi salonu yazılır; eski
+    sürüm bütün salonları sıralıyordu ve öğrenci nereye gideceğini
+    bilemiyordu. Salonu kayıtlı olmayan eski planlarda yine hepsi yazılır.
     """
     with vt.baglan() as b:
         satirlar = b.execute("""
             SELECT og.okul_no, og.ad_soyad, og.sube,
                    replace(o.duzey_kumesi,',','/'), d.ad, o.oturum_turu,
                    o.tarih, o.saat,
-                   COALESCE((SELECT group_concat(s.ad, ', ')
+                   COALESCE((SELECT s.ad FROM v_salon s WHERE s.id=oo.salon_id),
+                            (SELECT group_concat(s.ad, ', ')
                              FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id
                              WHERE os.oturum_id=o.id), '')
             FROM v_oturum_ogrenci oo
@@ -1566,6 +2109,37 @@ def gorevli_listesi(vt: Veritabani, plan_id: int) -> list[dict]:
     liste = [{"kimlik": r[0], "ad": r[1], "brans": r[2], "unvan": r[3],
               "komisyon": r[4], "gozcu": r[5]} for r in satirlar]
     return sorted(liste, key=lambda x: siralama_anahtari(x["ad"]))
+
+
+def kisi_bazli_gorevler(vt: Veritabani, plan_id: int) -> list[dict]:
+    """Her görevlinin kendi görev listesi: tarih, saat, sınav, rol, salon.
+
+    Görevlendirme çizelgesi sınav başınadır; öğretmen kendi görevlerini
+    bulmak için bütün çizelgeyi taramak zorunda kalıyordu. Tebliğ de kişinin
+    hangi görevleri tebellüğ ettiğini göstermelidir.
+    """
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT p.id, p.ad, COALESCE(p.brans,''), p.unvan, o.tarih, o.saat, o.sure,
+                   replace(o.duzey_kumesi,',','/') || ' ' || d.ad ||
+                   CASE o.oturum_turu WHEN 'uygulama' THEN ' (uygulama)' ELSE '' END,
+                   g.rol,
+                   COALESCE(gs.ad, (SELECT group_concat(s.ad, ', ')
+                                    FROM v_oturum_salon os JOIN v_salon s ON s.id=os.salon_id
+                                    WHERE os.oturum_id=o.id), '')
+            FROM v_gorevlendirme g
+            JOIN v_personel p ON p.id = g.personel_id
+            JOIN v_oturum o ON o.id = g.oturum_id
+            JOIN v_ders d ON d.id = o.ders_id
+            LEFT JOIN v_salon gs ON gs.id = g.salon_id
+            WHERE o.plan_id = ? ORDER BY o.tarih, o.saat""", (plan_id,)).fetchall()
+    kisiler: dict[int, dict] = {}
+    for kimlik, ad, brans, unvan, tarih, saat, sure, sinav, rol, salon in satirlar:
+        kayit = kisiler.setdefault(kimlik, {"kimlik": kimlik, "ad": ad, "brans": brans,
+                                            "unvan": unvan, "gorevler": []})
+        kayit["gorevler"].append({"tarih": date.fromisoformat(tarih), "saat": saat,
+                                  "sure": sure, "sinav": sinav, "rol": rol, "salon": salon})
+    return sorted(kisiler.values(), key=lambda x: siralama_anahtari(x["ad"]))
 
 
 # ================================================== personel elle yönetimi
@@ -1646,86 +2220,197 @@ def personel_sil(vt: Veritabani, personel_id: int) -> None:
 
 def personel_ayrintili_liste(vt: Veritabani) -> list[dict]:
     """Öğretmen ekranı için görev sayaçlarıyla birlikte personel listesi."""
-    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
+    sayilar: dict[int, int] = {}
+    for kimlik, _, _, _ in _gorev_kayitlari(vt, list(etkin_planlar(vt).values())):
+        sayilar[kimlik] = sayilar.get(kimlik, 0) + 1
     with vt.baglan() as b:
         satirlar = b.execute("""
             SELECT p.id, p.ad, p.unvan, p.brans, p.kadro_durumu, p.aktif_mi,
                    p.kaynak_aktarim_id,
-                   COALESCE((SELECT SUM(gs.komisyon_sayisi + gs.gozcu_sayisi)
-                             FROM v_gorev_sayaci gs
-                             WHERE gs.personel_id = p.id AND gs.ogretim_yili = ?), 0)
-            FROM v_personel p ORDER BY p.aktif_mi DESC, p.ad""", (ogretim_yili,)).fetchall()
+                   (SELECT count(*) FROM v_personel_musaitlik m WHERE m.personel_id = p.id)
+            FROM v_personel p ORDER BY p.aktif_mi DESC, p.ad""").fetchall()
     return [{"kimlik": r[0], "ad": r[1], "unvan": r[2], "brans": r[3],
              "kadro": r[4], "aktif_mi": bool(r[5]),
              "kaynak": "e-Okul raporu" if r[6] else "elle eklendi",
-             "gorev_sayisi": r[7]} for r in satirlar]
+             "gorev_sayisi": sayilar.get(r[0], 0), "musaitlik_sayisi": r[7]}
+            for r in satirlar]
 
 
 # ============================================ dönemler arası görev havuzu
 
-def onceki_gorev_sayaclari(vt: Veritabani, haric_plan_id: int | None = None
-                           ) -> dict[int, tuple[int, int]]:
-    """Aynı öğretim yılının diğer dönemlerindeki görev sayaçları.
-
-    Bir öğretim yılında üç sınav dönemi vardır. P2 planlanırken P1'de görev
-    almış öğretmenin yükü hesaba katılmazsa aynı kişiler üst üste
-    görevlendirilir. Planlayıcı sayaçlara buradan gelen değerlerle başlar.
-    """
-    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
-    if not ogretim_yili:
-        return {}
-    kosul = "" if haric_plan_id is None else " AND pl.id <> ?"
-    olcutler = [ogretim_yili] + ([] if haric_plan_id is None else [haric_plan_id])
+def _gorev_kayitlari(vt: Veritabani, plan_kimlikleri: list[int]
+                     ) -> list[tuple[int, GorevRolu, date, str]]:
+    """Verilen planların görevleri: (personel, rol, tarih, dönem kodu)."""
+    if not plan_kimlikleri:
+        return []
+    yer_tutucu = ",".join("?" * len(plan_kimlikleri))
     with vt.baglan() as b:
-        satirlar = b.execute(f"""
-            SELECT g.personel_id,
-                   SUM(CASE WHEN g.rol='komisyon_uyesi' THEN 1 ELSE 0 END),
-                   SUM(CASE WHEN g.rol='gozcu' THEN 1 ELSE 0 END)
+        return [(r[0], GorevRolu(r[1]), date.fromisoformat(r[2]), r[3]) for r in b.execute(f"""
+            SELECT g.personel_id, g.rol, o.tarih, pl.pencere_kodu
             FROM v_gorevlendirme g
             JOIN v_oturum o ON o.id = g.oturum_id
             JOIN v_plan pl ON pl.id = o.plan_id
-            WHERE pl.ogretim_yili = ?{kosul}
-            GROUP BY g.personel_id""", olcutler).fetchall()
-    return {r[0]: (r[1], r[2]) for r in satirlar}
+            WHERE pl.id IN ({yer_tutucu}) ORDER BY o.tarih, g.id""", plan_kimlikleri)]
+
+
+def onceki_gorev_kayitlari(vt: Veritabani, haric: tuple[str, str] | None = None
+                           ) -> tuple[tuple[int, GorevRolu, date], ...]:
+    """Aynı öğretim yılının geçerli planlarındaki görevler (personel, rol, tarih).
+
+    Bir öğretim yılında üç sınav dönemi vardır. P2 planlanırken P1'de görev
+    almış öğretmenin yükü hesaba katılmazsa aynı kişiler üst üste
+    görevlendirilir; yıllık ücret sınırı da (Karar md.12/2-a) yıla bakar.
+    `haric` (dönem, tür) yeniden planlanan planı dışarıda bırakır: eski
+    sürüm aynı dönemin eski planını "önceki dönem" sayıyor, yeni plan
+    eskisinde çok görev alan öğretmeni gereksiz yere geri plana itiyordu.
+    Her dönemden yalnız geçerli plan sayılır (bkz. `etkin_planlar`).
+    """
+    planlar = [kimlik for anahtar, kimlik in etkin_planlar(vt).items() if anahtar != haric]
+    return tuple((kimlik, rol, tarih) for kimlik, rol, tarih, _ in _gorev_kayitlari(vt, planlar))
+
+
+def _sayaclara_cevir(gorevler) -> dict[int, tuple[int, int]]:
+    sayac: dict[int, list[int]] = {}
+    for kimlik, rol, _ in gorevler:
+        kayit = sayac.setdefault(kimlik, [0, 0])
+        kayit[0 if rol is GorevRolu.KOMISYON_UYESI else 1] += 1
+    return {kimlik: (k, g) for kimlik, (k, g) in sayac.items()}
+
+
+def onceki_gorev_sayaclari(vt: Veritabani, haric: tuple[str, str] | None = None
+                           ) -> dict[int, tuple[int, int]]:
+    """Kişi başına (komisyon, gözcülük) sayacı; bkz. `onceki_gorev_kayitlari`."""
+    return _sayaclara_cevir(onceki_gorev_kayitlari(vt, haric))
 
 
 def gorev_havuzu_ozeti(vt: Veritabani) -> list[dict]:
-    """Öğretim yılı boyunca kişi başına dönem dönem görev dağılımı."""
-    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
-    with vt.baglan() as b:
-        satirlar = b.execute("""
-            SELECT personel_id, ad, brans, unvan, pencere_kodu,
-                   komisyon_sayisi, gozcu_sayisi
-            FROM v_gorev_sayaci WHERE ogretim_yili = ?""", (ogretim_yili,)).fetchall()
+    """Öğretim yılı boyunca kişi başına dönem dönem görev dağılımı.
+
+    Her dönemden yalnız geçerli plan sayılır; tek ders sınavının (OKY md.58/6)
+    görevleri bağlı olduğu dönemin sütununa girer. Ücret sınırı aşımı görev
+    tarihlerine göre hesaplanır (Karar md.12/2-a ve toplu sözleşme askısı).
+    """
     kisiler: dict[int, dict] = {}
-    for kimlik, ad, brans, unvan, pencere, komisyon, gozcu in satirlar:
+    personel = {p.kimlik: p for p in personelleri_getir(vt, yalniz_aktif=False)}
+    for kimlik, rol, tarih, pencere in _gorev_kayitlari(vt, list(etkin_planlar(vt).values())):
+        kisi = personel.get(kimlik)
         kayit = kisiler.setdefault(kimlik, {
-            "kimlik": kimlik, "ad": ad, "brans": brans, "unvan": unvan,
-            "pencereler": {}, "komisyon": 0, "gozcu": 0})
-        kayit["pencereler"][pencere] = (komisyon, gozcu)
-        kayit["komisyon"] += komisyon
-        kayit["gozcu"] += gozcu
+            "kimlik": kimlik, "ad": kisi.ad if kisi else f"#{kimlik}",
+            "brans": kisi.brans if kisi else "", "unvan": kisi.unvan if kisi else "",
+            "pencereler": {}, "komisyon": 0, "gozcu": 0, "_gorevler": []})
+        komisyon, gozcu = kayit["pencereler"].get(pencere, (0, 0))
+        if rol is GorevRolu.KOMISYON_UYESI:
+            kayit["pencereler"][pencere] = (komisyon + 1, gozcu)
+            kayit["komisyon"] += 1
+        else:
+            kayit["pencereler"][pencere] = (komisyon, gozcu + 1)
+            kayit["gozcu"] += 1
+        kayit["_gorevler"].append((rol, tarih))
     for kayit in kisiler.values():
         kayit["toplam"] = kayit["komisyon"] + kayit["gozcu"]
-        kayit["asildi_mi"] = yillik_sayac_asildi_mi(
-            ogretim_yili, kayit["komisyon"], kayit["gozcu"])
+        asan = ucretlendirilemeyen_gorevler(kayit.pop("_gorevler"))
+        kayit["ucretsiz_komisyon"] = asan[GorevRolu.KOMISYON_UYESI]
+        kayit["ucretsiz_gozcu"] = asan[GorevRolu.GOZCU]
+        kayit["asildi_mi"] = any(asan.values())
         kayit["ucretlendirilebilir"] = not Personel(0, "", "", kayit["unvan"]).yonetici_mi
     return sorted(kisiler.values(), key=lambda x: siralama_anahtari(x["ad"]))
 
 
 def taslak_pencereler(vt: Veritabani) -> list[str]:
-    """Bu öğretim yılında kesinleşmemiş planı olan dönemlerin adları.
+    """Bu öğretim yılında geçerli planı henüz kesinleşmemiş dönemlerin adları.
 
     Görev sayacı raporu kesinleşmemiş plandan da üretilir; sayıların
     değişebileceğini belgeye yazabilmek için hangi dönemlerin taslak olduğu
     bilinmelidir.
     """
-    ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
-    if not ogretim_yili:
+    etkin = etkin_planlar(vt)
+    if not etkin:
         return []
     with vt.baglan() as b:
-        kodlar = [r[0] for r in b.execute(
-            "SELECT DISTINCT pencere_kodu FROM v_plan"
-            " WHERE ogretim_yili=? AND durum='taslak' ORDER BY pencere_kodu",
-            (ogretim_yili,))]
-    return [pencere_adi(k) for k in kodlar]
+        taslaklar = {r[0] for r in b.execute(
+            f"SELECT id FROM v_plan WHERE durum='taslak' AND id IN "
+            f"({','.join('?' * len(etkin))})", list(etkin.values()))}
+    adlar = []
+    for (kod, tur), kimlik in sorted(etkin.items()):
+        if kimlik in taslaklar:
+            adlar.append(pencere_adi(kod) + (" (tek ders)" if tur == PlanTuru.TEK_DERS.value
+                                             else ""))
+    return adlar
+
+
+# ============================================ tek ders sınavı (OKY md.58/6)
+
+def tek_ders_adaylari(vt: Veritabani, pencere_kodu: str) -> list[dict]:
+    """Tek ders sınavına alınabilecek öğrenciler ve dersleri.
+
+    OKY md.58/6: sorumluluk sınavı sonunda tek dersten başarısızlığı kalan son
+    sınıf öğrencisi. Program sınav sonucunu bilmez (sonuç e-Okul'dadır); bu
+    yüzden o dönemin olağan planındaki 12. sınıf öğrencileri ve plandaki
+    dersleri listelenir, kullanıcı başarısız kalan tek dersi seçer.
+    """
+    plan_id = son_plani_getir(vt, pencere_kodu)
+    if plan_id is None:
+        return []
+    yil = ogretim_yili(vt)
+    with vt.baglan() as b:
+        satirlar = b.execute("""
+            SELECT DISTINCT og.id, og.okul_no, og.ad_soyad, og.sube, s.id, d.ad, s.duzey,
+                   (SELECT t.sorumluluk_kaydi_id FROM v_tek_ders_secimi t
+                     WHERE t.ogrenci_id = og.id AND t.ogretim_yili = ? AND t.pencere_kodu = ?)
+            FROM v_oturum_ogrenci oo
+            JOIN v_oturum o ON o.id = oo.oturum_id AND o.plan_id = ?
+            JOIN v_ogrenci og ON og.id = oo.ogrenci_id AND og.sinif_duzeyi = 12
+            JOIN v_sorumluluk_kaydi s ON s.ogrenci_id = og.id AND s.ders_id = o.ders_id
+                 AND s.durum = 'aktif'
+                 AND (',' || o.duzey_kumesi || ',') LIKE ('%,' || s.duzey || ',%')
+            JOIN v_ders d ON d.id = s.ders_id
+            ORDER BY og.sube, og.ad_soyad, d.ad""", (yil, pencere_kodu, plan_id)).fetchall()
+    return [{"ogrenci_id": r[0], "okul_no": r[1], "ad_soyad": r[2], "sube": r[3],
+             "sorumluluk_kaydi_id": r[4], "ders": r[5], "duzey": r[6],
+             "secili_mi": r[7] == r[4]} for r in satirlar]
+
+
+def tek_ders_sec(vt: Veritabani, pencere_kodu: str, ogrenci_id: int,
+                 sorumluluk_kaydi_id: int | None) -> None:
+    """Öğrencinin tek ders sınavına gireceği dersi seçer; None seçimi kaldırır.
+
+    Öğrenci başına tek ders seçilebilir: hüküm "tek dersten başarısızlığı
+    bulunan" öğrenci içindir.
+    """
+    yil = ogretim_yili(vt)
+    with vt.baglan() as b:
+        b.execute("UPDATE tek_ders_secimi SET silindi_mi=1 WHERE ogretim_yili=? AND"
+                  " pencere_kodu=? AND ogrenci_id=? AND silindi_mi=0",
+                  (yil, pencere_kodu, ogrenci_id))
+        if sorumluluk_kaydi_id is not None:
+            if not b.execute("SELECT 1 FROM v_sorumluluk_kaydi WHERE id=? AND ogrenci_id=?",
+                             (sorumluluk_kaydi_id, ogrenci_id)).fetchone():
+                raise HizmetHatasi("Seçilen ders bu öğrencinin sorumluluk kaydı değil.")
+            b.execute("INSERT INTO tek_ders_secimi(ogretim_yili,pencere_kodu,ogrenci_id,"
+                      "sorumluluk_kaydi_id,olusturuldu_at) VALUES(?,?,?,?,?)",
+                      (yil, pencere_kodu, ogrenci_id, sorumluluk_kaydi_id, simdi()))
+        vt.denetim_yaz(b, "tek_ders_secimi", ogrenci_id,
+                       "secildi" if sorumluluk_kaydi_id is not None else "kaldirildi",
+                       pencere_kodu)
+
+
+def tek_ders_kayitlari(vt: Veritabani, pencere_kodu: str) -> list[SorumlulukKaydi]:
+    with vt.baglan() as b:
+        return [SorumlulukKaydi(r[0], r[1], r[2], r[3], r[4], r[5]) for r in b.execute("""
+            SELECT og.okul_no, og.ad_soyad, og.sube, s.duzey, d.ad, s.kaynak
+            FROM v_tek_ders_secimi t
+            JOIN v_ogrenci og ON og.id = t.ogrenci_id
+            JOIN v_sorumluluk_kaydi s ON s.id = t.sorumluluk_kaydi_id
+            JOIN v_ders d ON d.id = s.ders_id
+            WHERE t.ogretim_yili = ? AND t.pencere_kodu = ?
+            ORDER BY d.ad, s.duzey, og.okul_no""", (ogretim_yili(vt), pencere_kodu))]
+
+
+# ================================================================== yedek
+
+def yedek_al(vt: Veritabani, hedef_klasor: Path) -> Path:
+    """Veritabanının tam yedeğini (WAL dâhil) seçilen klasöre alır."""
+    yol = vt.yedek_al(Path(hedef_klasor))
+    with vt.baglan() as b:
+        vt.denetim_yaz(b, "veritabani", 0, "yedek_alindi")
+    return yol
