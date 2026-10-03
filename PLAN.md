@@ -5,11 +5,23 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 03.10.2026 (0.7.0 yayımı; ayrıntılı taramanın sonuçları
-CHANGELOG 0.6.0 başlığında, bilinen borçların kapatılması 0.7.0 başlığında).
+Son gözden geçirme: 04.10.2026 (Qt arayüzü ve güncelleme denetimi; ayrıntı
+CHANGELOG "Yayımlanmamış" başlığında, kararlar 0015 ve 0016).
 
 ## Şimdi
 
+- [ ] **Qt arayüzünü yayımlamadan önce elle dene.** Arayüz baştan yazıldı
+      (karar 0016); testler ve ekran görüntüleri yeşil ama gerçek kullanımda
+      denenmedi. Windows'ta gerçek bir e-Okul listesiyle (yerel `/yerel/`
+      klasöründe) başvuru işaretleme (arama, toplu işaret, numara listesi),
+      plan ekranında sürükle-bırak ve görevli değiştirme, evrak üretimi ve
+      teslim çizelgesi bir tur yürütülsün. 125 % ve 150 % ekran ölçeğinde
+      görünüşe bakılsın.
+- [ ] **Güncelleme denetimini yayımda dene.** Sürüm çıkınca bir önceki
+      sürümün kurulu olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
+      dosyayı indirip özetini doğruladığı ve "Kurulumu başlat"ın kurulumu
+      açtığı görülmeli (karar 0015). GitHub'ın engelli olduğu okul ağında
+      sessiz kaldığı da görülsün.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 03.10.2026: yayımlanan sürüm 0.7.0;
       okul makineleri bekliyor. 0.7.0 ilk açılışta veritabanını şema 9'a
@@ -21,6 +33,8 @@ CHANGELOG 0.6.0 başlığında, bilinen borçların kapatılması 0.7.0 başlı�
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
       görünüşüne de bakılsın (0.6.0'daki kilit emojisi kapta kare çıkmıştı).
+      Qt sürümüyle ayrıca: GNOME'un Wayland oturumunda XWayland üzerinden
+      açılması, dosya seçme penceresinin (GTK teması) çalışması.
       İlk gerçek deneme sonucu buraya yazılsın.
 - [ ] **Tatil günlerini gir.** 2026-2027 için Kurum Ayarları'na resmî tatil
       ve idari izin günleri girilmeli; özellikle sınav pencerelerine düşenler.
@@ -64,6 +78,14 @@ sağlanmıştır.
 - **Planlayıcı bütçesi.** Düğüm bütçesi gerçekçi uydurma okullarla ayarlandı
   (`kararlar/0012`); çok daha büyük bir okulda son gün sayısı denemesi
   bütçeye takılırsa plan "üretilemedi" der. Gerçek veriyle süre gözlenmeli.
+- **GitHub yayım düzeni.** Güncelleme denetimi `releases/latest` ucunu ve
+  yayımdaki dosya adlarını okur (`kararlar/0015`). GitHub API'si ya da dosya
+  adları değişirse denetim susar ya da indiremez; program etkilenmez.
+  `testler/test_guncelleme.py` yanıt biçimini sahte ağla korur.
+- **Qt sürümü ve LGPL bildirimi.** PySide6 `pyproject.toml`'da tam sabittir;
+  yükseltirken NOTICE'taki sürüm ve kaynak adresi, yardım metnindeki
+  bildirim de değişir (`testler/test_lisans.py`). Yeni Qt sürümü yeni bir
+  sistem kitaplığı isterse Pardus derlemesi `bagimlilik_sorunlari` ile durur.
 
 ## Kapsam dışı
 
@@ -76,5 +98,7 @@ yazılarak gelsin.
   e-Okul'dadır; bkz. `kararlar/0010`.)
 - Ek ders ücreti hesabı. Uygulama yalnız Karar md.12/2-a'daki 12 komisyon /
   15 gözcülük sınırı için görev sayacı tutar; tutar hesabı MYS'de yapılır.
-- Ağ, bulut, telemetri, çevrimiçi güncelleme (bkz.
-  `kararlar/0001-cevrimdisi-ve-yerel-veri.md`).
+- Ağ, bulut, telemetri, hata bildirimi, uzak yedek (bkz.
+  `kararlar/0001-cevrimdisi-ve-yerel-veri.md`). Yeni sürüm denetimi
+  03.10.2026'dan beri kapsamdadır (`kararlar/0015`); kendiliğinden indirip
+  kurmak kapsam dışıdır.

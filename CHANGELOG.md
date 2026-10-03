@@ -28,6 +28,54 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+Arayüz baştan yazıldı (Tkinter → Qt) ve yeni sürüm denetimi eklendi. Şema
+değişmedi; veritabanına dokunulmaz.
+
+### Eklendi
+- **Yeni sürüm denetimi** (karar 0015). Program açılışta yayımlanan son
+  sürümün numarasını sorar, yeni sürüm varsa pencerenin üstünde şerit
+  gösterir. Windows'ta Hakkında sayfasından kurulum dosyası indirilir ve
+  yayımlanan SHA-256 özetiyle doğrulanır; kurulumu kullanıcı başlatır.
+  Pardus'ta indirme sayfasına yönlendirilir. İstek veri taşımaz; Hakkında
+  sayfasından ya da `SORUMLULUK_GUNCELLEME_DENETIMI=0` ile kapatılır. Ağ kodu
+  tek modüldedir, başka modülün ağa çıkmasını bir test engeller.
+- **Başvuru ekranında hızlı işaretleme.** Öğrenci ad, numara ya da şubeyle
+  aranır (Türkçe karakter yazmak gerekmez); şube, "yalnız 12. sınıflar",
+  "yalnız işaretliler" ve "önceki yıldan kalan işaretler" süzgeçleri vardır.
+  Beklemeli/devamsız kutucuğu tablonun içindedir ve tıklayınca hemen
+  kaydedilir, bildirimden geri alınır. Birden çok öğrenci seçilip toplu
+  işaretlenir; e-Okul'dan kopyalanan okul numaraları yapıştırılarak da
+  işaretlenir (önce hangi numaranın kime denk geldiği, bulunamayanlar ve iki
+  şubede geçenler gösterilir). Başvuru kararları "Kaydet ve sonrakine geç"
+  ile sırayla girilir.
+- Kısayollar: Ctrl+1 … Ctrl+0 adımlar, Ctrl+F arama, Ctrl+S kaydet, plan
+  ekranında Ctrl+Z / Ctrl+Y, F1 yardım.
+
+### Değişti
+- **Arayüz Qt for Python (PySide6) ile yeniden yazıldı** (karar 0016):
+  bütün ekranlar ve pencereler. Tablolar Türkçe alfabeye göre sıralanır ve
+  Türkçe karakterden bağımsız aranır; seçim yenilemede korunur. Plan üretimi
+  ve evrak üretimi arka planda yürür, pencere donmaz. Başarılı işlemler
+  kendiliğinden kapanan bildirimle, uzun işler bekleme örtüsüyle gösterilir.
+  Pencere boyu ve konumu hatırlanır; 1366×768 ekranlarda pencere büyütülmüş
+  açılır. Yardım sayfasında arama yalnız eşleşen bölümleri gösterir.
+- Qt'nin sağ tık menüsü, takvim ve standart düğmeleri Türkçedir.
+- "Lisans" adımının adı "Hakkında" oldu; sürüm, güncelleme denetimi ve
+  lisans bilgisi buradadır. Qt'nin LGPL-3.0 bildirimi ve lisans metinleri
+  (`LICENSES/`) pakete eklendi.
+- Pardus paketi Qt'nin X11 eklentisini taşır. Sistemden yalnız her
+  masaüstünde kurulu olan `libgl1`, `libegl1`, `libxcb1` ve `libfontconfig1`
+  istenir; derleme, paketin bunların dışında bir sistem kitaplığına
+  bağlanmasına izin vermez. Paket artık temiz bir Debian 12'ye kurulup
+  açılarak denenir.
+- Paketler büyüdü: Windows kurulum dosyası ~25 MB (önce ~15 MB), Pardus
+  paketi ~39 MB (önce ~16 MB; kurulu hâli ~135 MB). Qt'nin kullanılmayan
+  çevirileri, ağ modülü ve gömülü sistem eklentileri pakete girmez.
+- Windows kurulumu yükseltmede eski sürümün `_internal` klasörünü önce
+  siler; artık kullanılmayan dosyalar (ör. Tcl/Tk) geride kalmaz.
+
 ## [0.7.0] — 03.10.2026
 
 PLAN.md'deki bilinen borçların kapatılması. Şema göçü 009 (kullanılmayan bir

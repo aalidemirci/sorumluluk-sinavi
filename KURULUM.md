@@ -9,7 +9,9 @@ dosyasını çalıştırın.
   yazmaz. Varsayılan yer `%LOCALAPPDATA%\SorumlulukSinavi\uygulama`.
 - Başlat menüsüne kısayol eklenir; masaüstü kısayolu isteğe bağlıdır.
 - Python kurulu olmasına gerek yoktur.
-- Yeni sürüm eskisinin üzerine kurulur ve **veritabanınıza dokunmaz.**
+- Yeni sürüm eskisinin üzerine kurulur ve **veritabanınıza dokunmaz.** Eski
+  sürümün program dosyaları (`_internal` klasörü) kurulumdan önce silinir;
+  veri ayrı klasördedir.
 - Kaldırma Başlat menüsünden ya da Ayarlar → Uygulamalar üzerinden yapılır;
   kaldırma da veritabanını silmez.
 
@@ -32,10 +34,11 @@ sudo apt install ./sorumluluk-sinavi_0.5.0_amd64.deb
 - Pardus 23 ve üzeri (Debian 12 tabanlı her dağıtım) desteklenir. Paket
   Debian 12 kabında derlenir; daha yeni bir dağıtımda da çalışır, daha
   eskisinde çalışmaz.
-- **Python kurulu olmasına gerek yoktur**; yorumlayıcı ve bütün kitaplıklar
-  paketin içindedir. Kurulum internet istemez: paketin beklediği dört
-  kitaplık (`libx11-6`, `libxext6`, `libxft2`, `libfontconfig1`) her
-  masaüstü kurulumunda zaten yüklüdür.
+- **Python kurulu olmasına gerek yoktur**; yorumlayıcı, Qt ve bütün
+  kitaplıklar paketin içindedir. Kurulum internet istemez: paketin sistemden
+  beklediği kitaplıklar (`libgl1`, `libegl1`, `libxcb1`, `libfontconfig1`)
+  her masaüstü kurulumunda zaten yüklüdür.
+- Program X11 üzerinde çalışır; Wayland oturumunda XWayland üzerinden açılır.
 - Uygulama menüde **Ofis** ve **Eğitim** altında görünür; uçbirimden
   `sorumluluk-sinavi` komutuyla da açılır.
 - Veritabanı `~/.local/share/sorumluluk-sinavi/plan` altındadır. Veri
@@ -93,6 +96,35 @@ Bilinmesi gerekenler:
   altında kalır. Makineyi tamamen temizlemek istiyorsanız o klasörü elle
   silin — öncesinde aşağıdaki Yedekleme bölümünü okuyun.
 
+## Güncelleme denetimi
+
+Program açıldıktan birkaç saniye sonra yayımlanan son sürümün numarasını
+sorar. Yeni sürüm varsa pencerenin üstünde bir şerit çıkar; **Daha sonra** o
+sürüm için şeridi kapatır. İstek yalnız sürüm bilgisini alır; öğrenci,
+personel ya da okul verisi gönderilmez. İnternet yoksa ya da ağ GitHub'ı
+engelliyorsa denetim sessizce geçer, program çalışmaya devam eder.
+
+- **Windows:** Hakkında sayfasındaki **Doğrula ve indir**, kurulum dosyasını
+  `%LOCALAPPDATA%\SorumlulukSinavi\guncelleme` altına indirir ve yayımlanan
+  SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz.
+  **Kurulumu başlat** programı kapatıp kurulumu açar.
+- **Pardus:** yeni paket indirme sayfasından alınıp yukarıdaki gibi kurulur;
+  `sudo` gerektiren kurulumu program kendisi yapmaz.
+
+Denetimi kapatmak için Hakkında sayfasındaki **Program açılırken yeni sürümü
+denetle** seçeneğini kaldırın. Kurum genelinde kapatmak için
+`SORUMLULUK_GUNCELLEME_DENETIMI` ortam değişkenini `0` yapın; o zaman
+Hakkında sayfasındaki seçenek kapalı ve değiştirilemez görünür. Windows'ta
+kullanıcı için:
+
+```powershell
+setx SORUMLULUK_GUNCELLEME_DENETIMI 0
+```
+
+Pardus'ta aynı satır (`SORUMLULUK_GUNCELLEME_DENETIMI=0`) `/etc/environment`
+dosyasına eklenir. Programın internete çıkan tek isteği budur; gerekçe
+[kararlar/0015](kararlar/0015-guncelleme-denetimi.md).
+
 ## Kurulumsuz deneme
 
 `dist/SorumlulukSinavi/SorumlulukSinavi.exe` doğrudan çalıştırılabilir.
@@ -132,10 +164,24 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
    tamamını kapsıyorsa "tam listedir" işaretli kalsın; kısmi bir liste
    aktarıyorsanız işareti kaldırın, yoksa dosyada olmayan kayıtlar pasife
    alınır.
-5. **Başvuru** — beklemeli ve devamsız öğrencileri işaretleyin, duyuruyu
-   kaydedin, başvuru kararlarını girin (OKY md.58/2-d). Tablodan öğrenci
-   seçince mevcut işaretleri ve başvurusu kutulara gelir. Önceki öğretim
-   yılından kalan işaretler sarı görünür; gözden geçirip yeniden kaydedin.
+5. **Başvuru** — üç sekmede yürür (OKY md.58/2-d):
+   - **İşaretler:** beklemeli ve devamsız öğrencileri işaretleyin. Listede ad,
+     okul numarası ya da şubeyle arayın (Türkçe karakter yazmanız gerekmez);
+     şube, "Yalnız 12. sınıflar" ve "Yalnız işaretliler" süzgeçleri vardır.
+     Satırdaki kutucuğu tıklamak hemen kaydeder; alttaki bildirimdeki **Geri
+     al** işareti kaldırır. Birden çok satırı Ctrl ya da Shift ile seçip
+     **Beklemeli işaretle** / **Devamsız işaretle** ile toplu işaretleyebilir,
+     e-Okul'dan kopyaladığınız okul numaralarını **Numara listesiyle
+     işaretle…** penceresine yapıştırabilirsiniz; pencere önce hangi numaranın
+     kime karşılık geldiğini, bulunamayanları ve iki şubede geçenleri
+     gösterir. Önceki öğretim yılından kalan işaretler sarı görünür; gözden
+     geçirip yeniden işaretleyin.
+   - **Duyuru:** başvuru duyurusunu kaydedin. Son gün, sınav penceresinin
+     ilk gününden en az 5 iş günü önce olmalıdır; ekran en geç günü gösterir.
+   - **Başvuru kararları:** her öğrencinin başvuru tarihini ve dilekçe
+     bilgisini girin; **Kaydet ve sonrakine geç** sıradaki öğrenciyi açar.
+     Son günden sonraki başvuru müdür onayıyla kabul edilir; onay alanı
+     ancak o zaman açılır.
 6. **Ders / Branş** — her dersi bir branşa eşleyin. Türk dili ve edebiyatı ile
    yabancı dil derslerini **iki aşamalı** işaretleyin (OKY md.58/2-e); uygulama
    ders adına bakarak öneri getirir ama kararı siz verirsiniz. Birleşik
@@ -146,7 +192,12 @@ Soldaki adımlar sırayla tamamlanmalıdır; her adım bir sonrakinin girdisidir
 8. **Evrak ve Teslim** — planı kaydettikten sonra belgeleri üretin; sınavlardan
    sonra geri alınan evrakı teslim çizelgesine işleyin.
 9. **Yardım** — mevzuat hükümleri, kullanım ve çalışma mantığı bu sayfadadır.
-10. **Lisans** — program bilgisi, geliştirici ve kullanım koşulları.
+10. **Hakkında** — sürüm, güncelleme denetimi, geliştirici ve kullanım
+    koşulları.
+
+Kısayollar: **Ctrl+1 … Ctrl+0** adımlar arasında geçer, **Ctrl+F** sayfadaki
+aramaya gider, **Ctrl+S** kaydeder, plan ekranında **Ctrl+Z / Ctrl+Y**
+taşımayı geri ve ileri alır, **F1** yardımı açar.
 
 Tek ders sınavı (OKY md.58/6): olağan sınavların sonucu e-Okul'a girildikten
 sonra Sınav Planı ekranında dönem kutusundan "… — tek ders (58/6)" seçeneğini
@@ -183,20 +234,23 @@ Aynı yönerge ilgili ekranların üstünde ve Yardım sayfasında da yazılıd�
 - İki aşamalı derste yazılı kartı taşınınca uygulama da aynı gün ve saat
   farkıyla gelir; uygulama kartı ise tek başına başka bir güne taşınabilir
   (OKY md.58/2-e: farklı günlerde de yapılabilir).
-- Karta **tıklayınca** sınavın görevlileri alttaki şeritte görünür.
+- Karta **tıklayınca** sınavın görevlileri sağdaki **Seçili sınav** kartında
+  görünür.
   **Görevliyi değiştir…** penceresinde değiştirilecek kişiyi ve yerine gelecek
   kişiyi seçersiniz; uygun olmayanlar nedeniyle listelenir. Taslak planda
   değişiklik bellekte kalır, kesinleşmiş planda müdür onay numarası ve
   gerekçeyle hemen kaydedilir ve görevlendirme çizelgesinde listelenir.
-- **Geri Al / İleri Al** ile adım adım gezinebilirsiniz (görevli değişikliği
-  dâhil). Kaydedilmemiş plan başka sayfaya gidip dönünce kaybolmaz.
-- Plan **Kaydet** denene kadar veritabanına yazılmaz.
+- **Geri al / İleri al** (Ctrl+Z / Ctrl+Y) ile adım adım gezinebilirsiniz
+  (görevli değişikliği dâhil). Kaydedilmemiş plan başka sayfaya gidip dönünce
+  kaybolmaz; program kapatılırken sorulur.
+- Plan **Kaydet** (Ctrl+S) denene kadar veritabanına yazılmaz.
+- Plan arka planda üretilir; üretim sürerken pencere donmaz.
 - **Müdür onayıyla kesinleştir** planı kilitler; kesinleşmiş oturum taşınamaz,
   kesinleşmiş plan silinemez ve yerine yeni plan kaydedilemez.
 
-Alt paneldeki liste kural ihlallerini gösterir: kırmızı satırlar engel,
-sarı satırlar uyarıdır. Engelli plan taslak olarak kaydedilebilir ama
-kesinleştirilemez.
+Sağdaki **Kural denetimi** listesi kural ihlallerini gösterir: kırmızı
+satırlar engel, sarı satırlar uyarıdır. Engelli plan taslak olarak
+kaydedilebilir ama kesinleştirilemez.
 
 ## Evrak ve teslim ekranı
 
@@ -219,9 +273,10 @@ siyah-beyaz). Antetin ikinci satırı ve düzenleyen bilgisi Kurum Ayarları'nda
 gelir.
 
 **Teslim çizelgesi** sekmesinde her oturum için beklenen evrak listelenir.
-Bir satırı seçip teslim eden ile teslim alan görevliyi, varsa adedi ve teslim
-tarihini (varsayılan bugün) girerek **Seçili evrakı teslim al** düğmesine
-basın. Teslim eden ile alan aynı kişi olamaz. Yeşil satır teslim alınmış,
+Bir ya da birden çok satırı seçip teslim eden ile teslim alan görevliyi,
+varsa adedi ve teslim tarihini (varsayılan bugün) girerek **Seçilenleri
+teslim al** düğmesine basın; yanlış işlenen teslim **Teslimi geri al** ile
+kaldırılır. Teslim eden ile alan aynı kişi olamaz. Yeşil satır teslim alınmış,
 kırmızı satır süresinde gelmemiş evrakı gösterir; teslim süresi sınav tarihini
 izleyen ilk iş günüdür (tatil günleri iş günü sayılmaz).
 
@@ -242,8 +297,11 @@ Gerçek veriyi e-posta, kişisel bulut veya Git deposuna koymayın.
 .venv/Scripts/python -m PyInstaller SorumlulukSinavi.spec --noconfirm
 ```
 
-Pakete `veri/gocler/*.sql` ve `tzdata` girmek zorundadır: ilki şemayı kurar,
-ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta çözülemez.
+Pakete `veri/gocler/*.sql`, `tzdata` ve `LICENSES/` girmek zorundadır: ilki
+şemayı kurar, ikincisi olmadan `Europe/Istanbul` saat dilimi Windows'ta
+çözülemez, üçüncüsü Qt'nin LGPL-3.0 koşuludur. Qt'nin kullanılmayan parçaları
+(öbür dillerin çevirileri, ağ modülü, gömülü sistem ve Wayland eklentileri)
+betikte süzülür; gerekçeleri `SorumlulukSinavi.spec` içinde yazılıdır.
 
 ### Pardus paketini üretmek
 
@@ -257,18 +315,26 @@ uyumludur, geriye değil** — daha yeni bir tabanda derlenen ikili Pardus
 Docker kurulu bir makinede, depo kökünde:
 
 ```bash
-docker run --rm -v "$PWD:/kaynak" -w /kaynak debian:12 bash -c "apt-get update && apt-get install -y --no-install-recommends python3-venv python3-tk libpython3.11 dpkg-dev && python3 -m venv /tmp/o && /tmp/o/bin/pip install -e . pyinstaller && /tmp/o/bin/python yapim/deb_paketi.py"
+docker run --rm -v "$PWD:/kaynak" -w /kaynak debian:12 bash -c "apt-get update && apt-get install -y --no-install-recommends python3-venv libpython3.11 dpkg-dev binutils libgl1 libegl1 libfontconfig1 libdbus-1-3 libglib2.0-0 libxkbcommon0 libxkbcommon-x11-0 libx11-xcb1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 libxcb-xfixes0 libxcb-xkb1 && python3 -m venv /tmp/o && /tmp/o/bin/pip install -e . pyinstaller && /tmp/o/bin/python yapim/deb_paketi.py"
 ```
 
-Çıktı `dist-kurulum/` altına düşer: `.deb` dosyası ve SHA-256 özeti.
+Çıktı `dist-kurulum/` altına düşer: `.deb` dosyası ve SHA-256 özeti. Kaptaki
+Qt kitaplıkları pakete girer; biri eksikse betik hangi dosyanın neyi
+bulamadığını yazıp durur (`bagimlilik_sorunlari`). Depo bu komutta kaba
+yazılabilir bağlanır ve `dist/` klasörü Linux çıktısıyla değişir; Windows
+paketini derlemeden önce PyInstaller'ı yeniden çalıştırın.
 
 ### Testler GitHub'da da koşar
 
 `.github/workflows/testler.yml` her itmede ve her birleştirme isteğinde
 takımı üç ortamda koşturur: Windows'ta Python 3.11 ve 3.12, bir de Pardus
-23'ün tabanı olan Debian 12 kabında (arayüz testleri için `xvfb` ile).
-Bu makinedeki `pytest` bunun yerini tutmaz — özellikle Linux ayağı burada
-hiç denenmiyor.
+23'ün tabanı olan Debian 12 kabında. Arayüz testleri Qt'yi ekransız kipte
+kurar, sanal ekran gerekmez. Bu makinedeki `pytest` bunun yerini tutmaz —
+özellikle Linux ayağı burada hiç denenmiyor.
+
+Pardus paketi iş akışı (`pardus-paketi.yml`) paketi üretir, sonra **temiz**
+bir Debian 12 kabına kurup sanal ekranda açar: derleme kabında Qt'nin bütün
+kitaplıkları kurulu olduğundan eksik bir `Depends` satırı ancak orada görünür.
 
 Yalnız `.md`, `LICENSE` ve `NOTICE` değiştiren itmelerde iki iş akışı da
 koşmaz (`paths-ignore`). Listeye kod, test, `.gitignore` ya da iş akışı
@@ -278,6 +344,11 @@ dosyası eklemeyin.
 
 Sıra: `SURUM` güncellenir → CHANGELOG'da başlık açılır → testler koşar →
 paketler derlenir → commit → `git tag -a vX.Y.Z`.
+
+Yayımdaki dosya adları programın güncelleme denetiminin sözleşmesidir:
+etiket `vX.Y.Z`, kurulum dosyası `SorumlulukSinavi-Kurulum-X.Y.Z.exe`, üç
+paketi kapsayan özet `SHA256SUMS-X.Y.Z.txt`. Adlar değişirse kurulu programlar
+yeni sürümü bulur ama indiremez ([kararlar/0015](kararlar/0015-guncelleme-denetimi.md)).
 
 Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
 Arayüzdeki hakkında penceresi, `pyproject.toml`, PyInstaller betiği (exe'nin

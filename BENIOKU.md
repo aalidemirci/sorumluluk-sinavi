@@ -3,10 +3,12 @@
 Ortaöğretim kurumlarında sorumluluk sınavı planlaması ve görevlendirmesi için
 çevrimdışı çalışan masaüstü uygulaması.
 
-Uygulama **hiçbir ağ isteği yapmaz.** e-Okul, MEBBİS, DYS veya başka bir resmî
+Uygulama öğrenci, veli ve personel verisini **hiçbir yere göndermez** ve
+internet olmadan eksiksiz çalışır. e-Okul, MEBBİS, DYS veya başka bir resmî
 sisteme bağlanmaz, kullanıcı adı ya da şifre istemez. Yalnız sizin dışa
 aktardığınız dosyaları okur; ürettiği planın e-Okul'a girişi kullanıcı
-tarafından elle yapılır.
+tarafından elle yapılır. İnternete çıkan tek isteği yeni sürüm denetimidir;
+veri taşımaz ve kapatılabilir (bkz. [Güncelleme](#güncelleme)).
 
 Windows ve Pardus için ayrı paketler yayımlanır (`.exe` ve `.deb`); ikisinde
 de Python kurulu olması gerekmez. Kurulum yordamı KURULUM.md'dedir.
@@ -17,7 +19,10 @@ de Python kurulu olması gerekmez. Kurulum yordamı KURULUM.md'dedir.
    rapordan kurulur.
 2. e-Okul **OOK12001R010** sorumluluk raporunu içe aktarır.
 3. Beklemeli ve devamsız öğrencilerin başvurularını toplar; başvurusu olmayanı
-   plandan çıkarır (OKY md.58/2-d).
+   plandan çıkarır (OKY md.58/2-d). Öğrenci listede ad ya da numarayla
+   aranıp tek tıkla, satırlar seçilip toplu olarak ya da e-Okul'dan
+   kopyalanan okul numaralarıyla işaretlenir; her işaret hemen kaydedilir ve
+   geri alınabilir.
 4. Dersleri branşlara eşler; iki aşamalı dersleri işaretler.
 5. Sınav planını üretir: oturumları günlere ve saatlere yerleştirir,
    komisyon ve gözcüleri görevlendirir. Tatil günlerine sınav koymaz,
@@ -224,6 +229,21 @@ Kurum Ayarları'ndaki **Yedek al** düğmesi veritabanının tam yedeğini (WAL
 dâhil) seçilen klasöre alır. Veritabanını e-posta, kişisel bulut veya herkese
 açık depoya koymayın.
 
+## Güncelleme
+
+Program açılışta yayımlanan son sürümün numarasını sorar; yeni sürüm varsa
+pencerenin üstünde bir şerit çıkar. İstek yalnız sürüm bilgisini alır,
+öğrenci, personel ya da okul verisi göndermez. İnternet yoksa sessizce geçer.
+
+Windows'ta **Hakkında** sayfasındaki **Doğrula ve indir** kurulum dosyasını
+indirir ve yayımlanan SHA-256 özetiyle karşılaştırır; özet tutmayan dosya
+kullanılmaz. Kurulumu kullanıcı başlatır, program kendiliğinden kurmaz.
+Pardus'ta yeni paket indirme sayfasından alınır.
+
+Denetim Hakkında sayfasından kapatılabilir; kurum genelinde kapatmak için
+`SORUMLULUK_GUNCELLEME_DENETIMI=0` ortam değişkeni kullanılır. Gerekçe:
+[kararlar/0015](kararlar/0015-guncelleme-denetimi.md).
+
 ## Bilinmesi gerekenler
 
 - **Toplu sözleşme askısı:** Karar md.12/2-a'daki 12/15 sınırları, Eğitim,
@@ -286,7 +306,12 @@ Sorumluluk Sınavı, [PolyForm Noncommercial License 1.0.0](LICENSE) ile
 yayımlanır. Eğitim kurumları, kamu kurumları, kâr amacı gütmeyen kuruluşlar ve
 bireyler programı ticari olmayan amaçlarla kullanabilir. Bağlayıcı koşullar
 `LICENSE`, telif bildirimi `NOTICE` dosyasındadır. Aynı bilgiler uygulamanın
-Lisans sayfasında da yer alır.
+Hakkında sayfasında da yer alır.
+
+Arayüz [Qt for Python](https://www.qt.io/qt-for-python) (PySide6) ile
+çalışır. Qt, GNU LGPL sürüm 3 koşullarıyla kullanılır; kitaplıklar
+değiştirilmeden ayrı dosyalar olarak dağıtılır. Lisans metinleri `LICENSES/`
+klasöründe, kaynak kodu adresleri `NOTICE` dosyasındadır.
 
 Geliştirici: Ahmet Ali DEMİRCİ — aalidemirci@gmail.com
 
@@ -298,6 +323,11 @@ python -m venv .venv
 .venv/Scripts/python -m pytest
 .venv/Scripts/python sorumluluk_sinavi.py
 ```
+
+Arayüz Qt for Python (PySide6) ile yazılmıştır
+([kararlar/0016](kararlar/0016-arayuz-qt.md)); her adımın ekranı
+`arayuz/sayfalar/` altında ayrı bir modüldür. Arayüz testleri pytest-qt ile
+ekransız koşar, pencere açmaz.
 
 Kurulum ve paketleme KURULUM.md'de anlatılır.
 
