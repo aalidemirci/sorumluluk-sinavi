@@ -16,10 +16,11 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from typing import Iterable
 
 from .modeller import (
-    Ciddiyet, GorevRolu, Gorevlendirme, IkiAsamaliSayim, Ihlal, Oturum,
+    Ciddiyet, GorevRolu, Gorevlendirme, IkiAsamaliSayim, Ihlal, Musaitsizlik, Oturum,
     OturumTuru, Personel, Plan, Salon,
 )
 from .metin import esitle, siralama_anahtari
@@ -29,21 +30,54 @@ from .metin import esitle, siralama_anahtari
 # otuzu aşmıyorsa sınavlar birleştirilerek tek komisyonla yapılabilir.
 BIRLESTIRME_UST_SINIRI = 30
 
-# OKY md.58/2-b: öğrenci sayısının otuzu aşması hâlinde birden fazla salon
-# kullanılır ve her salon için ayrıca bir gözcü görevlendirilir.
+# Bir salona konan en çok öğrenci. Bu bir OKUL KARARIDIR, mevzuat salon
+# kapasitesi koymaz: OKY md.58/2-b yalnız "öğrenci sayısının otuzu aşması
+# ve/veya birden fazla salonda sınav yapılması hâlinde her sınav salonu için
+# ayrıca bir gözcü" ister. Program otuzu aşan sınavı salonlara böler ve salon
+# başına bir gözcü sayar.
 SALON_OGRENCI_UST_SINIRI = 30
 
 # OKY md.58/2-a: iki sınav öğretmeni (en az biri alan öğretmeni).
 KOMISYON_UYE_SAYISI = 2
+
+# ÖDY md.5/1-k: bir günde yapılacak yazılı ve uygulamalı sınavların sayısının
+# ikiyi geçmemesi esastır; zorunlu hâllerde bir sınav daha yapılabilir. Esas
+# aşılırsa uyarı, tavan aşılırsa engel üretilir. Program sınırı öğrenci
+# başına uygular.
+GUNLUK_SINAV_ESASI = 2
+GUNLUK_SINAV_TAVANI = 3
 
 # Karar md.12/2-a: bir öğretim yılında bir kişiye 12'den fazla komisyon
 # üyeliği ve 15'ten fazla gözcülük için ücret ödenmez.
 YILLIK_KOMISYON_SINIRI = 12
 YILLIK_GOZCU_SINIRI = 15
 
-# 8. Dönem Toplu Sözleşme md.4 gereği bu öğretim yıllarında yukarıdaki
-# sınırlar uygulanmaz; sayaç yine tutulur ve gösterilir.
-SINIRSIZ_OGRETIM_YILLARI = frozenset({"2025-2026", "2026-2027"})
+
+@dataclass(frozen=True)
+class SinirAskisi:
+    """Karar md.12/2-a sınırlarının uygulanmadığı dönem.
+
+    Toplu sözleşme hükümleri takvim yılına bağlıdır (8. Dönem: 01.01.2026 –
+    31.12.2027), öğretim yılına değil. Eski sürüm askıyı öğretim yılına
+    bağlamıştı; bu yüzden Eylül 2027 sınavları yanlışlıkla sınırlı, Eylül –
+    Aralık 2025 sınavlarının dayanağı da yanlış görünüyordu.
+    """
+
+    baslangic: date
+    bitis: date
+    dayanak: str
+
+
+# Yeni toplu sözleşme yayımlanınca buraya yeni dönem eklenir (bkz. PLAN.md).
+SINIR_ASKILARI: tuple[SinirAskisi, ...] = (
+    # Madde numarası resmî metinden teyit edilmedi; hükmün sürdüğü 7. Dönem
+    # eğitim hizmet kolu metninden bilinmektedir.
+    SinirAskisi(date(2024, 1, 1), date(2025, 12, 31),
+                "7. Dönem Toplu Sözleşme (2024–2025), Eğitim, Öğretim ve Bilim Hizmet Kolu"),
+    SinirAskisi(date(2026, 1, 1), date(2027, 12, 31),
+                "8. Dönem Toplu Sözleşme (RG 27.08.2025), Eğitim, Öğretim ve Bilim Hizmet "
+                "Kolu md.4"),
+)
 
 
 @dataclass(frozen=True)
@@ -62,8 +96,10 @@ def _k(kimlik: str, baslik: str, dayanak: str, ciddiyet: Ciddiyet, aciklama: str
 KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
     # --- SG: sorumluluğun doğuşu (içe aktarma bilgisi) --------------------
     _k("SG-05", "Nakil/geçiş kaynağı ayrı tutulur", "OKY md.58/1 son cümle", Ciddiyet.BILGI,
-       "Nakil ve geçişler nedeniyle ortaya çıkan sorumlu dersler 3/6 sayacına dâhil edilmez; "
-       "kayıt kaynağı 'basarisizlik' veya 'nakil_gecis' olarak ayrı tutulur."),
+       "Nakil ve geçişler nedeniyle ortaya çıkan sorumlu dersler 3/6 sayacına dâhil edilmez. "
+       "Veritabanı kayıt kaynağı için alan ayırır ('basarisizlik' / 'nakil_gecis'); "
+       "OOK12001R010 ayrıştırıcısı bu ayrımı okumadığından içe aktarılan kayıtlar "
+       "'basarisizlik' olarak girer. Program 3/6 sayacı hesaplamaz."),
     _k("SG-06", "Tavan aşımı hata değildir", "OKY md.58/1; SG-06 yorum notu", Ciddiyet.BILGI,
        "İçe aktarılan veride 3/6 tavanını aşan öğrenci bulunabilir (mezun olamayan 12. sınıf, "
        "nakil, olağanüstü dönem). Bu içe aktarmada hata sayılmaz, yalnız işaretlenir."),
@@ -84,12 +120,16 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
        "Farklı sınıflardaki aynı dersin öğrenci sayısı toplamda otuzu aşmıyorsa sınavlar "
        "birleştirilebilir. Aynı öğrenci aynı dersin iki düzeyinden sorumluysa birleştirilemez, "
        "ayrı ayrı sınava alınır."),
-    _k("SP-05", "Hafta sonu ve müdür onayı", "OKY md.58/2-ç", Ciddiyet.ENGEL,
-       "Sınavlar dersleri aksatmayacak biçimde hafta içinde planlanır; gerektiğinde cumartesi "
-       "ve pazar da yapılabilir, bu durumda gerekçe kaydedilir. Plan müdür onayıyla kesinleşir."),
+    _k("SP-05", "Hafta sonu ve müdür onayı", "OKY md.58/2-ç + okul uygulaması", Ciddiyet.ENGEL,
+       "Sınavlar dersleri aksatmayacak şekilde hafta içinde planlanır; gerektiğinde cumartesi "
+       "ve pazar günlerinde de yapılabilir. Sınav tarihleri ve görevliler okul müdürlüğünce "
+       "belirlenir. Hafta sonu oturumuna gerekçe yazılması ve planın müdür onayıyla "
+       "kesinleşmesi okul uygulamasıdır; mevzuat gerekçe şartı koymaz."),
     _k("SP-06", "İki aşamalı dersler", "OKY md.58/2-e (Ek:RG-22/2/2025-32821)", Ciddiyet.ENGEL,
        "Türk dili ve edebiyatı ile yabancı dil derslerinin sorumluluk sınavları yazılı ve "
-       "uygulamalı olarak iki aşamada yapılır. Komisyonların aynı üyelerden oluşturulması esastır."),
+       "uygulamalı olarak iki aşamada yapılır; yazılı ve uygulama için ayrı komisyon kurulur, "
+       "komisyonların aynı üyelerden oluşturulması esastır. Yazılı ve uygulama sınavları "
+       "sorumluluk sınavları dönemi içinde farklı günlerde de yapılabilir."),
     _k("SP-07", "Beklemeli ve devamsız öğrencinin başvurusu",
        "OKY md.58/2-d (Ek:RG-8/9/2023-32303)", Ciddiyet.ENGEL,
        "Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı yapıldığı hâlde "
@@ -97,19 +137,31 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
        "sınav tarihinden 5 iş günü öncesine kadar yazılı başvurmaları hâlinde dâhil edilir. "
        "Okulun ilan ettiği son günü kaçıran başvuru, fiilî sınav tarihine göre 5 iş günü "
        "şartını sağlıyorsa müdür onayıyla plana eklenir; mevzuat bu hâlde takdir tanımaz."),
-    _k("SP-10", "Sınav süresi", "ÖDY md.5/1-l", Ciddiyet.ENGEL,
-       "Zorunlu hâller dışında yazılı sınav süresi bir ders saatini aşamaz."),
+    _k("SP-08", "Tatil günü", "2429 sayılı Ulusal Bayram ve Genel Tatiller Hakkında Kanun; "
+       "idari izin kararları", Ciddiyet.ENGEL,
+       "Resmî tatil ve idari izin günlerinde sınav yapılmaz. Tatil günleri Kurum Ayarları "
+       "ekranından girilir; plan günleri ve iş günü hesapları bu listeyi kullanır."),
+    _k("SP-09", "Öğretmenin müsait olmadığı saat", "OKY md.58/2-ç + okul kaydı", Ciddiyet.ENGEL,
+       "Sınavlar dersleri aksatmayacak şekilde planlanır. Öğretmen listesinde dersi, izni ya "
+       "da başka görevi nedeniyle müsait olmadığı işaretlenen saatte öğretmene sınav görevi "
+       "verilmez."),
+    _k("SP-10", "Sınav süresi", "ÖDY md.5/1-l; OKY md.45/1-ç", Ciddiyet.ENGEL,
+       "Zorunlu hâller dışında yazılı sınav süresi bir ders saatini aşamaz. Uygulamalı "
+       "sınavın süresini zümre belirler (OKY md.45/1-f); bu sınır ona uygulanmaz."),
     _k("SP-11", "Günlük sınav sayısı", "ÖDY md.5/1-k", Ciddiyet.UYARI,
        "Bir günde yapılacak yazılı ve uygulamalı sınavların sayısının ikiyi geçmemesi esastır; "
-       "zorunlu hâllerde bir sınav daha yapılabilir. Uygulama, sınırı öğrenci başına uygular."),
+       "zorunlu hâllerde bir sınav daha yapılabilir. İkiyi aşan gün uyarı, üçü aşan gün engel "
+       "üretir. Program sınırı öğrenci başına uygular."),
     _k("SP-15", "Şubat ve Haziran için güncel liste", "Okul uygulaması", Ciddiyet.UYARI,
        "Nakil giden, açık öğretime geçen ya da sorumluluğu kalkan öğrenci ancak yeniden "
        "aktarılan OOK12001R010 listesiyle plandan düşer. Eylül planı aktarımın hemen ardından "
        "yapıldığı için hatırlatma gerekmez; Şubat (P2) ve Haziran (P3) planlarında liste "
        "aylar öncesine ait olabilir."),
     # --- EK: görev sayacı (parasal hesap yok) -----------------------------
-    _k("EK-03", "Aynı sınavda çifte rol yok", "Karar md.12/2-b", Ciddiyet.ENGEL,
-       "Bir sınavda aynı kişiye hem komisyon üyeliği hem gözcülük verilemez."),
+    _k("EK-03", "Aynı sınavda çifte rol yok", "OKY md.58/2-a; Karar md.12/2-b", Ciddiyet.ENGEL,
+       "Sınav iki öğretmen ve bir gözcü öğretmen tarafından yapılır (OKY md.58/2-a); bu yüzden "
+       "bir sınavda aynı kişiye hem komisyon üyeliği hem gözcülük verilmez. Karar md.12/2-b "
+       "de aynı sınavdaki iki rol için ücret ödenmeyeceğini söyler."),
 
     # --- Davranışı belgeleyen kurallar (ihlal üretmez) ---------------------
     # Bunlar denetim değil, programın verdiği kararın dayanağıdır. SG-05 kayıt
@@ -119,10 +171,12 @@ KURALLAR: dict[str, KuralTanimi] = {t.kimlik: t for t in (
     _k("EK-04", "Yönetici görevi ücretsizdir", "Karar md.12/2-c", Ciddiyet.BILGI,
        "Yöneticiler görevlendirilebilir fakat sınav görevi için ücret ödenmez. Bu program "
        "tutar hesaplamaz; yalnız görevi ücretsiz olarak işaretler."),
-    _k("EK-05", "Yıllık görev sayacı", "Karar md.12/2-a; 8. Dönem Toplu Sözleşme md.4", Ciddiyet.UYARI,
+    _k("EK-05", "Yıllık görev sayacı",
+       "Karar md.12/2-a; 7. ve 8. Dönem Toplu Sözleşme (eğitim hizmet kolu)", Ciddiyet.UYARI,
        "Bir öğretim yılında bir kişiye 12'den fazla komisyon üyeliği ve 15'ten fazla gözcülük "
-       "için ücret ödenmez. 2025-2026 ve 2026-2027 öğretim yıllarında bu sınırlar uygulanmaz, "
-       "sayaç yine gösterilir."),
+       "için ücret ödenmez. Toplu sözleşme gereği 01.01.2024 – 31.12.2027 tarihleri arasındaki "
+       "sınav görevlerinde bu sınırlar uygulanmaz; sayaç yine tutulur. Askı dışındaki bir "
+       "görev, aynı öğretim yılındaki bütün görevlerle birlikte sayılır."),
 
     # --- TS: evrak teslim takibi ------------------------------------------
     _k("TS-01", "Evrak teslim kaydı", "Okul uygulaması", Ciddiyet.UYARI,
@@ -166,6 +220,38 @@ def gereken_salon_sayisi(ogrenci_sayisi: int, salonlar: list[Salon],
     )
 
 
+def salonlara_dagit(ogrenci_sayisi: int, kapasiteler: list[int],
+                    salon_ust_siniri: int = SALON_OGRENCI_UST_SINIRI) -> list[int]:
+    """Öğrencileri oturumun salonlarına kapasiteyle orantılı dağıtır.
+
+    Eski sürüm öğrencileri salonlara sırayla (1, 2, 1, 2 …) dağıtıyordu; 30
+    ve 10 kişilik iki salona düşen 35 öğrencinin 17'si 10 kişilik salona
+    yazılıyordu. Burada her salon en çok kendi kapasitesi (ve okulun salon
+    üst sınırı) kadar öğrenci alır, kalan fark sırayla dağıtılır.
+    """
+    if ogrenci_sayisi <= 0 or not kapasiteler:
+        return [0] * len(kapasiteler)
+    tavanlar = [max(0, min(k, salon_ust_siniri)) for k in kapasiteler]
+    toplam = sum(tavanlar)
+    if toplam <= 0:
+        raise ValueError("Salon kapasitesi tanımlanmamış.")
+    adetler = [min(t, ogrenci_sayisi * t // toplam) for t in tavanlar]
+    kalan = ogrenci_sayisi - sum(adetler)
+    while kalan > 0:
+        ilerledi = False
+        for sira, tavan in enumerate(tavanlar):
+            if kalan and adetler[sira] < tavan:
+                adetler[sira] += 1
+                kalan -= 1
+                ilerledi = True
+        if not ilerledi:
+            # Kapasite yetmiyor: fazlalık son salona yazılır, doğrulayıcı
+            # salon yetersizliğini planlama aşamasında zaten bildirir.
+            adetler[-1] += kalan
+            break
+    return adetler
+
+
 def gunluk_sinav_yuku(oturumlar: list[Oturum], sayim: IkiAsamaliSayim) -> Counter:
     """(öğrenci, gün) -> o gün sayılan sınav adedi.
 
@@ -185,11 +271,38 @@ def gunluk_sinav_yuku(oturumlar: list[Oturum], sayim: IkiAsamaliSayim) -> Counte
     return sayac
 
 
-def yillik_sayac_asildi_mi(ogretim_yili: str, komisyon: int, gozcu: int) -> bool:
-    """EK-05: 12/15 sınırının aşılıp aşılmadığı. Sınırsız yıllarda hep False."""
-    if ogretim_yili in SINIRSIZ_OGRETIM_YILLARI:
-        return False
-    return komisyon > YILLIK_KOMISYON_SINIRI or gozcu > YILLIK_GOZCU_SINIRI
+def sinir_askisi(tarih: date) -> SinirAskisi | None:
+    """Görev tarihinde 12/15 sınırını askıya alan toplu sözleşme dönemi."""
+    return next((a for a in SINIR_ASKILARI if a.baslangic <= tarih <= a.bitis), None)
+
+
+def ucretlendirilemeyen_gorevler(gorevler: Iterable[tuple[GorevRolu, date]]) -> dict[GorevRolu, int]:
+    """EK-05: bir kişinin öğretim yılı görevlerinden ücret sınırına takılanların sayısı.
+
+    Görevler tarih sırasıyla sayılır. Karar md.12/2-a sınırı öğretim yılı
+    içindir; toplu sözleşme ise askıyı görev tarihine bağlar. Bu yüzden askı
+    dönemindeki görevler yıllık sayaca girer ama kendileri sınıra takılmaz;
+    askı dışındaki bir görev, yıl içi sırası sınırı aşıyorsa ücretlendirilemez
+    sayılır. Bu, iki hükmün birlikte okunmasında programın yorumudur.
+    """
+    sinirlar = {GorevRolu.KOMISYON_UYESI: YILLIK_KOMISYON_SINIRI,
+                GorevRolu.GOZCU: YILLIK_GOZCU_SINIRI}
+    sira: Counter = Counter()
+    asan: Counter = Counter()
+    for rol, tarih in sorted(gorevler, key=lambda g: (g[1], g[0].value)):
+        sira[rol] += 1
+        if sira[rol] > sinirlar[rol] and sinir_askisi(tarih) is None:
+            asan[rol] += 1
+    return {rol: asan[rol] for rol in sinirlar}
+
+
+def musait_degil_mi(musaitsizlikler: Iterable[Musaitsizlik], tarih: date, saat: time,
+                    sure_dakika: int) -> bool:
+    """SP-09: görevin [saat, saat + süre) aralığı bir müsaitsizlikle çakışıyor mu?"""
+    bitis = (datetime.combine(tarih, saat) + timedelta(minutes=sure_dakika)).time()
+    if bitis <= saat:          # gece yarısını aşan süre; pratikte olmaz
+        bitis = time(23, 59)
+    return any(m.kapsar_mi(tarih, saat, bitis) for m in musaitsizlikler)
 
 
 # ============================================================== doğrulayıcı
@@ -209,12 +322,21 @@ class DogrulamaBaglami:
     # `gecerli_basvurular` bunlardan planına alınabilecek olanlarınkidir.
     basvuru_kapsami: frozenset[str] = frozenset()
     gecerli_basvurular: frozenset[str] = frozenset()
+    # EK-05: aynı öğretim yılının diğer planlarındaki görevler
+    # (personel kimliği, rol, tarih). Yıllık sınır tek plana değil yıla bakar.
+    onceki_gorevler: tuple[tuple[int, GorevRolu, date], ...] = ()
+    # SP-08: resmî tatil ve idari izin günleri.
+    tatiller: frozenset[date] = frozenset()
+    # SP-09: personel kimliği -> görev alamayacağı zamanlar.
+    musaitsizlikler: dict[int, tuple[Musaitsizlik, ...]] = None
 
     def __post_init__(self) -> None:
         if self.ogrenci_adlari is None:
             self.ogrenci_adlari = {}
         if self.kisisel_gunluk_sinir is None:
             self.kisisel_gunluk_sinir = {}
+        if self.musaitsizlikler is None:
+            self.musaitsizlikler = {}
 
     def ogrenci_etiketi(self, anahtar: str) -> str:
         return self.ogrenci_adlari.get(anahtar, anahtar)
@@ -255,6 +377,36 @@ def _sp01_pencere(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
     ]
 
 
+def _sp08_tatil(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
+    return [
+        ihlal("SP-08", o.anahtar,
+              f"{o.ders_adi} sınavı {o.tarih.strftime('%d.%m.%Y')} tarihinde; bu gün tatil "
+              "olarak işaretli.")
+        for o in plan.oturumlar if o.tarih in baglam.tatiller
+    ]
+
+
+def _sp09_musaitlik(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
+    """Müsait olmadığı saatte görev verilen kişi (OKY md.58/2-ç)."""
+    if not baglam.musaitsizlikler:
+        return []
+    oturumlar = {o.anahtar: o for o in plan.oturumlar}
+    ihlaller = []
+    for gorev in plan.gorevlendirmeler:
+        oturum = oturumlar.get(gorev.oturum_anahtari)
+        kayitlar = baglam.musaitsizlikler.get(gorev.personel_kimligi, ())
+        if oturum is None or not kayitlar:
+            continue
+        if musait_degil_mi(kayitlar, oturum.tarih, oturum.saat, oturum.sure_dakika):
+            kisi = baglam.personel.get(gorev.personel_kimligi)
+            ihlaller.append(ihlal(
+                "SP-09", f"{oturum.anahtar}:{gorev.personel_kimligi}",
+                f"{kisi.ad if kisi else gorev.personel_kimligi} "
+                f"{oturum.tarih.strftime('%d.%m.%Y')} {oturum.saat.strftime('%H:%M')} saatinde "
+                f"müsait değil olarak işaretli ama {oturum.ders_adi} sınavında görevli."))
+    return ihlaller
+
+
 def _sp05_hafta_sonu(plan: Plan) -> list[Ihlal]:
     return [
         ihlal("SP-05", o.anahtar,
@@ -266,15 +418,24 @@ def _sp05_hafta_sonu(plan: Plan) -> list[Ihlal]:
 
 
 def _sp10_sure(plan: Plan) -> list[Ihlal]:
+    """Yalnız yazılı oturum denetlenir; uygulamalı sınavın süresini zümre belirler."""
     ders_saati = plan.parametreler.oturum_suresi_dakika
     return [
         ihlal("SP-10", o.anahtar,
-              f"{o.ders_adi} sınavı {o.sure_dakika} dakika; bir ders saati {ders_saati} dakikadır.")
-        for o in plan.oturumlar if o.sure_dakika > ders_saati
+              f"{o.ders_adi} yazılı sınavı {o.sure_dakika} dakika; bir ders saati "
+              f"{ders_saati} dakikadır.")
+        for o in plan.oturumlar
+        if o.oturum_turu is OturumTuru.YAZILI and o.sure_dakika > ders_saati
     ]
 
 
 def _sp11_gunluk_yuk(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
+    """ÖDY md.5/1-k esası (2) ve tavanı (3) ile kullanıcının seçtiği sınır.
+
+    Mevzuat ölçüsü her durumda uygulanır: kişisel sınırı yükseltilmiş bir
+    öğrencinin günde üç sınavı yine uyarıdır (zorunlu hâl), dördüncü sınav
+    engeldir. Kullanıcı daha sıkı bir sınır seçtiyse onun aşımı da gösterilir.
+    """
     varsayilan = plan.parametreler.ogrenci_gunluk_sinav_siniri
     sayac = gunluk_sinav_yuku(plan.oturumlar, plan.parametreler.iki_asamali_sayim)
     gunluk_dersler: dict[tuple[str, date], list[str]] = defaultdict(list)
@@ -287,14 +448,24 @@ def _sp11_gunluk_yuk(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
     ihlaller = []
     for (ogrenci, gun), adet in sorted(sayac.items(), key=lambda x: (x[0][1], x[0][0])):
         sinir = baglam.sinir(ogrenci, varsayilan)
-        if adet <= sinir:
+        if adet <= min(sinir, GUNLUK_SINAV_ESASI):
             continue
-        # Kişisel sınırı yükseltilmiş öğrencide bile aşım varsa bu bir hatadır.
-        ciddiyet = Ciddiyet.ENGEL if adet > sinir + 1 else Ciddiyet.UYARI
+        if adet > GUNLUK_SINAV_TAVANI:
+            ciddiyet, neden = Ciddiyet.ENGEL, (
+                f"günde {GUNLUK_SINAV_TAVANI} sınavı aşamaz — ikiyi geçmemesi esastır, zorunlu "
+                "hâllerde yalnız bir sınav daha yapılabilir")
+        elif adet > sinir + 1:
+            ciddiyet, neden = Ciddiyet.ENGEL, f"seçilen sınır {sinir}"
+        elif adet > GUNLUK_SINAV_ESASI:
+            ciddiyet, neden = Ciddiyet.UYARI, (
+                "ikiyi geçmemesi esastır; zorunlu hâl"
+                + (" — kişisel sınırı yükseltildi" if sinir > varsayilan else ""))
+        else:
+            ciddiyet, neden = Ciddiyet.UYARI, f"seçilen sınır {sinir}"
         ihlaller.append(ihlal(
             "SP-11", f"{ogrenci}:{gun.isoformat()}",
             f"{baglam.ogrenci_etiketi(ogrenci)} — {gun.strftime('%d.%m.%Y')} — "
-            f"{adet} sınav (sınır {sinir}): " + "; ".join(gunluk_dersler[(ogrenci, gun)]),
+            f"{adet} sınav ({neden}): " + "; ".join(gunluk_dersler[(ogrenci, gun)]),
             ciddiyet))
     return ihlaller
 
@@ -459,22 +630,31 @@ def _salon_cakismasi(plan: Plan, salonlar: dict[int, Salon]) -> list[Ihlal]:
 
 
 def _ek05_sayac(plan: Plan, baglam: DogrulamaBaglami) -> list[Ihlal]:
-    if baglam.ogretim_yili in SINIRSIZ_OGRETIM_YILLARI:
-        return []
-    sayac: dict[int, Counter] = defaultdict(Counter)
+    """Yıllık 12/15 sınırı: bu planın görevleri, yılın diğer planlarıyla birlikte."""
+    oturum_tarihi = {o.anahtar: o.tarih for o in plan.oturumlar}
+    gorevler: dict[int, list[tuple[GorevRolu, date]]] = defaultdict(list)
+    for kimlik, rol, tarih in baglam.onceki_gorevler:
+        gorevler[kimlik].append((rol, tarih))
+    bu_plandaki: set[int] = set()
     for gorev in plan.gorevlendirmeler:
-        sayac[gorev.personel_kimligi][gorev.rol] += 1
+        tarih = oturum_tarihi.get(gorev.oturum_anahtari)
+        if tarih is not None:
+            gorevler[gorev.personel_kimligi].append((gorev.rol, tarih))
+            bu_plandaki.add(gorev.personel_kimligi)
     ihlaller = []
-    for kimlik, adetler in sorted(sayac.items()):
-        komisyon = adetler[GorevRolu.KOMISYON_UYESI]
-        gozcu = adetler[GorevRolu.GOZCU]
-        if yillik_sayac_asildi_mi(baglam.ogretim_yili, komisyon, gozcu):
-            kisi = baglam.personel.get(kimlik)
-            ihlaller.append(ihlal(
-                "EK-05", str(kimlik),
-                f"{kisi.ad if kisi else kimlik}: {komisyon} komisyon üyeliği, {gozcu} gözcülük. "
-                f"Sınır {YILLIK_KOMISYON_SINIRI}/{YILLIK_GOZCU_SINIRI}; aşan görevler için "
-                "ücret ödenmez."))
+    for kimlik in sorted(bu_plandaki):
+        asan = ucretlendirilemeyen_gorevler(gorevler[kimlik])
+        if not any(asan.values()):
+            continue
+        adet = Counter(rol for rol, _ in gorevler[kimlik])
+        kisi = baglam.personel.get(kimlik)
+        ihlaller.append(ihlal(
+            "EK-05", str(kimlik),
+            f"{kisi.ad if kisi else kimlik}: öğretim yılında "
+            f"{adet[GorevRolu.KOMISYON_UYESI]} komisyon üyeliği, {adet[GorevRolu.GOZCU]} "
+            f"gözcülük. Sınır {YILLIK_KOMISYON_SINIRI}/{YILLIK_GOZCU_SINIRI}; "
+            f"{asan[GorevRolu.KOMISYON_UYESI]} komisyon üyeliği ve {asan[GorevRolu.GOZCU]} "
+            "gözcülük için ücret ödenmez."))
     return ihlaller
 
 
@@ -491,11 +671,13 @@ def dogrula_plan(plan: Plan, baglam: DogrulamaBaglami,
     ihlaller += _sp04_birlestirme(plan)
     ihlaller += _sp05_hafta_sonu(plan)
     ihlaller += _sp06_iki_asamali(plan, baglam)
+    ihlaller += _sp08_tatil(plan, baglam)
     ihlaller += _sp10_sure(plan)
     ihlaller += _ogrenci_slot_cakismasi(plan, baglam)
     ihlaller += _sp11_gunluk_yuk(plan, baglam)
     if plan.gorevlendirmeler:
         ihlaller += _sp02_sp03_gorevlendirme(plan, baglam)
+        ihlaller += _sp09_musaitlik(plan, baglam)
         ihlaller += _personel_slot_cakismasi(plan, baglam)
         ihlaller += _ek05_sayac(plan, baglam)
     ihlaller += _salon_cakismasi(plan, salonlar or {})

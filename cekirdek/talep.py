@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from hashlib import sha256
 from math import ceil
 
-from .kurallar import BIRLESTIRME_UST_SINIRI, SALON_OGRENCI_UST_SINIRI, gereken_salon_sayisi
+from .kurallar import (
+    BIRLESTIRME_UST_SINIRI, GUNLUK_SINAV_TAVANI, SALON_OGRENCI_UST_SINIRI, gereken_salon_sayisi,
+)
 from .metin import siralama_anahtari
 from .modeller import DersAyari, IkiAsamaliSayim, OturumTuru, Salon, SorumlulukKaydi
 
@@ -169,32 +171,42 @@ class YukOzeti:
     def gereken_gun(self, yuk: int) -> int:
         return ceil(yuk / self.gunluk_sinir) if yuk else 0
 
-    def asgari_gun_sayisi(self, slot_sayisi: int) -> int:
-        """Bir öğrencinin günde en çok slot sayısı kadar sınavı olabileceği
-        için pencerenin inebileceği en küçük gün sayısı."""
+    @staticmethod
+    def gunluk_tavan(slot_sayisi: int) -> int:
+        """Bir öğrencinin bir günde girebileceği en çok sınav.
+
+        İki sınır birlikte bağlar: günde slot sayısından fazla oturum olmaz ve
+        ÖDY md.5/1-k zorunlu hâlde bile günde üç sınavı geçmeye izin vermez.
+        """
         if slot_sayisi <= 0:
             raise ValueError("Günlük slot sayısı sıfırdan büyük olmalıdır.")
-        return max((ceil(yuk / slot_sayisi) for yuk in self.ogrenci_yukleri.values()),
-                   default=1)
+        return min(slot_sayisi, GUNLUK_SINAV_TAVANI)
+
+    def asgari_gun_sayisi(self, slot_sayisi: int) -> int:
+        """En yüklü öğrencinin günlük tavanla bitirebileceği en kısa pencere."""
+        tavan = self.gunluk_tavan(slot_sayisi)
+        return max((ceil(yuk / tavan) for yuk in self.ogrenci_yukleri.values()), default=1)
 
     def onerilen_gun_sayisi(self, slot_sayisi: int) -> int:
         """Çoğunluğun sığdığı en kısa standart pencere.
 
         Bir hafta (5 iş günü) yetmiyorsa iki hafta (10 iş günü), o da
         yetmiyorsa gereken kadar gün kullanılır. Sonuç hiçbir zaman
-        `asgari_gun_sayisi` değerinin altına inemez: en yüklü öğrenci günde
-        slot sayısından fazla sınava giremez.
+        `asgari_gun_sayisi` değerinin altına inemez: en yüklü öğrenci de
+        günde üç sınavı (ÖDY md.5/1-k) ve slot sayısını aşmadan bitirebilmelidir.
         """
         gereken = self.gereken_gun(self.cogunluk_yuku)
         standart = 5 if gereken <= 5 else (10 if gereken <= 10 else gereken)
         return max(standart, self.asgari_gun_sayisi(slot_sayisi))
 
-    def kisisel_sinirlar(self, gun_sayisi: int, slot_sayisi: int | None = None) -> dict[str, int]:
+    def kisisel_sinirlar(self, gun_sayisi: int, slot_sayisi: int | None = None,
+                         etiketler: dict[str, str] | None = None) -> dict[str, int]:
         """Verilen gün sayısına sığmayan öğrencilerin yükseltilmiş sınırı.
 
         Sınır, o öğrencinin planı bitirebilmesi için gereken *en düşük*
         değere çıkarılır; başkalarının sınırı değişmez. `slot_sayisi`
-        verilirse aşan öğrenciler ayrıca hata olarak bildirilir.
+        verilirse günlük tavanı (en çok 3 sınav, en çok slot sayısı kadar
+        oturum) aşması gereken öğrenciler hata olarak bildirilir.
         """
         if gun_sayisi <= 0:
             raise ValueError("Gün sayısı sıfırdan büyük olmalıdır.")
@@ -204,13 +216,20 @@ class YukOzeti:
             if gereken > self.gunluk_sinir:
                 yukseltilen[ogrenci] = gereken
         if slot_sayisi is not None:
-            asanlar = {o: s for o, s in yukseltilen.items() if s > slot_sayisi}
+            tavan = self.gunluk_tavan(slot_sayisi)
+            asanlar = {o: s for o, s in yukseltilen.items() if s > tavan}
             if asanlar:
-                detay = "; ".join(f"{o}: günde {s} sınav gerekiyor" for o, s in asanlar.items())
+                etiketler = etiketler or {}
+                detay = "; ".join(f"{etiketler.get(o, o)}: {self.ogrenci_yukleri[o]} sınav, "
+                                  f"günde {s} sınav gerekiyor" for o, s in asanlar.items())
+                if tavan == GUNLUK_SINAV_TAVANI:
+                    neden = (f"bir öğrenci günde en çok {GUNLUK_SINAV_TAVANI} sınava girebilir "
+                             "(ÖDY md.5/1-k)")
+                else:
+                    neden = f"günde {slot_sayisi} oturum saati var"
                 raise ValueError(
-                    f"{gun_sayisi} günlük planda günde {slot_sayisi} oturum saati var ama "
-                    f"{detay}. Gün sayısını artırın, günlük oturum saati ekleyin ya da bu "
-                    "öğrencileri ayrı programa alın.")
+                    f"{gun_sayisi} günlük planda {neden}; {detay}. Gün sayısını artırın, "
+                    "hafta sonunu açın ya da günlük oturum saati ekleyin.")
         return yukseltilen
 
 

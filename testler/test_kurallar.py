@@ -6,15 +6,18 @@ olduğunu ya da mutlu yolda geçtiğini sınamak bir şey kanıtlamaz.
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import date, time
+
 import pytest
 
 from cekirdek.kurallar import (
     BIRLESTIRME_UST_SINIRI, KURALLAR, Ciddiyet, DogrulamaBaglami,
     dogrula_plan, engelleri_ayikla, gereken_salon_sayisi, gunluk_sinav_yuku,
-    yillik_sayac_asildi_mi,
+    sinir_askisi, ucretlendirilemeyen_gorevler,
 )
 from cekirdek.modeller import (
-    Gorevlendirme, GorevRolu, IkiAsamaliSayim, OturumTuru, Salon,
+    Gorevlendirme, GorevRolu, IkiAsamaliSayim, Musaitsizlik, OturumTuru, Salon,
 )
 from testler.yardimci import PERSONEL, SALONLAR, baglam, gorevler, kimlikler, oturum, plan
 
@@ -32,8 +35,8 @@ def test_her_kuralin_dayanagi_ve_ciddiyeti_vardir() -> None:
 def test_kural_kimlikleri_beklenen_kumedir() -> None:
     assert set(KURALLAR) == {
         "SG-05", "SG-06",
-        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-07", "SP-10",
-        "SP-11", "SP-15",
+        "SP-01", "SP-02", "SP-03", "SP-04", "SP-05", "SP-06", "SP-07", "SP-08", "SP-09",
+        "SP-10", "SP-11", "SP-15",
         "EK-03", "EK-04", "EK-05",
         "TS-01", "TS-02", "TS-03",
     }
@@ -162,6 +165,66 @@ def test_sp10_bir_ders_saatini_asan_sinav_engeldir() -> None:
     assert "SP-10" in kimlikler(sonuc)
 
 
+def test_sp10_uygulama_sinavina_uygulanmaz() -> None:
+    """ÖDY md.5/1-l yalnız yazılı sınavı sınırlar; uygulamalı sınavın süresini
+    zümre belirler (OKY md.45/1-f)."""
+    ortak = dict(ders="İNGİLİZCE", ogrenciler=["101|9/A"], brans="İngilizce", birim="ing-9")
+    ikisi = [oturum("a", saat=(9, 0), tur=OturumTuru.YAZILI, **ortak),
+             oturum("b", saat=(10, 0), tur=OturumTuru.UYGULAMA, sure=80, **ortak)]
+    assert "SP-10" not in kimlikler(dogrula_plan(plan(ikisi), baglam()))
+
+
+# --------------------------------------------------------- SP-08 tatil günü
+
+def test_sp08_tatil_gunundeki_oturum_engeldir() -> None:
+    sonuc = dogrula_plan(plan([oturum("a", "MATEMATİK", ["101|9/A"], gun=15)]),
+                         baglam(tatiller=frozenset({date(2026, 9, 15)})))
+    assert "SP-08" in kimlikler(sonuc)
+    assert engelleri_ayikla(sonuc)
+
+
+def test_sp08_tatil_olmayan_gun_ihlal_uretmez() -> None:
+    sonuc = dogrula_plan(plan([oturum("a", "MATEMATİK", ["101|9/A"], gun=14)]),
+                         baglam(tatiller=frozenset({date(2026, 9, 15)})))
+    assert "SP-08" not in kimlikler(sonuc)
+
+
+# ------------------------------------------------- SP-09 öğretmen müsaitliği
+
+def test_sp09_musait_olmadigi_saatte_gorev_engeldir() -> None:
+    """14.09.2026 pazartesi; kişi 1 pazartesi 08:00–12:00 derste."""
+    ders = Musaitsizlik(1, hafta_gunu=0, bas_saat=time(8, 0), bit_saat=time(12, 0))
+    tek = oturum("a", "MATEMATİK", ["101|9/A"], gun=14, saat=(9, 0))
+    sonuc = dogrula_plan(plan([tek], gorevler("a", komisyon=(1, 2), gozcu=(3,))),
+                         baglam(musaitsizlikler={1: (ders,)}))
+    sp09 = [i for i in sonuc if i.kural_kimligi == "SP-09"]
+    assert sp09 and sp09[0].engel_mi
+    assert "Uydurma Matematikçi" in sp09[0].aciklama
+
+
+def test_sp09_musait_saatteki_gorev_ihlal_uretmez() -> None:
+    ders = Musaitsizlik(1, hafta_gunu=0, bas_saat=time(8, 0), bit_saat=time(12, 0))
+    ogleden_sonra = oturum("a", "MATEMATİK", ["101|9/A"], gun=14, saat=(13, 30))
+    sali = oturum("b", "MATEMATİK", ["102|9/A"], gun=15, saat=(9, 0))
+    atamalar = gorevler("a", komisyon=(1, 2), gozcu=(3,)) + gorevler("b", komisyon=(1, 2),
+                                                                     gozcu=(3,))
+    sonuc = dogrula_plan(plan([ogleden_sonra, sali], atamalar),
+                         baglam(musaitsizlikler={1: (ders,)}))
+    assert "SP-09" not in kimlikler(sonuc)
+
+
+def test_sp09_tarih_araligindaki_izin_butun_gunu_kapsar() -> None:
+    izin = Musaitsizlik(2, bas_tarih=date(2026, 9, 14), bit_tarih=date(2026, 9, 16))
+    icinde = oturum("a", "MATEMATİK", ["101|9/A"], gun=16, saat=(14, 30))
+    disinda = oturum("b", "MATEMATİK", ["102|9/A"], gun=17, saat=(9, 0))
+    atamalar = gorevler("a", komisyon=(1, 2), gozcu=(3,)) + gorevler("b", komisyon=(1, 2),
+                                                                     gozcu=(3,))
+    sonuc = dogrula_plan(plan([icinde, disinda], atamalar),
+                         baglam(musaitsizlikler={2: (izin,)}))
+    sp09 = [i for i in sonuc if i.kural_kimligi == "SP-09"]
+    assert len(sp09) == 1 and "16.09.2026" in sp09[0].aciklama
+
+
 # -------------------------------------------------------- SP-11 günlük yük
 
 def test_sp11_gunluk_sinir_asiminda_ogrenci_gun_ve_sinavlar_yazilir() -> None:
@@ -180,8 +243,24 @@ def test_sp11_gunluk_sinir_asiminda_ogrenci_gun_ve_sinavlar_yazilir() -> None:
     assert "MATEMATİK" in aciklama and "KİMYA" in aciklama
 
 
-def test_sp11_kisisel_sinir_yukseltilen_ogrenci_ihlal_uretmez() -> None:
-    """Çok sayıda sorumlu dersi olan öğrencinin sınırı yükseltilir."""
+def test_sp11_kisisel_siniri_yukseltilen_ogrencide_ucuncu_sinav_uyaridir() -> None:
+    """Sınır yükseltilse de ÖDY md.5/1-k esası (2) uyarı olarak gösterilir:
+    üçüncü sınav ancak zorunlu hâlde yapılabilir."""
+    ayni_gun = [
+        oturum("a", "MATEMATİK", ["101|12/B"], saat=(9, 0)),
+        oturum("b", "FİZİK", ["101|12/B"], saat=(10, 0), brans="Fizik"),
+        oturum("c", "KİMYA", ["101|12/B"], saat=(11, 0), brans="Kimya"),
+    ]
+    sonuc = dogrula_plan(plan(ayni_gun), baglam(kisisel_gunluk_sinir={"101|12/B": 3}))
+    sp11 = [i for i in sonuc if i.kural_kimligi == "SP-11"]
+    assert len(sp11) == 1
+    assert sp11[0].ciddiyet is Ciddiyet.UYARI
+    assert "zorunlu hâl" in sp11[0].aciklama
+
+
+def test_sp11_dorduncu_sinav_her_durumda_engeldir() -> None:
+    """Zorunlu hâlde bile yalnız bir sınav eklenebilir; kişisel sınır 4'e
+    çıkarılmış olsa da dördüncü sınav engeldir."""
     ayni_gun = [
         oturum("a", "MATEMATİK", ["101|12/B"], saat=(9, 0)),
         oturum("b", "FİZİK", ["101|12/B"], saat=(10, 0), brans="Fizik"),
@@ -189,7 +268,21 @@ def test_sp11_kisisel_sinir_yukseltilen_ogrenci_ihlal_uretmez() -> None:
         oturum("d", "TARİH", ["101|12/B"], saat=(13, 30), brans="Tarih"),
     ]
     sonuc = dogrula_plan(plan(ayni_gun), baglam(kisisel_gunluk_sinir={"101|12/B": 4}))
-    assert "SP-11" not in kimlikler(sonuc)
+    sp11 = [i for i in sonuc if i.kural_kimligi == "SP-11"]
+    assert sp11 and sp11[0].engel_mi
+    assert "3 sınavı aşamaz" in sp11[0].aciklama
+
+
+def test_sp11_secilen_daha_siki_sinir_da_gosterilir() -> None:
+    """Kullanıcı günde bir sınav seçtiyse ikinci sınav uyarıdır."""
+    ayni_gun = [
+        oturum("a", "MATEMATİK", ["101|9/A"], saat=(9, 0)),
+        oturum("b", "FİZİK", ["101|9/A"], saat=(10, 0), brans="Fizik"),
+    ]
+    siki = dogrula_plan(plan(ayni_gun, ogrenci_gunluk_sinav_siniri=1), baglam())
+    olagan = dogrula_plan(plan(ayni_gun, ogrenci_gunluk_sinav_siniri=2), baglam())
+    assert any(i.kural_kimligi == "SP-11" and "seçilen sınır 1" in i.aciklama for i in siki)
+    assert "SP-11" not in kimlikler(olagan)
 
 
 def test_sp11_iki_asamali_ders_tek_sinav_sayilir() -> None:
@@ -309,28 +402,75 @@ def test_ayni_salon_ayni_saatte_iki_sinava_ayrilamaz() -> None:
 
 # ------------------------------------------------------------- EK-05 sayaç
 
-def test_ek05_sinirsiz_ogretim_yillarinda_sayac_asimi_bildirilmez() -> None:
-    assert not yillik_sayac_asildi_mi("2026-2027", 99, 99)
-    assert yillik_sayac_asildi_mi("2027-2028", 13, 0)
-    assert yillik_sayac_asildi_mi("2027-2028", 0, 16)
-    assert not yillik_sayac_asildi_mi("2027-2028", 12, 15)
+K, G = GorevRolu.KOMISYON_UYESI, GorevRolu.GOZCU
+
+
+def test_ek05_toplu_sozlesme_askisi_takvim_yilina_baglidir() -> None:
+    """8. Dönem Toplu Sözleşme md.4: 01.01.2026 – 31.12.2027. Eski sürüm askıyı
+    öğretim yılına bağladığı için Eylül 2027 görevlerini sınırlı sayıyordu."""
+    assert sinir_askisi(date(2027, 9, 20)) is not None
+    assert "8. Dönem" in sinir_askisi(date(2026, 1, 1)).dayanak
+    assert sinir_askisi(date(2025, 9, 15)) is not None          # 7. Dönem
+    assert sinir_askisi(date(2028, 1, 1)) is None
+
+
+def test_ek05_askidaki_gorevler_sinira_takilmaz() -> None:
+    eylul_2027 = [(K, date(2027, 9, 13 + i % 5)) for i in range(20)]
+    assert ucretlendirilemeyen_gorevler(eylul_2027) == {K: 0, G: 0}
+
+
+def test_ek05_aski_disinda_sinir_asimi_sayilir() -> None:
+    subat_2028 = [(K, date(2028, 2, 7 + i % 5)) for i in range(13)] + [
+        (G, date(2028, 2, 7)) for _ in range(16)]
+    assert ucretlendirilemeyen_gorevler(subat_2028) == {K: 1, G: 1}
+    sinirda = [(K, date(2028, 2, 7)) for _ in range(12)] + [(G, date(2028, 2, 7))] * 15
+    assert ucretlendirilemeyen_gorevler(sinirda) == {K: 0, G: 0}
+
+
+def test_ek05_askidaki_gorevler_yillik_sayaca_girer() -> None:
+    """2027-2028: Eylül'deki 10 görev askıda ama yıl içi sayaca girer; Şubat
+    2028'deki 3 görevin 1'i 12'yi aşar."""
+    gorevler_ = [(K, date(2027, 9, 14))] * 10 + [(K, date(2028, 2, 8))] * 3
+    assert ucretlendirilemeyen_gorevler(gorevler_) == {K: 1, G: 0}
+
+
+def _subat_2028_oturumlari(adet: int):
+    return [replace(oturum(f"o{i}", "MATEMATİK", [f"{100 + i}|9/A"], saat=(9, 0)),
+                    tarih=date(2028, 2, 7 + i % 5)) for i in range(adet)]
 
 
 def test_ek05_sinir_asiminda_uyari_uretilir() -> None:
-    oturumlar = [oturum(f"o{i}", "MATEMATİK", ["101|9/A"], gun=14 + i % 10, saat=(9, 0))
-                 for i in range(13)]
-    atamalar = [Gorevlendirme(o.anahtar, 1, GorevRolu.KOMISYON_UYESI) for o in oturumlar]
-    sonuc = dogrula_plan(plan(oturumlar, atamalar), baglam(ogretim_yili="2027-2028"))
+    oturumlar = _subat_2028_oturumlari(13)
+    atamalar = [Gorevlendirme(o.anahtar, 1, K) for o in oturumlar]
+    sonuc = dogrula_plan(plan(oturumlar, atamalar),
+                         baglam(ogretim_yili="2027-2028",
+                                pencere=(date(2028, 2, 7), date(2028, 2, 20))))
     ek05 = [i for i in sonuc if i.kural_kimligi == "EK-05"]
     assert ek05 and "13 komisyon üyeliği" in ek05[0].aciklama
+    assert ek05[0].ciddiyet is Ciddiyet.UYARI
 
 
-def test_ek05_sinirsiz_yilda_plan_uyari_uretmez() -> None:
-    oturumlar = [oturum(f"o{i}", "MATEMATİK", ["101|9/A"], gun=14 + i % 10, saat=(9, 0))
+def test_ek05_askidaki_tarihlerde_plan_uyari_uretmez() -> None:
+    oturumlar = [oturum(f"o{i}", "MATEMATİK", [f"{100 + i}|9/A"], gun=14 + i % 10, saat=(9, 0))
                  for i in range(13)]
-    atamalar = [Gorevlendirme(o.anahtar, 1, GorevRolu.KOMISYON_UYESI) for o in oturumlar]
+    atamalar = [Gorevlendirme(o.anahtar, 1, K) for o in oturumlar]
     sonuc = dogrula_plan(plan(oturumlar, atamalar), baglam(ogretim_yili="2026-2027"))
     assert "EK-05" not in kimlikler(sonuc)
+
+
+def test_ek05_onceki_donem_gorevleri_hesaba_katilir() -> None:
+    """Yıllık sınır tek plana değil yıla bakar: Şubat'ta 11 görev almış kişi
+    Haziran planındaki 2 görevle 12'yi aşar."""
+    haziran = [replace(oturum(f"h{i}", "MATEMATİK", [f"{100 + i}|9/A"], saat=(9, 0)),
+                       tarih=date(2028, 6, 12 + i)) for i in range(2)]
+    atamalar = [Gorevlendirme(o.anahtar, 1, K) for o in haziran]
+    onceki = tuple((1, K, date(2028, 2, 8)) for _ in range(11))
+    pencere = (date(2028, 6, 12), date(2028, 6, 25))
+    yalniz_plan = dogrula_plan(plan(haziran, atamalar), baglam(pencere=pencere))
+    yil_boyu = dogrula_plan(plan(haziran, atamalar),
+                            baglam(pencere=pencere, onceki_gorevler=onceki))
+    assert "EK-05" not in kimlikler(yalniz_plan)
+    assert "EK-05" in kimlikler(yil_boyu)
 
 
 # --------------------------------------------------------------- sıralama

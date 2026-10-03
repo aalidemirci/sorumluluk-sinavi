@@ -106,6 +106,36 @@ class Personel:
 
 
 @dataclass(frozen=True)
+class Musaitsizlik:
+    """Öğretmenin sınav görevi alamayacağı zaman.
+
+    OKY md.58/2-ç sınavların "dersleri aksatmayacak şekilde" planlanmasını
+    ister; program öğretmenin ders programını e-Okul'dan okuyamaz, bu yüzden
+    dolu saatler buradan verilir. Kayıt ya haftalık tekrar eden bir gündür
+    (`hafta_gunu`) ya da bir tarih aralığıdır (izin, görevlendirme); saat
+    verilmezse bütün gün kapsanır.
+    """
+
+    personel_kimligi: int
+    hafta_gunu: int | None = None      # 0 = pazartesi … 6 = pazar
+    bas_saat: time | None = None
+    bit_saat: time | None = None
+    bas_tarih: date | None = None
+    bit_tarih: date | None = None
+
+    def kapsar_mi(self, tarih: date, bas: time, bit: time) -> bool:
+        """[bas, bit) aralığındaki bir görev bu kayıtla çakışıyor mu?"""
+        if self.bas_tarih is not None:
+            if not self.bas_tarih <= tarih <= (self.bit_tarih or self.bas_tarih):
+                return False
+        elif self.hafta_gunu is not None and tarih.weekday() != self.hafta_gunu:
+            return False
+        if self.bas_saat is None or self.bit_saat is None:
+            return True
+        return bas < self.bit_saat and self.bas_saat < bit
+
+
+@dataclass(frozen=True)
 class Salon:
     kimlik: int
     ad: str
@@ -136,6 +166,19 @@ class DersAyari:
         return (self.brans, *self.esdeger_branslar)
 
 
+class PlanTuru(str, Enum):
+    """Planın hangi sınav için yapıldığı.
+
+    OKY md.58/6, sorumluluk sınavı sonunda tek dersten başarısızlığı kalan
+    son sınıf öğrencileri için "aynı usulle takip eden hafta içinde" bir
+    sınav daha ister. Bu sınav ayrı bir plandır: penceresi ve öğrencileri
+    farklıdır, kuralları aynıdır.
+    """
+
+    OLAGAN = "olagan"
+    TEK_DERS = "tek_ders"
+
+
 @dataclass(frozen=True)
 class PlanParametreleri:
     """Kullanıcının plan üretmeden önce yanıtladığı sorular."""
@@ -147,12 +190,29 @@ class PlanParametreleri:
     slot_saatleri: tuple[time, ...] = (
         time(8, 0), time(9, 0), time(10, 0), time(11, 0), time(13, 30), time(14, 30),
     )
-    oturum_suresi_dakika: int = 40  # ÖDY md.5/1-l: bir ders saatini aşamaz
+    oturum_suresi_dakika: int = 40  # ÖDY md.5/1-l: yazılı sınav bir ders saatini aşamaz
     hedef_gun_sayisi: int | None = None  # None ise yükten otomatik belirlenir
+    # Uygulamalı sınavın süresini zümre belirler (OKY md.45/1-f, ÖDY md.5/1-ğ);
+    # yazılı sınavın bir ders saati sınırı ona uygulanmaz.
+    uygulama_suresi_dakika: int = 40
+    plan_turu: PlanTuru = PlanTuru.OLAGAN
+
+    def oturum_suresi(self, tur: OturumTuru) -> int:
+        return (self.uygulama_suresi_dakika if tur is OturumTuru.UYGULAMA
+                else self.oturum_suresi_dakika)
 
     def dogrula(self) -> None:
+        # Döngüsel içe aktarmayı önlemek için yerel: kurallar bu modülü içe aktarır.
+        from .kurallar import GUNLUK_SINAV_TAVANI
         if self.ogrenci_gunluk_sinav_siniri < 1:
             raise ValueError("Öğrenci günlük sınav sınırı en az 1 olmalıdır.")
+        if self.ogrenci_gunluk_sinav_siniri > GUNLUK_SINAV_TAVANI:
+            raise ValueError(
+                f"Öğrenci günlük sınav sınırı en çok {GUNLUK_SINAV_TAVANI} olabilir: bir günde "
+                "yapılacak sınavların ikiyi geçmemesi esastır, zorunlu hâllerde bir sınav "
+                "daha yapılabilir (ÖDY md.5/1-k).")
+        if self.uygulama_suresi_dakika < 1:
+            raise ValueError("Uygulama sınavı süresi sıfırdan büyük olmalıdır.")
         if not self.slot_saatleri:
             raise ValueError("En az bir oturum saati tanımlanmalıdır.")
         if len(set(self.slot_saatleri)) != len(self.slot_saatleri):
@@ -202,6 +262,9 @@ class Gorevlendirme:
     rol: GorevRolu
     gerekce: str = ""
     kilitli_mi: bool = False
+    # Gözcünün bulunduğu salon. OKY md.58/2-b her salon için ayrı gözcü
+    # ister; hangi gözcünün hangi salonda olduğu evrakta yazılmalıdır.
+    salon_kimligi: int | None = None
 
 
 @dataclass

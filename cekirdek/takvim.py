@@ -1,12 +1,15 @@
 """İş günü hesapları ve sorumluluk sınavı pencereleri.
 
 Pencereler OKY md.58/2-a uyarınca dönem tarihlerinden hesaplanır; koda
-gömülmez. Resmî tatiller çağıranca verilir, uygulama kendi tatil listesi
-tutmaz.
+gömülmez. Resmî tatiller çağıranca verilir: çekirdek tatil listesi tutmaz,
+kurumun girdiği liste servis katmanından gelir. Bayram tarihleri her yıl
+kaydığı ve idari izinler önceden bilinmediği için gömülü bir liste
+eskiyecekti.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 
 
@@ -58,11 +61,15 @@ def is_gunu_ekle(baslangic: date, adet: int, tatiller: Tatiller = frozenset()) -
 
 def gunleri_listele(baslangic: date, bitis: date, hafta_sonu_dahil: bool,
                     tatiller: Tatiller = frozenset()) -> list[date]:
-    """Pencere içindeki planlanabilir günleri sırayla döndürür."""
+    """Pencere içindeki planlanabilir günleri sırayla döndürür.
+
+    Tatil günü hafta sonu açık olsa da listeye girmez: hafta sonu izni
+    cumartesi ve pazarı açar (OKY md.58/2-ç), bayram ve idari izni değil.
+    """
     gunler = []
     gun = baslangic
     while gun <= bitis:
-        if hafta_sonu_dahil or is_gunu_mu(gun, tatiller):
+        if gun not in tatiller and (hafta_sonu_dahil or gun.weekday() < 5):
             gunler.append(gun)
         gun += timedelta(days=1)
     return gunler
@@ -78,3 +85,65 @@ def sinav_pencereleri(birinci_donem_baslangic: date, ikinci_donem_baslangic: dat
         "P2": (ikinci_donem_baslangic, ikinci_donem_baslangic + genislik),
         "P3": (ikinci_donem_bitis - genislik, ikinci_donem_bitis),
     }
+
+
+def tek_ders_penceresi(son_sinav_tarihi: date) -> tuple[date, date]:
+    """OKY md.58/6: sorumluluk sınavı sonunda tek dersten başarısızlığı kalan
+    son sınıf öğrencisi için "takip eden hafta içinde" bir sınav daha yapılır.
+
+    Takip eden hafta, son sınavın düştüğü takvim haftasından sonraki
+    pazartesi–pazar aralığıdır. Hafta sonu kullanımı olağan plandaki gibi
+    OKY md.58/2-ç'ye bağlıdır ("aynı usulle").
+    """
+    pazartesi = son_sinav_tarihi + timedelta(days=7 - son_sinav_tarihi.weekday())
+    return pazartesi, pazartesi + timedelta(days=6)
+
+
+def varsayilan_pencere_kodu(pencereler: dict[str, tuple[date, date]], bugun: date,
+                            gecmise_bak: bool = False) -> str:
+    """Ekranların açılışta göstereceği dönem.
+
+    Planlama ileriye bakar: içinde bulunulan, yoksa sıradaki dönem. Evrak
+    teslimi geriye bakar (`gecmise_bak`): başlamış dönemlerin en sonuncusu,
+    çünkü evrak sınavdan sonra toplanır. Eski sürüm her ekranı Eylül'le
+    açıyordu; Şubat'ta çalışan kullanıcı dönem kutusunu değiştirmeyi
+    unutursa Eylül planı üzerinde işlem yapıyordu.
+    """
+    if not pencereler:
+        raise ValueError("Pencere tanımlı değil.")
+    sirali = sorted(pencereler.items(), key=lambda x: x[1][0])
+    if gecmise_bak:
+        baslamis = [kod for kod, (bas, _) in sirali if bas <= bugun]
+        return baslamis[-1] if baslamis else sirali[0][0]
+    for kod, (_, bit) in sirali:
+        if bugun <= bit:
+            return kod
+    return sirali[-1][0]
+
+
+# ------------------------------------------------------------ tarih biçimi
+
+_GG_AA_YYYY = re.compile(r"^\s*(\d{1,2})[./-](\d{1,2})[./-](\d{4})\s*$")
+
+
+def tarih_coz(metin: str) -> date:
+    """Kullanıcının yazdığı tarihi çözer.
+
+    Arayüz gg.aa.yyyy ister (proje kuralı); eski sürümün YYYY-AA-GG biçimi de
+    kabul edilir ki önceden kaydedilmiş değerler ve alışkanlıklar kırılmasın.
+    """
+    deger = str(metin or "").strip()
+    eslesme = _GG_AA_YYYY.match(deger)
+    try:
+        if eslesme:
+            gun, ay, yil = (int(x) for x in eslesme.groups())
+            return date(yil, ay, gun)
+        return date.fromisoformat(deger)
+    except ValueError as hata:
+        raise ValueError(
+            f"'{deger}' geçerli bir tarih değil; gg.aa.yyyy biçiminde yazın "
+            "(ör. 14.09.2026).") from hata
+
+
+def tarih_yaz(deger: date | None) -> str:
+    return deger.strftime("%d.%m.%Y") if deger else ""
