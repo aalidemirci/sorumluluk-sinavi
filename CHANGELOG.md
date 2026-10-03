@@ -43,6 +43,10 @@ derlenir.
   evrak yeniden üretilince değişen belgeler için föy kaydedilir ve evrak
   ekranı imzalanmış eski çıktıların yerine yeni sürümün imzaya sunulmasını
   söyler.
+- Belgelerin dosya özellikleri python-docx şablonundan kalıyordu (yazar
+  "python-docx", oluşturma 2013, program "Microsoft Macintosh Word"). Artık
+  yazar ve program uygulamanın adı ve sürümü, başlık belgenin adı, tarih
+  üretim zamanıdır; kişi adı yazılmaz.
 
 ### Değiştirildi
 - Servis katmanı (`veri/hizmet.py`, ~2 400 satır) konu modüllerine bölündü

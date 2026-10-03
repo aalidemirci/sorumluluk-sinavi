@@ -71,6 +71,31 @@ def test_bos_tablo_kayit_yok_yazar(tmp_path: Path) -> None:
     assert "Kayıt yok" in _metin(tmp_path / "bos.docx")
 
 
+def test_ust_veri_uygulamayi_gosterir_sablondan_iz_tasimaz(tmp_path: Path) -> None:
+    """0.6.2'ye kadar dosya özellikleri python-docx şablonundan kalıyordu
+    (yazar "python-docx", oluşturma 2013, program "Microsoft Macintosh Word")."""
+    import zipfile
+    from datetime import datetime
+
+    from docx import Document
+
+    from cekirdek.surum import SURUM
+    yol = tmp_path / "belge.docx"
+    b = Belge("Deneme Lisesi", "Sınav Programı")
+    b.paragraf("Bir paragraf.")
+    b.kaydet(yol)
+    ozellik = Document(yol).core_properties
+    assert ozellik.author == f"Sorumluluk Sınavı {SURUM}"
+    assert ozellik.title == "Sınav Programı"
+    assert ozellik.comments == ""
+    assert ozellik.created.year == datetime.now().year
+    with zipfile.ZipFile(yol) as arsiv:
+        tum = b"".join(arsiv.read(ad) for ad in ("docProps/core.xml", "docProps/app.xml"))
+    assert b"python-docx" not in tum and b"Macintosh" not in tum
+    assert f"<Application>Sorumluluk Sınavı {SURUM}</Application>".encode("utf-8") in tum
+    assert _metin(yol).count("Bir paragraf.") == 1      # gövde bozulmadı
+
+
 # ============================================================== evrak üretimi
 
 def test_tum_evraklar_uretilir(hazir) -> None:
