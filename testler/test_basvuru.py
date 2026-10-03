@@ -267,3 +267,88 @@ def test_taze_liste_hatirlatma_uretmez(vt: Veritabani, tmp_path: Path) -> None:
         b.execute("UPDATE ice_aktarim SET onaylandi_at='2027-02-01T09:00:00+03:00'"
                   " WHERE tur='sorumluluk'")
     assert hizmet.liste_tazeligi_uyarisi(vt, "P2") == ""
+
+
+# ================================================ toplu işaret ve numara listesi
+
+def test_toplu_isaret_verilmeyen_bayraga_dokunmaz(vt: Veritabani, tmp_path: Path) -> None:
+    """Eski ekranda tek bayrağı değiştiren kullanıcı öbürünü sessizce siliyordu;
+    toplu işlemde verilmeyen (None) bayrak olduğu gibi kalır."""
+    _kur(vt, tmp_path)
+    beklemeli, devamsiz = _ogrenci_id(vt, "301"), _ogrenci_id(vt, "302")
+    hizmet.ogrenci_bayrak_guncelle(vt, devamsiz, False, True)
+    degisen = hizmet.ogrenci_bayraklarini_toplu_guncelle(
+        vt, [beklemeli, devamsiz, beklemeli], mezun_olamayan=True)
+    assert degisen == 2
+    satirlar = {s["okul_no"]: s for s in hizmet.basvuru_tablosu(vt, "P1")}
+    assert (satirlar["301"]["mezun_olamayan_mi"], satirlar["301"]["devamsizlik_tebligati_mi"]) \
+        == (True, False)
+    assert (satirlar["302"]["mezun_olamayan_mi"], satirlar["302"]["devamsizlik_tebligati_mi"]) \
+        == (True, True)
+    assert satirlar["301"]["sinif"] == 12 and satirlar["101"]["sinif"] == 9
+
+
+def test_toplu_isaret_kaldirma_ve_degismeyen_sayilmaz(vt: Veritabani, tmp_path: Path) -> None:
+    _kur(vt, tmp_path)
+    beklemeli = _ogrenci_id(vt, "301")
+    hizmet.ogrenci_bayrak_guncelle(vt, beklemeli, True, False)
+    assert hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [beklemeli],
+                                                      mezun_olamayan=True) == 0
+    assert hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [beklemeli],
+                                                      mezun_olamayan=False) == 1
+    satir = next(s for s in hizmet.basvuru_tablosu(vt, "P1") if s["okul_no"] == "301")
+    assert not satir["bayrakli_mi"] and satir["isaret_yili"] == ""
+
+
+def test_toplu_isaret_onceki_yilin_isaretini_bu_yila_ceker(vt: Veritabani,
+                                                           tmp_path: Path) -> None:
+    """Gözden geçirilip yeniden kaydedilen eski işaret artık uyarı üretmez."""
+    _kur(vt, tmp_path)
+    beklemeli = _ogrenci_id(vt, "301")
+    hizmet.ogrenci_bayrak_guncelle(vt, beklemeli, True, False)
+    with vt.baglan() as b:
+        b.execute("UPDATE ogrenci SET isaret_ogretim_yili='2025-2026' WHERE id=?", (beklemeli,))
+    assert hizmet.isaret_tazeligi_uyarisi(vt)
+    assert hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [beklemeli], mezun_olamayan=True) == 1
+    assert hizmet.isaret_tazeligi_uyarisi(vt) == ""
+
+
+def test_toplu_isaret_bos_secim_ve_bilinmeyen_ogrenci(vt: Veritabani, tmp_path: Path) -> None:
+    """Olumsuz senaryolar: işaret seçilmeden çağrı ve listede olmayan öğrenci."""
+    _kur(vt, tmp_path)
+    with pytest.raises(HizmetHatasi, match="işaret seçilmedi"):
+        hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [_ogrenci_id(vt, "301")])
+    with pytest.raises(HizmetHatasi, match="bulunamadı"):
+        hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [_ogrenci_id(vt, "301"), 999_999],
+                                                   devamsizlik_tebligati=True)
+    assert hizmet.ogrenci_bayraklarini_toplu_guncelle(vt, [], mezun_olamayan=True) == 0
+    assert not any(s["bayrakli_mi"] for s in hizmet.basvuru_tablosu(vt, "P1"))
+
+
+def test_numara_listesi_e_okul_satirlarindan_numarayi_ayiklar(vt: Veritabani,
+                                                              tmp_path: Path) -> None:
+    """Ad ve şubeyle kopyalanan satırlarda yalnız rakam öbekleri numaradır."""
+    _kur(vt, tmp_path)
+    sonuc = hizmet.numara_listesini_coz(
+        vt, "301 Uydurma Beklemeli 12/A\n302;301, 999\n\tabc")
+    assert [(s["no"], s["durum"]) for s in sonuc] == [
+        ("301", "bulundu"), ("302", "bulundu"), ("999", "bulunamadi")]
+    assert sonuc[0]["ad_soyad"] == "Uydurma Beklemeli" and sonuc[0]["sube"] == "12/A"
+    assert hizmet.numara_listesini_coz(vt, "  ad soyad 12/A ") == []
+
+
+def test_numara_iki_subede_varsa_isaretlenecek_ogrenci_secilmez(vt: Veritabani,
+                                                                 tmp_path: Path) -> None:
+    """Olumsuz senaryo: eski sürümden kalma veride aynı numara iki şubede
+    kayıtlı olabilir; hangisi olduğu bilinemez ve satır işaretlenmez."""
+    _kur(vt, tmp_path)
+    with vt.baglan() as b:
+        ilk = b.execute("SELECT id FROM ogrenci WHERE okul_no='101'").fetchone()[0]
+        ikinci = b.execute("INSERT INTO ogrenci(okul_no,ad_soyad,sube,sinif_duzeyi)"
+                           " VALUES('101','Uydurma Eski Kayıt','10/B',10)").lastrowid
+        b.execute("INSERT INTO sorumluluk_kaydi(ogrenci_id,ders_id,duzey,kaynak)"
+                  " SELECT ?,ders_id,duzey,kaynak FROM sorumluluk_kaydi WHERE ogrenci_id=?",
+                  (ikinci, ilk))
+    satir = hizmet.numara_listesini_coz(vt, "101")[0]
+    assert satir["durum"] == "birden_cok" and satir["ogrenci_id"] is None
+    assert satir["sube"] == "10/B, 9/A"

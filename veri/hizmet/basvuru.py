@@ -4,6 +4,7 @@ dışı bırakılanlar.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from cekirdek.takvim import is_gunu_ekle, is_gunu_farki, pencere_adi
@@ -145,6 +146,94 @@ def ogrenci_bayrak_guncelle(vt: Veritabani, ogrenci_id: int, mezun_olamayan: boo
         vt.denetim_yaz(b, "ogrenci", ogrenci_id, "basvuru_bayragi_guncellendi")
 
 
+def ogrenci_bayraklarini_toplu_guncelle(vt: Veritabani, ogrenci_idleri: list[int], *,
+                                        mezun_olamayan: bool | None = None,
+                                        devamsizlik_tebligati: bool | None = None) -> int:
+    """Birden çok öğrencinin md.58/2-d işaretini tek işlemde değiştirir.
+
+    Verilmeyen (None) bayrağa dokunulmaz: tek bayrağı topluca değiştiren
+    kullanıcı öbür bayrağı sessizce silmemeli (eski tek kayıtlı ekranın hatası
+    buydu). İşareti kalan her öğrencinin işaret yılı bu öğretim yılına çekilir;
+    önceki yıldan kalan işareti gözden geçirip yeniden kaydetmek budur.
+    Değişen öğrenci sayısını döndürür.
+    """
+    if mezun_olamayan is None and devamsizlik_tebligati is None:
+        raise HizmetHatasi("Değiştirilecek işaret seçilmedi.")
+    kimlikler = sorted(set(ogrenci_idleri))
+    if not kimlikler:
+        return 0
+    yil = ogretim_yili(vt)
+    degisen = 0
+    with vt.baglan() as b:
+        yer = ",".join("?" * len(kimlikler))
+        mevcut = {r[0]: (bool(r[1]), bool(r[2]), r[3] or "") for r in b.execute(
+            f"SELECT id,mezun_olamayan_mi,devamsizlik_tebligati_mi,isaret_ogretim_yili"
+            f" FROM v_ogrenci WHERE id IN ({yer})", kimlikler)}
+        eksik = len(kimlikler) - len(mevcut)
+        if eksik:
+            raise HizmetHatasi(f"{eksik} öğrenci bulunamadı; liste yenilenip yeniden denenmeli.")
+        for kimlik, (mezun, devamsiz, eski_yil) in mevcut.items():
+            yeni_mezun = mezun if mezun_olamayan is None else bool(mezun_olamayan)
+            yeni_devamsiz = devamsiz if devamsizlik_tebligati is None else bool(devamsizlik_tebligati)
+            yeni_yil = yil if (yeni_mezun or yeni_devamsiz) else ""
+            if (yeni_mezun, yeni_devamsiz, yeni_yil) == (mezun, devamsiz, eski_yil):
+                continue
+            b.execute("UPDATE ogrenci SET mezun_olamayan_mi=?,devamsizlik_tebligati_mi=?,"
+                      "isaret_ogretim_yili=? WHERE id=?",
+                      (int(yeni_mezun), int(yeni_devamsiz), yeni_yil, kimlik))
+            vt.denetim_yaz(b, "ogrenci", kimlik, "basvuru_bayragi_guncellendi")
+            degisen += 1
+    return degisen
+
+
+def numara_listesini_coz(vt: Veritabani, metin: str) -> list[dict]:
+    """Yapıştırılan okul numaralarını öğrencilerle eşler (işaretleme önizlemesi).
+
+    Ayırıcı boşluk, virgül, noktalı virgül ya da satır sonudur; yalnız
+    rakamdan oluşan parçalar numara sayılır, böylece e-Okul'dan ad ve şubeyle
+    birlikte kopyalanan satırlar da çalışır ("12/A" ya da ad numara sayılmaz).
+    İçe aktarma öğrenciyi okul numarasıyla tanır, ama şema (okul_no, şube)
+    çiftini tekil tutar ve eski sürümlerden kalma veride aynı numara iki
+    şubede bulunabilir: o durumda hangisi olduğu bilinemez, satır "birden çok
+    kayıt" olarak döner ve işaretlenmez. Aktif sorumluluk kaydı olmayan
+    öğrencinin işareti bir şey değiştirmeyeceği için ayrıca belirtilir.
+    """
+    numaralar = list(dict.fromkeys(
+        parca for parca in re.split(r"[\s,;]+", metin.strip()) if re.fullmatch(r"\d{1,9}", parca)))
+    if not numaralar:
+        return []
+    with vt.baglan() as b:
+        yer = ",".join("?" * len(numaralar))
+        kayitlar: dict[str, list[tuple]] = {}
+        for r in b.execute(f"""
+                SELECT o.okul_no,o.id,o.ad_soyad,o.sube,o.mezun_olamayan_mi,
+                       o.devamsizlik_tebligati_mi,
+                       EXISTS(SELECT 1 FROM v_sorumluluk_kaydi s
+                              WHERE s.ogrenci_id=o.id AND s.durum='aktif')
+                FROM v_ogrenci o WHERE o.okul_no IN ({yer})
+                ORDER BY o.sube""", numaralar):
+            kayitlar.setdefault(r[0], []).append(r)
+    sonuc = []
+    for no in numaralar:
+        eslesen = kayitlar.get(no, [])
+        aktif = [r for r in eslesen if r[6]]
+        if len(aktif) == 1:
+            r = aktif[0]
+            sonuc.append({"no": no, "durum": "bulundu", "ogrenci_id": r[1], "ad_soyad": r[2],
+                          "sube": r[3], "mezun_olamayan_mi": bool(r[4]),
+                          "devamsizlik_tebligati_mi": bool(r[5])})
+        elif len(aktif) > 1:
+            sonuc.append({"no": no, "durum": "birden_cok", "ogrenci_id": None,
+                          "ad_soyad": "", "sube": ", ".join(r[3] for r in aktif)})
+        elif eslesen:
+            sonuc.append({"no": no, "durum": "sorumlulugu_yok", "ogrenci_id": None,
+                          "ad_soyad": eslesen[0][2], "sube": eslesen[0][3]})
+        else:
+            sonuc.append({"no": no, "durum": "bulunamadi", "ogrenci_id": None,
+                          "ad_soyad": "", "sube": ""})
+    return sonuc
+
+
 def eski_yildan_isaretler(vt: Veritabani) -> list[dict]:
     """Önceki öğretim yılında konmuş md.58/2-d işaretleri.
 
@@ -245,6 +334,12 @@ def _gec_basvuru_suresini_denetle(vt: Veritabani, ogrenci_id: int, pencere_kodu:
             f"{BASVURU_IS_GUNU} iş günü önce yapılmış olmalıdır (OKY md.58/2-d).")
 
 
+def sube_duzeyi(sube: str) -> int | None:
+    """"12/A" → 12. Rapor şubeyi "düzey/şube" diye kaydeder; düzey yoksa None."""
+    eslesme = re.match(r"\s*(\d{1,2})", sube or "")
+    return int(eslesme.group(1)) if eslesme else None
+
+
 def basvuru_tablosu(vt: Veritabani, pencere_kodu: str) -> list[dict]:
     """Aktif sorumluluğu olan öğrenciler, bayrakları ve o pencerede durumları."""
     ogretim_yili = ayarlari_getir(vt).get("ogretim_yili", "")
@@ -268,6 +363,7 @@ def basvuru_tablosu(vt: Veritabani, pencere_kodu: str) -> list[dict]:
         grup = _grup_adi(r[4], r[5]) if bayrakli else "—"
         sonuc.append({
             "ogrenci_id": r[0], "okul_no": r[1], "ad_soyad": r[2], "sube": r[3],
+            "sinif": sube_duzeyi(r[3]),
             "mezun_olamayan_mi": bool(r[4]), "devamsizlik_tebligati_mi": bool(r[5]),
             "bayrakli_mi": bayrakli,
             "isaret_yili": r[12] or "", "eski_isaret_mi": eski,
