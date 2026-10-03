@@ -28,7 +28,10 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.7.0] — 03.10.2026
+
+PLAN.md'deki bilinen borçların kapatılması. Şema göçü 009 (kullanılmayan bir
+tablo ve görünüm kaldırılır); göç öncesi yedek kendiliğinden alınır.
 
 ### Eklendi
 - Sorumluluk raporu önizlemesi, programın okumadığı sütun başlıklarını

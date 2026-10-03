@@ -5,17 +5,18 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 03.10.2026 (0.6.2 yayımı; ayrıntılı taramanın sonuçları
-CHANGELOG 0.6.0 başlığında).
+Son gözden geçirme: 03.10.2026 (0.7.0 yayımı; ayrıntılı taramanın sonuçları
+CHANGELOG 0.6.0 başlığında, bilinen borçların kapatılması 0.7.0 başlığında).
 
 ## Şimdi
 
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 03.10.2026: yayımlanan sürüm 0.6.2;
-      okul makineleri bekliyor. 0.6 ilk açılışta veritabanını şema 8'e
-      geçirir (öncesinde yedek alır); geçişten sonra tatil günleri girilmeli.
+      makineleri güncelleme" başlığında. 03.10.2026: yayımlanan sürüm 0.7.0;
+      okul makineleri bekliyor. 0.7.0 ilk açılışta veritabanını şema 9'a
+      geçirir (öncesinde yedek alır). 0.5.x ya da daha eskisinden gelen
+      makinede geçişten sonra tatil günleri girilmeli.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0, 0.6.x) yalnız `debian:12` kabında (GitHub Actions ve yerelde
+      (0.5.0 – 0.7.0) yalnız `debian:12` kabında (GitHub Actions ve yerelde
       Docker) kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle

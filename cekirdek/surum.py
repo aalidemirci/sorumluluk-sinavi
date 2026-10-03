@@ -17,4 +17,4 @@ ayrıştırılır. Biçimi değiştirmeyin; yalnızca numarayı güncelleyin.
 
 from __future__ import annotations
 
-SURUM = "0.6.2"
+SURUM = "0.7.0"
