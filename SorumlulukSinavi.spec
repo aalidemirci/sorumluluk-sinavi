@@ -84,6 +84,7 @@ analiz = Analysis(
         "xlrd",
         "arayuz.uygulama",
         "arayuz.takvim",
+        "arayuz.pencereler",
         "veri.hizmet",
         "veri.rapor_okuma",
         "veri.veritabani",

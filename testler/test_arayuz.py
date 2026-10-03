@@ -96,10 +96,17 @@ def uygulama(tk_koku, tmp_path: Path, monkeypatch):
         if ad == "İNGİLİZCE":
             hizmet.ders_ozellik_guncelle(vt, ders_id, True, True)
 
+    # Ekranlar bugünün tarihine göre dönem seçer; testler takvimden bağımsız
+    # olsun diye Eylül'e sabitlenir.
+    monkeypatch.setattr(hizmet, "varsayilan_pencere",
+                        lambda vt, gecmise_bak=False, bugun=None: "P1")
     from arayuz.uygulama import Uygulama
     # Kök `tk_koku`dan gelir; buradaki TclError artık atlanmaz, testi kırar.
     pencere = Uygulama(tkinter.Toplevel(tk_koku))
     yield pencere
+    for cocuk in list(pencere.kok.winfo_children()):
+        if isinstance(cocuk, tkinter.Toplevel):
+            cocuk.destroy()
     pencere.kok.destroy()
 
 
@@ -265,3 +272,110 @@ def test_basvuru_sayfasi_acilir_ve_bayrakli_ogrenciyi_gosterir(uygulama) -> None
     assert len(bayrakli) == 1
     assert bayrakli[0]["ozet"] == "KARAR BEKLİYOR"
     assert len(hizmet.basvuru_bekleyenler(uygulama.vt, "P1")) == 1
+
+
+def test_basvuru_ekraninda_secilen_ogrencinin_isaretleri_kutulara_gelir(uygulama) -> None:
+    """Eski sürümde kutular boş açılıyor, tek bayrağı değiştirmek isteyen
+    kullanıcı öbürünü sessizce siliyordu: öğrenci başvurusuz plana giriyordu."""
+    with uygulama.vt.baglan() as b:
+        ogrenci_id = b.execute("SELECT id FROM v_ogrenci ORDER BY okul_no").fetchone()[0]
+    hizmet.ogrenci_bayrak_guncelle(uygulama.vt, ogrenci_id, False, True)
+    uygulama._sayfa_goster(sayfa("Başvuru"))
+    uygulama.basvuru_tablosu.selection_set(str(ogrenci_id))
+    uygulama.kok.update()
+    mezun, devamsiz = uygulama.basvuru_isaretleri
+    assert mezun.get() is False and devamsiz.get() is True
+
+
+def _plan_kaydet(uygulama, monkeypatch) -> int:
+    monkeypatch.setattr("arayuz.uygulama.messagebox.showinfo", lambda *a, **k: None)
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    uygulama._plan_uret()
+    uygulama._plan_kaydet()
+    return uygulama.aktif_plan_id
+
+
+def test_donem_degisince_o_donemin_plani_acilir(uygulama, monkeypatch) -> None:
+    """Eski sürümde dönem kutusu değişse de ekranda Eylül planı kalıyordu."""
+    plan_id = _plan_kaydet(uygulama, monkeypatch)
+    secenekler = [s[1:] for s in uygulama._plan_secenekleri]
+    from cekirdek.modeller import PlanTuru
+    uygulama.pencere_secimi.current(secenekler.index(("P2", PlanTuru.OLAGAN)))
+    uygulama._plan_donemi_degisti()
+    assert uygulama.aktif_plan_id is None and uygulama.plan_sonucu is None
+    uygulama.pencere_secimi.current(secenekler.index(("P1", PlanTuru.OLAGAN)))
+    uygulama._plan_donemi_degisti()
+    assert uygulama.aktif_plan_id == plan_id
+
+
+def test_kaydedilmemis_plan_sayfa_degisince_kaybolmaz(uygulama) -> None:
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    uygulama._plan_uret()
+    uretilen = uygulama.plan_sonucu
+    uygulama._sayfa_goster(sayfa("Salonlar"))
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    assert uygulama.plan_sonucu is uretilen and uygulama.kaydedilmemis is True
+
+
+def test_karta_tiklamak_gorevlileri_gosterir(uygulama) -> None:
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    uygulama._plan_uret()
+    oturum = uygulama.plan_sonucu.plan.oturumlar[0]
+    uygulama._kart_secildi(oturum.anahtar)
+    assert "Komisyon:" in uygulama.secim_etiketi["text"]
+    assert str(uygulama.gorevli_dugmesi["state"]) == "normal"
+
+
+def test_gorevli_degistir_penceresi_degisikligi_uygular_ve_geri_alinir(uygulama) -> None:
+    from arayuz.pencereler import GorevliDegistirPenceresi
+    uygulama._sayfa_goster(sayfa("Sınav Planı"))
+    uygulama._plan_uret()
+    plan = uygulama.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    pencere = GorevliDegistirPenceresi(uygulama, oturum.anahtar)
+    gozcu = next(i for i in pencere.mevcut.get_children() if i.endswith("|gozcu"))
+    pencere.mevcut.selection_set(gozcu)
+    pencere._adaylari_doldur()
+    aday = pencere.adaylar.get_children()[0]
+    pencere.adaylar.selection_set(aday)
+    pencere._degistir()
+    assert int(aday) in {g.personel_kimligi for g in plan.oturum_gorevleri(oturum.anahtar)}
+    assert len(uygulama.geri_yigini) == 1 and uygulama.kaydedilmemis
+    uygulama._geri_al()
+    assert int(aday) not in {g.personel_kimligi for g in plan.oturum_gorevleri(oturum.anahtar)}
+
+
+def test_tek_ders_ve_musaitlik_pencereleri_acilir(uygulama, monkeypatch) -> None:
+    from arayuz.pencereler import MusaitlikPenceresi, TekDersPenceresi
+    _plan_kaydet(uygulama, monkeypatch)
+    TekDersPenceresi(uygulama, "P1").destroy()
+    uygulama._sayfa_goster(sayfa("Öğretmen Listesi"))
+    kisi = uygulama.personel_kayitlari[0]
+    pencere = MusaitlikPenceresi(uygulama, kisi)
+    pencere.gun.current(2)
+    pencere.h_bas.insert(0, "08:00")
+    pencere.h_bit.insert(0, "12:00")
+    pencere._haftalik_ekle()
+    assert len(pencere.tablo.get_children()) == 1
+    pencere._kapat()
+    assert hizmet.musaitlik_listesi(uygulama.vt, kisi["kimlik"])[0]["zaman"] == "Her çarşamba"
+
+
+def test_takvim_kalabalik_hucredeki_butun_kartlari_cizer(tk_koku) -> None:
+    """Eski sürüm bir hücreye üçten fazla oturum düşünce fazlasını çizmiyordu."""
+    from datetime import date, time
+    from arayuz.takvim import SurukleBirakTakvim
+    ust = tkinter.Toplevel(tk_koku)
+    try:
+        kartlar = [{"anahtar": f"k{i}", "baslik": f"Ders {i}", "tarih": date(2026, 9, 14),
+                    "saat": time(9, 0), "tur": "yazili", "kilitli": False} for i in range(6)]
+        takvim = SurukleBirakTakvim(ust, [date(2026, 9, 14)], [time(9, 0), time(10, 0)],
+                                    kartlar, lambda *a: None)
+        cizilen = {etiket for nesne in takvim.canvas.find_withtag("kart")
+                   for etiket in takvim.canvas.gettags(nesne) if etiket.startswith("kart:")}
+        assert cizilen == {f"kart:k{i}" for i in range(6)}
+        # Satır büyüdüğü için ikinci saatin hücresi hâlâ doğru bulunur.
+        x, y = takvim.hucre_merkezi(date(2026, 9, 14), time(10, 0))
+        assert takvim._koordinattan_hucre(x, y) == (0, 1)
+    finally:
+        ust.destroy()

@@ -1,18 +1,21 @@
 """Tkinter arayüzü.
 
-Altı adım: Kurum Ayarları → Öğretmen Listesi → Salonlar → e-Okul Sorumluluk
-→ Ders/Branş → Sınav Planı. Arayüz SQL yazmaz, kural bilmez; her şeyi
-`veri.hizmet` üzerinden yapar.
+Adımlar soldaki şeritte sıralıdır (bkz. ADIMLAR): kurum ayarları, öğretmen
+listesi, salonlar, e-Okul sorumluluk raporu, başvuru, ders/branş, sınav
+planı, evrak ve teslim, yardım, lisans. Arayüz SQL yazmaz, kural bilmez; her
+şeyi `veri.hizmet` üzerinden yapar. Küçük iletişim pencereleri
+`arayuz.pencereler` içindedir.
 
-Sınav Planı ekranında plan bellekte tutulur: sürükle-bırakla düzenlenir,
-"Geri Al" ile adım adım geri sarılır ve ancak "Kaydet" ile veritabanına
-yazılır.
+Sınav Planı ekranında plan bellekte tutulur: sürükle-bırakla ve görevli
+değişikliğiyle düzenlenir, "Geri Al" ile adım adım geri sarılır ve ancak
+"Kaydet" ile veritabanına yazılır.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 import tkinter as tk
 from datetime import date
 from pathlib import Path
@@ -20,18 +23,20 @@ from tkinter import BOTH, END, LEFT, RIGHT, X, Y, filedialog, messagebox, ttk
 
 from arayuz.palet import RENK
 from cekirdek.kaynak import varlik_yolu
-from cekirdek.modeller import IkiAsamaliSayim, PlanParametreleri
+from cekirdek.kurallar import GUNLUK_SINAV_TAVANI
+from cekirdek.modeller import GorevRolu, IkiAsamaliSayim, PlanParametreleri, PlanTuru
 from cekirdek.planlayici import PlanlamaBasarisiz, sinir_onizlemesi
 from cekirdek.surum import SURUM
-from cekirdek.takvim import pencere_adi
+from cekirdek.takvim import pencere_adi, tarih_coz, tarih_yaz
 from veri import hizmet
 from veri.hizmet import HizmetHatasi
 from veri.rapor_okuma import RaporHatasi
 from veri.veritabani import Veritabani
 from evrak import uretici
+from evrak.uretici import birim_adi, ust_idare
 from . import yardim_metni
+from .pencereler import GorevliDegistirPenceresi, MusaitlikPenceresi, TekDersPenceresi
 from .takvim import SurukleBirakTakvim
-
 
 
 ADIMLAR = (
@@ -53,10 +58,18 @@ AYAR_ALANLARI = (
     ("il", "İl"),
     ("ilce", "İlçe"),
     ("ogretim_yili", "Öğretim yılı (ör. 2026-2027)"),
-    ("birinci_donem_baslangic", "1. dönem başlangıcı (YYYY-AA-GG)"),
-    ("ikinci_donem_baslangic", "2. dönem başlangıcı (YYYY-AA-GG)"),
-    ("ikinci_donem_bitis", "2. dönem bitişi (YYYY-AA-GG)"),
+    ("birinci_donem_baslangic", "1. dönem başlangıcı (gg.aa.yyyy)"),
+    ("ikinci_donem_baslangic", "2. dönem başlangıcı (gg.aa.yyyy)"),
+    ("ikinci_donem_bitis", "2. dönem bitişi (gg.aa.yyyy)"),
+    # İsteğe bağlı: evrak anteti ve imza bloğu.
+    ("ust_idare", "Antet: üst idare (boşsa ilçeden)"),
+    ("duzenleyen_adi", "Düzenleyen adı (isteğe bağlı)"),
+    ("duzenleyen_unvani", "Düzenleyen unvanı (ör. Müdür Yardımcısı)"),
 )
+TARIH_ALANLARI = frozenset(hizmet.DONEM_TARIHLERI)
+
+# Plan ve evrak ekranlarında dönem kutusu: (gösterim, dönem kodu, plan türü).
+PLAN_TURU_EKI = {PlanTuru.OLAGAN: "", PlanTuru.TEK_DERS: " — tek ders (58/6)"}
 
 
 def veri_klasoru() -> Path:
@@ -267,29 +280,112 @@ class Uygulama:
     def _sayfa_kurum(self) -> None:
         kart = self._kart(
             "Okul ve dönem bilgileri",
-            "Sınav pencereleri (P1/P2/P3) bu tarihlerden hesaplanır — OKY md.58/2-a.")
+            "Sınav pencereleri (Eylül/Şubat/Haziran) bu tarihlerden hesaplanır — OKY md.58/2-a. "
+            "Antet ve düzenleyen bilgisi evrakta kullanılır (Resmî Yazışma Yönetmeliği md.10).")
         mevcut = hizmet.ayarlari_getir(self.vt)
         cerceve = tk.Frame(kart, bg=RENK["kart"])
-        cerceve.pack(fill=X, padx=15, pady=10)
+        cerceve.pack(fill=X, padx=15, pady=(8, 4))
         self.ayar_girdileri = {}
         for sira, (anahtar, etiket) in enumerate(AYAR_ALANLARI):
             satir, sutun = sira // 2, (sira % 2) * 2
             ttk.Label(cerceve, text=etiket, style="Kart.TLabel").grid(
-                row=satir, column=sutun, sticky="w", padx=(0, 8), pady=6)
+                row=satir, column=sutun, sticky="w", padx=(0, 8), pady=4)
             girdi = ttk.Entry(cerceve, width=34)
-            girdi.insert(0, mevcut.get(anahtar, ""))
-            girdi.grid(row=satir, column=sutun + 1, sticky="ew", padx=(0, 24), pady=6)
+            deger = mevcut.get(anahtar, "")
+            if anahtar in TARIH_ALANLARI and deger:
+                try:
+                    deger = tarih_yaz(tarih_coz(deger))
+                except ValueError:
+                    pass
+            girdi.insert(0, deger)
+            girdi.grid(row=satir, column=sutun + 1, sticky="ew", padx=(0, 24), pady=4)
             self.ayar_girdileri[anahtar] = girdi
         cerceve.columnconfigure(1, weight=1)
         cerceve.columnconfigure(3, weight=1)
 
         alt = tk.Frame(kart, bg=RENK["kart"])
-        alt.pack(fill=X, padx=15, pady=(0, 14))
+        alt.pack(fill=X, padx=15, pady=(0, 8))
         self.pencere_etiketi = ttk.Label(alt, text="", style="Soluk.TLabel")
         self.pencere_etiketi.pack(side=LEFT)
         ttk.Button(alt, text="Kaydet", style="Ana.TButton",
                    command=self._kurum_kaydet).pack(side=RIGHT)
+        antet = mevcut.get("ust_idare") or ust_idare(mevcut.get("il", ""), mevcut.get("ilce", ""))
+        if antet:
+            ttk.Label(kart, text=f"Evrak anteti: T.C. / {antet} / "
+                                 f"{birim_adi(mevcut.get('okul_adi', ''))}",
+                      style="Soluk.TLabel").pack(anchor="w", padx=15)
         self._pencereleri_goster()
+        self._tatil_bolumu(kart)
+        self._yedek_bolumu(kart)
+
+    def _tatil_bolumu(self, kart: tk.Frame) -> None:
+        """SP-08: resmî tatil ve idari izin günleri.
+
+        Plan bu günlere sınav koymaz; başvurudaki 5 iş günü ve evrak teslim
+        süresi bu günleri iş günü saymaz.
+        """
+        ttk.Label(kart, text="Tatil ve idari izin günleri", style="KartBaslik.TLabel").pack(
+            anchor="w", padx=15, pady=(6, 0))
+        ttk.Label(kart, text="Bayram, resmî tatil ve idari izin günlerini girin; sınav "
+                             "penceresine düşenler özellikle önemlidir.",
+                  style="Soluk.TLabel").pack(anchor="w", padx=15)
+        tablo = self._tablo(kart, ("tarih", "gun", "aciklama"), ("Tarih", "Gün", "Açıklama"),
+                            (110, 100, 420), 4)
+        for tatil in hizmet.tatil_listesi(self.vt):
+            tablo.insert("", END, iid=str(tatil["kimlik"]), values=(
+                tarih_yaz(tatil["tarih"]), hizmet.HAFTA_GUNLERI[tatil["tarih"].weekday()],
+                tatil["aciklama"]))
+        satir = tk.Frame(kart, bg=RENK["kart"])
+        satir.pack(fill=X, padx=15, pady=(0, 6))
+        ttk.Label(satir, text="Tarih", style="Kart.TLabel").pack(side=LEFT)
+        tarih_girdisi = ttk.Entry(satir, width=12)
+        tarih_girdisi.pack(side=LEFT, padx=(4, 10))
+        ttk.Label(satir, text="Açıklama", style="Kart.TLabel").pack(side=LEFT)
+        aciklama_girdisi = ttk.Entry(satir, width=34)
+        aciklama_girdisi.pack(side=LEFT, padx=(4, 10))
+
+        def ekle() -> None:
+            try:
+                hizmet.tatil_ekle(self.vt, tarih_coz(tarih_girdisi.get()),
+                                  aciklama_girdisi.get())
+            except (HizmetHatasi, ValueError) as hata:
+                self._hata("Tatil eklenemedi", hata)
+                return
+            self._sayfa_goster(0)
+
+        def sil() -> None:
+            if not tablo.selection():
+                messagebox.showwarning("Seçim yok", "Silinecek günü seçin.")
+                return
+            hizmet.tatil_sil(self.vt, int(tablo.selection()[0]))
+            self._sayfa_goster(0)
+
+        ttk.Button(satir, text="Ekle", style="Ikincil.TButton", command=ekle).pack(side=LEFT)
+        ttk.Button(satir, text="Seçili günü sil", style="Ikincil.TButton",
+                   command=sil).pack(side=LEFT, padx=6)
+
+    def _yedek_bolumu(self, kart: tk.Frame) -> None:
+        satir = tk.Frame(kart, bg=RENK["kart"])
+        satir.pack(fill=X, padx=15, pady=(4, 12))
+        ttk.Label(satir, text=f"Veri klasörü: {self.vt.yol.parent}",
+                  style="Soluk.TLabel").pack(side=LEFT)
+
+        def yedekle() -> None:
+            klasor = filedialog.askdirectory(title="Yedeğin yazılacağı klasör")
+            if not klasor:
+                return
+            try:
+                yol = hizmet.yedek_al(self.vt, Path(klasor))
+            except (OSError, sqlite3.Error) as hata:
+                self._hata("Yedek alınamadı", hata)
+                return
+            messagebox.showinfo(
+                "Yedek alındı", f"Veritabanının tam yedeği alındı:\n{yol}\n\n"
+                "Yedeği kurumun yedek ortamında saklayın; e-posta, kişisel bulut veya herkese "
+                "açık depoya koymayın.")
+
+        ttk.Button(satir, text="Yedek al…", style="Ikincil.TButton",
+                   command=yedekle).pack(side=RIGHT)
 
     def _pencereleri_goster(self) -> None:
         try:
@@ -329,9 +425,9 @@ class Uygulama:
         self.personel_durum.pack(side=LEFT, padx=10)
 
         self.personel_tablosu = self._tablo(
-            kart, ("ad", "unvan", "kadro", "brans", "durum", "gorev"),
-            ("Adı Soyadı", "Görevi", "Kadro", "Branşı", "Durum", "Görev"),
-            (215, 165, 115, 185, 115, 55), 10)
+            kart, ("ad", "unvan", "kadro", "brans", "durum", "gorev", "musait"),
+            ("Adı Soyadı", "Görevi", "Kadro", "Branşı", "Durum", "Görev", "Müsait değil"),
+            (205, 155, 105, 175, 115, 50, 90), 10)
         for etiket, renk in (("eklenecek", RENK["basari_zemin"]),
                              ("guncellenecek", RENK["uyari_zemin"]),
                              ("pasif", RENK["pasif_zemin"])):
@@ -347,7 +443,8 @@ class Uygulama:
             self.personel_tablosu.insert(
                 "", END, iid=str(kisi["kimlik"]),
                 values=(kisi["ad"], kisi["unvan"], kisi["kadro"], kisi["brans"],
-                        f"{durum} - {kisi['kaynak']}", kisi["gorev_sayisi"]),
+                        f"{durum} - {kisi['kaynak']}", kisi["gorev_sayisi"],
+                        f"{kisi['musaitlik_sayisi']} kayıt" if kisi["musaitlik_sayisi"] else ""),
                 tags=() if kisi["aktif_mi"] else ("pasif",))
 
     def _personel_yonetim_bolumu(self, kart: tk.Frame) -> None:
@@ -357,7 +454,10 @@ class Uygulama:
                    command=self._personel_durum_degistir).pack(side=LEFT)
         ttk.Button(islem, text="Listeden sil", style="Ikincil.TButton",
                    command=self._personel_sil).pack(side=LEFT, padx=6)
-        ttk.Label(islem, text="Görevi olan kişi silinemez; pasife alınır.",
+        ttk.Button(islem, text="Müsaitlik…", style="Ikincil.TButton",
+                   command=self._musaitlik_ac).pack(side=LEFT)
+        ttk.Label(islem, text="Görevi olan kişi silinemez, pasife alınır. Müsaitlik: dolu "
+                              "saatler (OKY md.58/2-ç).",
                   style="Soluk.TLabel").pack(side=LEFT, padx=8)
 
         ekle = tk.Frame(kart, bg=RENK["kart"])
@@ -383,6 +483,11 @@ class Uygulama:
             return None
         kimlik = int(self.personel_tablosu.selection()[0])
         return next((k for k in self.personel_kayitlari if k["kimlik"] == kimlik), None)
+
+    def _musaitlik_ac(self) -> None:
+        kisi = self._secili_personel()
+        if kisi is not None:
+            MusaitlikPenceresi(self, kisi)
 
     def _personel_durum_degistir(self) -> None:
         kisi = self._secili_personel()
@@ -466,7 +571,8 @@ class Uygulama:
         kart = self._kart(
             "Sınav salonları",
             "Salon sayısı ve kapasitesi, aynı saatte kaç sınav yapılabileceğini belirler. "
-            "Bir salona en çok 30 öğrenci konur — OKY md.58/2-b.")
+            "Program bir salona en çok 30 öğrenci koyar (okul kararı); her salon için ayrı "
+            "bir gözcü görevlendirilir — OKY md.58/2-b.")
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=8)
         ttk.Label(ust, text="Salon adı", style="Kart.TLabel").pack(side=LEFT)
@@ -590,24 +696,29 @@ class Uygulama:
 
         Yalnız iki grup işaretlenir; geri kalan öğrenci başvurusuz plana girer.
         """
-        kod = getattr(self, "basvuru_pencere_kodu", "P1")
+        kod = getattr(self, "basvuru_pencere_kodu", None) or hizmet.varsayilan_pencere(self.vt)
         kart = self._kart(
             "Beklemeli ve devamsız öğrenci başvuruları",
             "Okuldan mezun olamayan 12. sınıf öğrencileri ile devamsızlık tebligatı yapıldığı "
             "hâlde okula veya sınavlara katılımları sağlanamayan öğrenciler otomatik olarak "
             "plana alınmaz; yazılı başvuruları hâlinde dâhil edilir — OKY md.58/2-d. "
-            "e-Okul raporu bu ayrımı taşımadığı için işaretleme elle yapılır. İşaret öğrenciye "
-            "aittir ve öğretim yılı boyunca kalır; başvuru her pencerede yenilenir.")
+            "e-Okul raporu bu ayrımı taşımadığı için işaretleme elle yapılır. İşaret konduğu "
+            "öğretim yılına aittir; başvuru her dönemde yenilenir.")
 
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=(4, 6))
-        ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
-        pencere = ttk.Combobox(ust, values=("P1", "P2", "P3"), width=5, state="readonly")
-        pencere.set(kod)
+        ttk.Label(ust, text="Dönem", style="Kart.TLabel").pack(side=LEFT)
+        kodlar = ("P1", "P2", "P3")
+        pencere = ttk.Combobox(ust, values=[pencere_adi(k) for k in kodlar], width=9,
+                               state="readonly")
+        pencere.current(kodlar.index(kod) if kod in kodlar else 0)
         pencere.pack(side=LEFT, padx=(6, 14))
 
+        def secili_kod() -> str:
+            return kodlar[pencere.current()]
+
         def pencere_degisti(_olay=None) -> None:
-            self.basvuru_pencere_kodu = pencere.get()
+            self.basvuru_pencere_kodu = secili_kod()
             self._sayfa_goster(4)
 
         pencere.bind("<<ComboboxSelected>>", pencere_degisti)
@@ -616,29 +727,37 @@ class Uygulama:
         bekleyen = len(hizmet.basvuru_bekleyenler(self.vt, kod))
         if duyuru:
             ozet = (f"{pencere_adi(kod)} duyurusu kayıtlı — son başvuru "
-                    f"{duyuru['basvuru_son_gunu'].strftime('%d.%m.%Y')}"
+                    f"{tarih_yaz(duyuru['basvuru_son_gunu'])}"
                     + (f" • {bekleyen} öğrenci KARAR BEKLİYOR" if bekleyen
                        else " • karar bekleyen yok"))
         else:
             ozet = f"{pencere_adi(kod)} için duyuru kaydedilmedi — başvuru alınamaz."
         ttk.Label(ust, text=ozet, style="Soluk.TLabel").pack(side=LEFT)
 
+        eski_uyari = hizmet.isaret_tazeligi_uyarisi(self.vt)
+        if eski_uyari:
+            ttk.Label(kart, text=eski_uyari, style="Soluk.TLabel", foreground=RENK["engel"],
+                      wraplength=980, justify=LEFT).pack(anchor="w", padx=15, pady=(0, 6))
+
         # ---------------------------------------------------------- duyuru
+        # İki satır: tek satırda Pardus'un geniş yazı tipiyle düğme taşıyordu.
         duyuru_cerceve = tk.Frame(kart, bg=RENK["kart"])
-        duyuru_cerceve.pack(fill=X, padx=15, pady=(0, 8))
+        duyuru_cerceve.pack(fill=X, padx=15, pady=(0, 2))
+        duyuru_cerceve2 = tk.Frame(kart, bg=RENK["kart"])
+        duyuru_cerceve2.pack(fill=X, padx=15, pady=(0, 8))
         girdiler: dict[str, ttk.Entry] = {}
-        for anahtar, etiket, genislik, varsayilan in (
-                ("duyuru_tarihi", "Duyuru tarihi", 12, ""),
-                ("basvuru_son_gunu", "Son başvuru", 12, ""),
-                ("belge_referansi", "Belge referansı", 20, ""),
-                ("yayim_yeri", "Yayım yeri", 26, "Okul web sayfası ve okul panosu")):
-            ttk.Label(duyuru_cerceve, text=etiket, style="Kart.TLabel").pack(side=LEFT)
-            girdi = ttk.Entry(duyuru_cerceve, width=genislik)
+        for satir, anahtar, etiket, genislik in (
+                (duyuru_cerceve, "duyuru_tarihi", "Duyuru tarihi", 11),
+                (duyuru_cerceve, "basvuru_son_gunu", "Son başvuru", 11),
+                (duyuru_cerceve, "belge_referansi", "Belge referansı", 22),
+                (duyuru_cerceve2, "yayim_yeri", "Yayım yeri", 40)):
+            ttk.Label(satir, text=etiket, style="Kart.TLabel").pack(side=LEFT)
+            girdi = ttk.Entry(satir, width=genislik)
             girdi.pack(side=LEFT, padx=(4, 12))
             girdiler[anahtar] = girdi
         if duyuru:
-            girdiler["duyuru_tarihi"].insert(0, duyuru["duyuru_tarihi"].isoformat())
-            girdiler["basvuru_son_gunu"].insert(0, duyuru["basvuru_son_gunu"].isoformat())
+            girdiler["duyuru_tarihi"].insert(0, tarih_yaz(duyuru["duyuru_tarihi"]))
+            girdiler["basvuru_son_gunu"].insert(0, tarih_yaz(duyuru["basvuru_son_gunu"]))
             girdiler["belge_referansi"].insert(0, duyuru["belge_referansi"])
             girdiler["yayim_yeri"].insert(0, duyuru["yayim_yeri"])
         else:
@@ -647,30 +766,32 @@ class Uygulama:
         def duyuru_kaydet() -> None:
             try:
                 uyarilar = hizmet.duyuru_kaydet(
-                    self.vt, pencere.get(),
-                    date.fromisoformat(girdiler["duyuru_tarihi"].get().strip()),
-                    date.fromisoformat(girdiler["basvuru_son_gunu"].get().strip()),
+                    self.vt, secili_kod(),
+                    tarih_coz(girdiler["duyuru_tarihi"].get()),
+                    tarih_coz(girdiler["basvuru_son_gunu"].get()),
                     girdiler["belge_referansi"].get(), girdiler["yayim_yeri"].get())
                 if uyarilar:
                     messagebox.showwarning("Duyuru kaydedildi", "\n\n".join(uyarilar))
-                self.basvuru_pencere_kodu = pencere.get()
+                self.basvuru_pencere_kodu = secili_kod()
                 self._sayfa_goster(4)
             except (HizmetHatasi, ValueError) as hata:
                 self._hata("Duyuru kaydedilemedi", hata)
 
-        ttk.Button(duyuru_cerceve, text="Duyuruyu kaydet", style="Ana.TButton",
+        ttk.Button(duyuru_cerceve2, text="Duyuruyu kaydet", style="Ana.TButton",
                    command=duyuru_kaydet).pack(side=LEFT)
 
         # --------------------------------------------------------- öğrenci
-        satirlar = hizmet.basvuru_tablosu(self.vt, kod)
+        satirlar = {satir["ogrenci_id"]: satir for satir in hizmet.basvuru_tablosu(self.vt, kod)}
         tablo = self._tablo(
             kart, ("no", "ad", "sube", "grup", "ders", "durum", "belge"),
             ("Okul no", "Adı Soyadı", "Şube", "Grup", "Ders", "Başvuru durumu", "Belge"),
-            (70, 190, 70, 200, 55, 175, 170), yukseklik=10)
-        for satir in satirlar:
+            (70, 180, 60, 250, 45, 170, 160), yukseklik=10)
+        tablo.tag_configure("eski", background=RENK["uyari_zemin"])
+        for satir in satirlar.values():
             tablo.insert("", END, iid=str(satir["ogrenci_id"]), values=(
-                satir["okul_no"], satir["ad_soyad"], satir["sube"], satir["grup"],
-                satir["ders_sayisi"], satir["ozet"], satir["belge_referansi"]))
+                satir["okul_no"], satir["ad_soyad"], satir["sube"], satir["grup_ekran"],
+                satir["ders_sayisi"], satir["ozet"], satir["belge_referansi"]),
+                tags=("eski",) if satir["eski_isaret_mi"] else ())
 
         def secili_id() -> int:
             secim = tablo.selection()
@@ -691,39 +812,67 @@ class Uygulama:
             try:
                 hizmet.ogrenci_bayrak_guncelle(self.vt, secili_id(), mezun_degeri.get(),
                                                devamsiz_degeri.get())
-                self.basvuru_pencere_kodu = pencere.get()
+                self.basvuru_pencere_kodu = secili_kod()
                 self._sayfa_goster(4)
             except HizmetHatasi as hata:
                 self._hata("İşaretleme kaydedilemedi", hata)
 
         ttk.Button(isaret, text="İşaretlemeyi kaydet", style="Ikincil.TButton",
                    command=bayrak_kaydet).pack(side=LEFT)
+        ttk.Label(isaret, text="Seçilen öğrencinin mevcut işaretleri kutulara gelir.",
+                  style="Soluk.TLabel").pack(side=LEFT, padx=10)
 
         giris = tk.Frame(kart, bg=RENK["kart"])
         giris.pack(fill=X, padx=15, pady=(0, 12))
+        durumlar = (("basvurdu", "Başvurdu"), ("basvurmadi", "Başvurmadı"))
         ttk.Label(giris, text="Başvuru", style="Kart.TLabel").pack(side=LEFT)
-        durum_kutusu = ttk.Combobox(giris, values=("basvurdu", "basvurmadi"), width=11,
+        durum_kutusu = ttk.Combobox(giris, values=[ad for _, ad in durumlar], width=11,
                                     state="readonly")
-        durum_kutusu.set("basvurdu")
+        durum_kutusu.current(0)
         durum_kutusu.pack(side=LEFT, padx=(4, 10))
-        tarih_girdisi = ttk.Entry(giris, width=12)
-        tarih_girdisi.pack(side=LEFT, padx=(0, 6))
-        belge_girdisi = ttk.Entry(giris, width=20)
-        belge_girdisi.pack(side=LEFT, padx=(0, 6))
-        onay_girdisi = ttk.Entry(giris, width=16)
-        onay_girdisi.pack(side=LEFT, padx=(0, 10))
-        ttk.Label(giris, text="tarih • dilekçe • geç başvuruda müdür onayı",
-                  style="Soluk.TLabel").pack(side=LEFT)
+        ttk.Label(giris, text="Tarih", style="Kart.TLabel").pack(side=LEFT)
+        tarih_girdisi = ttk.Entry(giris, width=11)
+        tarih_girdisi.pack(side=LEFT, padx=(4, 10))
+        ttk.Label(giris, text="Dilekçe", style="Kart.TLabel").pack(side=LEFT)
+        belge_girdisi = ttk.Entry(giris, width=16)
+        belge_girdisi.pack(side=LEFT, padx=(4, 10))
+        ttk.Label(giris, text="Geç başvuru onay no", style="Kart.TLabel").pack(side=LEFT)
+        onay_girdisi = ttk.Entry(giris, width=10)
+        onay_girdisi.pack(side=LEFT, padx=(4, 10))
+
+        def secim_degisti(_olay=None) -> None:
+            """Seçilen öğrencinin işaret ve başvuru bilgisi kutulara gelir.
+
+            Eski sürümde kutular hep boş açılıyordu; tek bayrağı değiştirmek
+            isteyen kullanıcı "İşaretlemeyi kaydet"e basınca öbür bayrak
+            sessizce siliniyor, öğrenci başvurusuz plana giriyordu.
+            """
+            if not tablo.selection():
+                return
+            satir = satirlar[int(tablo.selection()[0])]
+            mezun_degeri.set(satir["mezun_olamayan_mi"])
+            devamsiz_degeri.set(satir["devamsizlik_tebligati_mi"])
+            durum_kutusu.current(1 if satir["basvuru_durumu"] == "basvurmadi" else 0)
+            for girdi, deger in ((tarih_girdisi, tarih_yaz(satir["basvuru_tarihi"])),
+                                 (belge_girdisi, satir["belge_referansi"]),
+                                 (onay_girdisi, satir["mudur_onay_no"])):
+                girdi.delete(0, END)
+                girdi.insert(0, deger or "")
+
+        tablo.bind("<<TreeviewSelect>>", secim_degisti)
+        # Testlerin ulaşabilmesi için.
+        self.basvuru_tablosu = tablo
+        self.basvuru_isaretleri = (mezun_degeri, devamsiz_degeri)
 
         def basvuru_kaydet() -> None:
             try:
-                durum = durum_kutusu.get()
+                durum = durumlar[durum_kutusu.current()][0]
                 tarih_metni = tarih_girdisi.get().strip()
                 hizmet.basvuru_kaydet(
-                    self.vt, secili_id(), pencere.get(), durum,
-                    date.fromisoformat(tarih_metni) if tarih_metni else None,
+                    self.vt, secili_id(), secili_kod(), durum,
+                    tarih_coz(tarih_metni) if tarih_metni else None,
                     belge_girdisi.get(), onay_girdisi.get())
-                self.basvuru_pencere_kodu = pencere.get()
+                self.basvuru_pencere_kodu = secili_kod()
                 self._sayfa_goster(4)
             except (HizmetHatasi, ValueError) as hata:
                 self._hata("Başvuru kaydedilemedi", hata)
@@ -744,7 +893,7 @@ class Uygulama:
             if not klasor:
                 return
             try:
-                uretilen = pencere_evraki_uret(self.vt, pencere.get(), Path(klasor))
+                uretilen = pencere_evraki_uret(self.vt, secili_kod(), Path(klasor))
                 messagebox.showinfo(
                     "Belgeler üretildi",
                     "\n".join(str(yol) for yol, _ in uretilen)
@@ -824,11 +973,12 @@ class Uygulama:
                 if not brans_secimi.get():
                     raise HizmetHatasi("Branş havuzundan bir alan seçin.")
                 ders_id = int(tablo.selection()[0])
+                ders_adi = next(k[1] for k in dersler if k[0] == ders_id)
                 esdeger = () if esdeger_secimi.get() in ("", "—") else (esdeger_secimi.get(),)
                 hizmet.ders_brans_esle(self.vt, ders_id, brans_secimi.get(),
                                        karar_girdisi.get(), esdeger)
                 hizmet.ders_ozellik_guncelle(self.vt, ders_id, iki_asamali.get(),
-                                             iki_asamali.get())
+                                             hizmet.yabanci_dil_mi(ders_adi))
                 self._sayfa_goster(5)
             except HizmetHatasi as hata:
                 self._hata("Eşleme kaydedilemedi", hata)
@@ -857,7 +1007,21 @@ class Uygulama:
                   style="Soluk.TLabel",
                   foreground=RENK["engel"] if eksik else RENK["basari"]).pack(side=RIGHT)
 
-    # ========================================================= 06 sınav planı
+    # ========================================================= 07 sınav planı
+
+    def _donem_secenekleri(self) -> list[tuple[str, str, PlanTuru]]:
+        """(gösterim, dönem kodu, plan türü). Tek ders sınavı (OKY md.58/6) her
+        dönemin olağan planının yanında ayrı bir seçenektir."""
+        secenekler = []
+        for kod in ("P1", "P2", "P3"):
+            for tur in (PlanTuru.OLAGAN, PlanTuru.TEK_DERS):
+                try:
+                    bas, bit = hizmet.pencere_araligi(self.vt, kod, tur)
+                except HizmetHatasi:
+                    continue
+                secenekler.append((f"{pencere_adi(kod)}{PLAN_TURU_EKI[tur]}  "
+                                   f"{tarih_yaz(bas)}–{tarih_yaz(bit)}", kod, tur))
+        return secenekler
 
     def _sayfa_plan(self) -> None:
         kart = self._kart("Sınav planı")
@@ -865,46 +1029,65 @@ class Uygulama:
         ust.pack(fill=X, padx=15, pady=(10, 4))
 
         try:
-            pencereler = hizmet.pencereleri_getir(self.vt)
+            hizmet.pencereleri_getir(self.vt)
         except HizmetHatasi as hata:
             ttk.Label(kart, text=str(hata), style="Kart.TLabel",
                       foreground=RENK["engel"]).pack(anchor="w", padx=15, pady=20)
             return
 
-        ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
+        self._plan_secenekleri = self._donem_secenekleri()
+        ttk.Label(ust, text="Dönem", style="Kart.TLabel").pack(side=LEFT)
         self.pencere_secimi = ttk.Combobox(
-            ust, state="readonly", width=30,
-            values=[f"{pencere_adi(kod)}  {bas.strftime('%d.%m.%Y')}–"
-                    f"{bit.strftime('%d.%m.%Y')}"
-                    for kod, (bas, bit) in pencereler.items()])
-        self.pencere_secimi.current(0)
+            ust, state="readonly", width=44, values=[s[0] for s in self._plan_secenekleri])
+        varsayilan = (getattr(self, "plan_secimi", None)
+                      or (hizmet.varsayilan_pencere(self.vt), PlanTuru.OLAGAN))
+        bellekteki = self._bellekteki_plan_secimi()
+        if bellekteki:
+            varsayilan = bellekteki
+        sira = next((i for i, s in enumerate(self._plan_secenekleri)
+                     if (s[1], s[2]) == tuple(varsayilan)), 0)
+        self.pencere_secimi.current(sira)
         self.pencere_secimi.pack(side=LEFT, padx=6)
-
-        self.hafta_sonu = tk.BooleanVar(value=False)
-        ttk.Checkbutton(ust, text="Hafta sonu kullanılabilir",
-                        variable=self.hafta_sonu).pack(side=LEFT, padx=8)
-
-        ttk.Label(ust, text="Günlük sınav sınırı", style="Kart.TLabel").pack(side=LEFT, padx=(8, 2))
-        self.gunluk_sinir = ttk.Spinbox(ust, from_=1, to=8, width=4)
-        self.gunluk_sinir.set(2)
-        self.gunluk_sinir.pack(side=LEFT)
-
-        ttk.Label(ust, text="Yazılı+uygulama", style="Kart.TLabel").pack(side=LEFT, padx=(10, 2))
-        self.sayim_secimi = ttk.Combobox(ust, state="readonly", width=16,
-                                         values=("tek sınav sayılır", "ayrı sayılır"))
-        self.sayim_secimi.current(0)
-        self.sayim_secimi.pack(side=LEFT)
+        self.pencere_secimi.bind("<<ComboboxSelected>>", self._plan_donemi_degisti)
+        self.tek_ders_dugmesi = ttk.Button(ust, text="Tek ders öğrencileri…",
+                                           style="Ikincil.TButton", command=self._tek_ders_ac)
+        self.tek_ders_dugmesi.pack(side=LEFT, padx=6)
+        # Eylem düğmeleri sağda: parametre satırları dar ekranda (Pardus'un
+        # geniş yazı tipiyle) taşınca düğmeler görünmez olmasın.
+        ttk.Button(ust, text="Planı üret", style="Ana.TButton",
+                   command=self._plan_uret).pack(side=RIGHT)
+        ttk.Button(ust, text="Yükü çözümle", style="Ikincil.TButton",
+                   command=self._yuku_cozumle).pack(side=RIGHT, padx=6)
 
         ust2 = tk.Frame(kart, bg=RENK["kart"])
         ust2.pack(fill=X, padx=15, pady=4)
-        ttk.Label(ust2, text="Oturum saatleri", style="Kart.TLabel").pack(side=LEFT)
-        self.saat_girdisi = ttk.Entry(ust2, width=42)
+        self.hafta_sonu = tk.BooleanVar(value=False)
+        ttk.Checkbutton(ust2, text="Hafta sonu kullanılabilir",
+                        variable=self.hafta_sonu).pack(side=LEFT)
+        ttk.Label(ust2, text="Günlük sınav sınırı", style="Kart.TLabel").pack(side=LEFT,
+                                                                          padx=(14, 2))
+        # ÖDY md.5/1-k: ikiyi geçmemesi esastır, zorunlu hâlde bir fazla.
+        self.gunluk_sinir = ttk.Spinbox(ust2, from_=1, to=GUNLUK_SINAV_TAVANI, width=3,
+                                        state="readonly")
+        self.gunluk_sinir.set(2)
+        self.gunluk_sinir.pack(side=LEFT)
+        ttk.Label(ust2, text="Yazılı+uygulama", style="Kart.TLabel").pack(side=LEFT, padx=(14, 2))
+        self.sayim_secimi = ttk.Combobox(ust2, state="readonly", width=15,
+                                         values=("tek sınav sayılır", "ayrı sayılır"))
+        self.sayim_secimi.current(0)
+        self.sayim_secimi.pack(side=LEFT)
+        ttk.Label(ust2, text="Uygulama süresi (dk)", style="Kart.TLabel").pack(side=LEFT,
+                                                                           padx=(14, 2))
+        self.uygulama_suresi = ttk.Spinbox(ust2, from_=10, to=180, increment=5, width=4)
+        self.uygulama_suresi.set(40)
+        self.uygulama_suresi.pack(side=LEFT)
+
+        ust3 = tk.Frame(kart, bg=RENK["kart"])
+        ust3.pack(fill=X, padx=15, pady=(0, 2))
+        ttk.Label(ust3, text="Oturum saatleri", style="Kart.TLabel").pack(side=LEFT)
+        self.saat_girdisi = ttk.Entry(ust3, width=40)
         self.saat_girdisi.insert(0, ", ".join(hizmet.VARSAYILAN_SLOT_SAATLERI))
         self.saat_girdisi.pack(side=LEFT, padx=6)
-        ttk.Button(ust2, text="Yükü çözümle", style="Ikincil.TButton",
-                   command=self._yuku_cozumle).pack(side=LEFT, padx=6)
-        ttk.Button(ust2, text="Planı üret", style="Ana.TButton",
-                   command=self._plan_uret).pack(side=LEFT, padx=6)
 
         self.plan_ozet = ttk.Label(kart, text="Parametreleri seçip planı üretin.",
                                    style="Soluk.TLabel", wraplength=1000, justify=LEFT)
@@ -912,6 +1095,21 @@ class Uygulama:
 
         self.takvim_alani = tk.Frame(kart, bg=RENK["kart"])
         self.takvim_alani.pack(fill=BOTH, expand=True, padx=15, pady=(0, 4))
+
+        secim = tk.Frame(kart, bg=RENK["chip"], highlightthickness=1,
+                         highlightbackground=RENK["cizgi"])
+        secim.pack(fill=X, padx=15, pady=(0, 4))
+        self.secim_etiketi = tk.Label(
+            secim, text="Bir sınav kartına tıklayın: görevlileri burada görünür. Kartı "
+                        "sürükleyerek başka gün/saate taşıyabilirsiniz.",
+            bg=RENK["chip"], fg=RENK["yazi"], font=("Segoe UI", 9), anchor="w",
+            justify=LEFT, wraplength=900)
+        self.secim_etiketi.pack(side=LEFT, fill=X, expand=True, padx=10, pady=6)
+        self.gorevli_dugmesi = ttk.Button(secim, text="Görevliyi değiştir…",
+                                          style="Ikincil.TButton", state="disabled",
+                                          command=self._gorevli_degistir_ac)
+        self.gorevli_dugmesi.pack(side=RIGHT, padx=8, pady=4)
+        self.secili_oturum: str | None = None
 
         self.ihlal_tablosu = ttk.Treeview(
             kart, columns=("kural", "duzey", "aciklama"), show="headings", height=4)
@@ -940,24 +1138,79 @@ class Uygulama:
                    command=self._plan_kesinlestir).pack(side=RIGHT)
         ttk.Label(alt, text="Onay no:", style="Kart.TLabel").pack(side=RIGHT, padx=(0, 4))
 
-        self._son_plani_yukle()
+        self._tek_ders_dugmesini_ayarla()
+        # Kaydedilmemiş plan başka sayfaya gidip dönünce kaybolmamalı; eski
+        # sürüm sayfa her açıldığında kayıtlı planı yeniden yüklüyordu.
+        if bellekteki and bellekteki == self._plan_secimi():
+            self._takvimi_ciz()
+        else:
+            self._son_plani_yukle()
 
     # ------------------------------------------------- plan yardımcıları
 
+    def _bellekteki_plan_secimi(self) -> tuple[str, PlanTuru] | None:
+        """Kaydedilmemiş bir plan varsa onun dönemi ve türü."""
+        if not (self.kaydedilmemis and self.plan_sonucu):
+            return None
+        parametreler = self.plan_sonucu.plan.parametreler
+        return parametreler.pencere_kodu, PlanTuru(parametreler.plan_turu)
+
+    def _plan_secimi(self) -> tuple[str, PlanTuru]:
+        _, kod, tur = self._plan_secenekleri[self.pencere_secimi.current()]
+        return kod, tur
+
     def _pencere_kodu(self) -> str:
         """Seçili dönemin kısa kodu. Ekranda ay adı yazar, veritabanında kod durur."""
-        secili = self.pencere_secimi.get().split()[0]
-        return next((kod for kod in ("P1", "P2", "P3") if pencere_adi(kod) == secili),
-                    secili)
+        return self._plan_secimi()[0]
+
+    def _tek_ders_dugmesini_ayarla(self) -> None:
+        tek = self._plan_secimi()[1] is PlanTuru.TEK_DERS
+        self.tek_ders_dugmesi.configure(state="normal" if tek else "disabled")
+
+    def _plan_donemi_degisti(self, _olay=None) -> None:
+        """Dönem değişince o dönemin kayıtlı planı açılır.
+
+        Eski sürümde kutu değişse de ekranda Eylül planı kalıyordu; "Müdür
+        onayıyla kesinleştir" seçili dönemi değil ekrandaki planı
+        kesinleştirebiliyordu.
+        """
+        yeni = self._plan_secimi()
+        if self.kaydedilmemis and not messagebox.askyesno(
+                "Kaydedilmemiş plan",
+                "Ekrandaki planın kaydedilmemiş değişiklikleri var. Dönem değişirse bunlar "
+                "kaybolur. Devam edilsin mi?", icon="warning"):
+            eski = self._bellekteki_plan_secimi()
+            sira = next((i for i, s in enumerate(self._plan_secenekleri)
+                         if eski and (s[1], s[2]) == eski), 0)
+            self.pencere_secimi.current(sira)
+            return
+        self.plan_secimi = yeni
+        self.plan_sonucu = None
+        self.aktif_plan_id = None
+        self.kaydedilmemis = False
+        self.geri_yigini.clear()
+        self.ileri_yigini.clear()
+        self._tek_ders_dugmesini_ayarla()
+        self._son_plani_yukle()
+
+    def _tek_ders_ac(self) -> None:
+        TekDersPenceresi(self, self._pencere_kodu())
 
     def _parametreleri_topla(self) -> PlanParametreleri:
+        kod, tur = self._plan_secimi()
+        try:
+            uygulama_suresi = int(self.uygulama_suresi.get())
+        except ValueError as hata:
+            raise HizmetHatasi("Uygulama süresi dakika olarak sayı girilmelidir.") from hata
         return PlanParametreleri(
-            pencere_kodu=self._pencere_kodu(),
+            pencere_kodu=kod,
             hafta_sonu_kullan=self.hafta_sonu.get(),
             ogrenci_gunluk_sinav_siniri=int(self.gunluk_sinir.get()),
             iki_asamali_sayim=(IkiAsamaliSayim.TEK if self.sayim_secimi.current() == 0
                                else IkiAsamaliSayim.AYRI),
             slot_saatleri=hizmet.slot_saatlerini_coz(self.saat_girdisi.get()),
+            uygulama_suresi_dakika=uygulama_suresi,
+            plan_turu=tur,
         )
 
     def _yuku_cozumle(self) -> None:
@@ -965,7 +1218,8 @@ class Uygulama:
             parametreler = self._parametreleri_topla()
             ozet = hizmet.yuk_ozetini_getir(
                 self.vt, parametreler.iki_asamali_sayim,
-                parametreler.ogrenci_gunluk_sinav_siniri)
+                parametreler.ogrenci_gunluk_sinav_siniri, parametreler.pencere_kodu,
+                parametreler.plan_turu)
         except (HizmetHatasi, ValueError) as hata:
             self._hata("Yük çözümlenemedi", hata)
             return
@@ -974,6 +1228,8 @@ class Uygulama:
             f"Öğrenci sayısı: {len(ozet.ogrenci_yukleri)}   "
             f"çoğunluğun sınav yükü: {ozet.cogunluk_yuku}   en yüklü öğrenci: {ozet.azami_yuk}",
             f"Önerilen gün sayısı: {ozet.onerilen_gun_sayisi(slot_sayisi)}",
+            f"Bir öğrenci günde en çok {GUNLUK_SINAV_TAVANI} sınava girebilir; ikiyi "
+            "geçmemesi esastır (ÖDY md.5/1-k).",
             "",
         ]
         for onizleme in sinir_onizlemesi(ozet, [5, 10, 14], slot_sayisi):
@@ -991,13 +1247,17 @@ class Uygulama:
         except (HizmetHatasi, ValueError) as hata:
             self._hata("Plan üretilemedi", hata)
             return
-        # SP-15: Şubat ve Haziran planları aylar önceki listeyle üretilebilir.
-        # Nakil ve ayrılmalar ancak yeniden aktarılan listeyle plandan düşer.
-        uyari = hizmet.liste_tazeligi_uyarisi(self.vt, parametreler.pencere_kodu)
-        if uyari and not messagebox.askyesno(
-                "Liste güncel mi?", uyari + "\n\nYine de bu listeyle devam edilsin mi?",
-                icon="warning"):
-            return
+        if parametreler.plan_turu is PlanTuru.OLAGAN:
+            # SP-15: Şubat ve Haziran planları aylar önceki listeyle üretilebilir.
+            # Nakil ve ayrılmalar ancak yeniden aktarılan listeyle plandan düşer.
+            # md.58/2-d işaretleri de önceki yıldan kalmış olabilir.
+            for baslik, uyari in (
+                    ("Liste güncel mi?",
+                     hizmet.liste_tazeligi_uyarisi(self.vt, parametreler.pencere_kodu)),
+                    ("Başvuru işaretleri güncel mi?", hizmet.isaret_tazeligi_uyarisi(self.vt))):
+                if uyari and not messagebox.askyesno(
+                        baslik, uyari + "\n\nYine de devam edilsin mi?", icon="warning"):
+                    return
         try:
             self.kok.configure(cursor="watch")
             self.kok.update_idletasks()
@@ -1015,8 +1275,16 @@ class Uygulama:
         self._takvimi_ciz()
 
     def _son_plani_yukle(self) -> None:
-        plan_id = hizmet.son_plani_getir(self.vt, self._pencere_kodu())
+        kod, tur = self._plan_secimi()
+        plan_id = hizmet.son_plani_getir(self.vt, kod, tur)
         if plan_id is None:
+            self.plan_sonucu = None
+            self.aktif_plan_id = None
+            self._takvimi_ciz()
+            self.plan_ozet.configure(text="Bu dönemde kayıtlı plan yok. Parametreleri seçip "
+                                          "planı üretin.")
+            self.ihlal_tablosu.delete(*self.ihlal_tablosu.get_children())
+            self._dugmeleri_tazele()
             return
         try:
             plan, bilgi = hizmet.plan_yukle(self.vt, plan_id)
@@ -1035,14 +1303,20 @@ class Uygulama:
         for cocuk in self.takvim_alani.winfo_children():
             cocuk.destroy()
         if not self.plan_sonucu:
+            self._secimi_temizle()
             return
         plan = self.plan_sonucu.plan
         try:
-            bas, bit = hizmet.pencereleri_getir(self.vt)[plan.parametreler.pencere_kodu]
+            bas, bit = hizmet.pencere_araligi(self.vt, plan.parametreler.pencere_kodu,
+                                              plan.parametreler.plan_turu)
         except HizmetHatasi:
             return
         from cekirdek.takvim import gunleri_listele
-        gunler = gunleri_listele(bas, bit, plan.parametreler.hafta_sonu_kullan)
+        gunler = gunleri_listele(bas, bit, plan.parametreler.hafta_sonu_kullan,
+                                 hizmet.tatilleri_getir(self.vt))
+        # Kayıtlı plandaki bir oturum sonradan tatil yapılan güne düşüyorsa o
+        # gün de gösterilir; yoksa kart görünmez olur (SP-08 engeli zaten yazar).
+        gunler = sorted(set(gunler) | {o.tarih for o in plan.oturumlar})
         saatler = sorted({o.saat for o in plan.oturumlar}
                          | set(plan.parametreler.slot_saatleri))
         kartlar = [{
@@ -1052,9 +1326,69 @@ class Uygulama:
             "tarih": o.tarih, "saat": o.saat, "tur": o.oturum_turu.value,
             "kilitli": o.kilitli_mi,
         } for o in plan.oturumlar]
-        SurukleBirakTakvim(self.takvim_alani, gunler, saatler, kartlar,
-                           self._kart_birakildi).pack(fill=BOTH, expand=True)
+        self.takvim = SurukleBirakTakvim(self.takvim_alani, gunler, saatler, kartlar,
+                                         self._kart_birakildi, self._kart_secildi)
+        self.takvim.pack(fill=BOTH, expand=True)
+        if self.secili_oturum and plan.oturum_bul(self.secili_oturum):
+            self._kart_secildi(self.secili_oturum)
+        else:
+            self._secimi_temizle()
         self._ozeti_tazele()
+
+    def _secimi_temizle(self) -> None:
+        self.secili_oturum = None
+        if hasattr(self, "secim_etiketi"):
+            self.secim_etiketi.configure(
+                text="Bir sınav kartına tıklayın: görevlileri burada görünür. Kartı "
+                     "sürükleyerek başka gün/saate taşıyabilirsiniz.")
+            self.gorevli_dugmesi.configure(state="disabled")
+
+    def _kart_secildi(self, anahtar: str) -> None:
+        """Seçili oturumun ayrıntısı; görevli değişikliğinin başlangıcı."""
+        if not self.plan_sonucu:
+            return
+        plan = self.plan_sonucu.plan
+        oturum = plan.oturum_bul(anahtar)
+        if oturum is None:
+            self._secimi_temizle()
+            return
+        self.secili_oturum = anahtar
+        if hasattr(self, "takvim"):
+            self.takvim.secimi_goster(anahtar)
+        kisiler = {p.kimlik: p.ad for p in hizmet.personelleri_getir(self.vt, yalniz_aktif=False)}
+        salonlar = {s.kimlik: s.ad for s in hizmet.salonlari_getir(self.vt)}
+        gorevler = plan.oturum_gorevleri(anahtar)
+        komisyon = ", ".join(kisiler.get(g.personel_kimligi, "?") for g in gorevler
+                             if g.rol is GorevRolu.KOMISYON_UYESI) or "atanmadı"
+        gozcu = ", ".join(
+            kisiler.get(g.personel_kimligi, "?")
+            + (f" ({salonlar[g.salon_kimligi]})" if g.salon_kimligi in salonlar else "")
+            for g in gorevler if g.rol is GorevRolu.GOZCU) or "atanmadı"
+        tur = " (uygulama)" if oturum.oturum_turu.value == "uygulama" else ""
+        self.secim_etiketi.configure(text=(
+            f"{'/'.join(map(str, oturum.duzeyler))} {oturum.ders_adi}{tur} • "
+            f"{tarih_yaz(oturum.tarih)} {oturum.saat.strftime('%H:%M')} • "
+            f"{oturum.ogrenci_sayisi} öğrenci • "
+            f"{', '.join(salonlar.get(s, '?') for s in oturum.salon_kimlikleri)}\n"
+            f"Komisyon: {komisyon}   •   Gözcü: {gozcu}"
+            + ("   •   kesin plan: değişiklik müdür onayıyla" if oturum.kilitli_mi else "")))
+        self.gorevli_dugmesi.configure(state="normal")
+
+    def _gorevli_degistir_ac(self) -> None:
+        if not self.plan_sonucu or not self.secili_oturum:
+            return
+        oturum = self.plan_sonucu.plan.oturum_bul(self.secili_oturum)
+        if oturum is None:
+            return
+        if oturum.kilitli_mi and (self.aktif_plan_id is None or self.kaydedilmemis):
+            messagebox.showwarning("Kaydedilmemiş plan", "Önce planı kaydedin.")
+            return
+        GorevliDegistirPenceresi(self, self.secili_oturum)
+
+    def _dugmeleri_tazele(self) -> None:
+        self.geri_dugmesi.configure(state="normal" if self.geri_yigini else "disabled")
+        self.ileri_dugmesi.configure(state="normal" if self.ileri_yigini else "disabled")
+        self.kaydet_dugmesi.configure(state="normal" if self.kaydedilmemis else "disabled")
 
     def _ozeti_tazele(self) -> None:
         sonuc = self.plan_sonucu
@@ -1064,12 +1398,13 @@ class Uygulama:
         engel = sum(1 for i in ihlaller if i.engel_mi)
         gunler = sorted({o.tarih for o in plan.oturumlar})
         durum = "kaydedilmedi" if self.kaydedilmemis else f"kayıtlı (#{self.aktif_plan_id})"
-        satir = (f"{len(plan.oturumlar)} oturum  •  {len(gunler)} gün "
-                 f"({gunler[0].strftime('%d.%m.%Y')} – {gunler[-1].strftime('%d.%m.%Y')})  •  "
+        aralik = (f"({tarih_yaz(gunler[0])} – {tarih_yaz(gunler[-1])})" if gunler else "")
+        satir = (f"{len(plan.oturumlar)} oturum  •  {len(gunler)} gün {aralik}  •  "
                  f"{len(plan.gorevlendirmeler)} görev  •  {engel} engel, "
                  f"{len(ihlaller) - engel} uyarı  •  {durum}")
         if sonuc.yukseltilen_sinirlar:
-            satir += f"\nGünlük sınırı yükseltilen öğrenci: {len(sonuc.yukseltilen_sinirlar)}"
+            satir += (f"\nGünlük sınırı yükseltilen öğrenci: {len(sonuc.yukseltilen_sinirlar)} "
+                      "(ikiyi geçmemesi esastır — ÖDY md.5/1-k; ayrıntı aşağıda)")
         for not_metni in sonuc.notlar[:3]:
             satir += "\n" + not_metni
         self.plan_ozet.configure(text=satir)
@@ -1079,9 +1414,7 @@ class Uygulama:
             self.ihlal_tablosu.insert(
                 "", END, values=(ihlal.kural_kimligi, ihlal.ciddiyet.value, ihlal.aciklama),
                 tags=(ihlal.ciddiyet.value,))
-        self.geri_dugmesi.configure(state="normal" if self.geri_yigini else "disabled")
-        self.ileri_dugmesi.configure(state="normal" if self.ileri_yigini else "disabled")
-        self.kaydet_dugmesi.configure(state="normal" if self.kaydedilmemis else "disabled")
+        self._dugmeleri_tazele()
 
     def _kart_birakildi(self, anahtar: str, tarih: date, saat) -> None:
         if not self.plan_sonucu:
@@ -1100,7 +1433,7 @@ class Uygulama:
         if not sonuc.uygulandi:
             messagebox.showwarning(
                 "Taşıma yapılamadı",
-                f"{oturum.ders_adi} sınavı {tarih.strftime('%d.%m.%Y')} "
+                f"{oturum.ders_adi} sınavı {tarih_yaz(tarih)} "
                 f"{saat.strftime('%H:%M')} saatine taşınamadı.\n\n" + sonuc.mesaj())
             return
         self.geri_yigini.append(goruntu)
@@ -1164,11 +1497,11 @@ class Uygulama:
             "Plan müdür onayıyla kesinleşti ve oturumlar kilitlendi.")
         self._sayfa_goster(6)
 
-    # ==================================================== 07 evrak ve teslim
+    # ==================================================== 08 evrak ve teslim
 
     def _sayfa_evrak(self) -> None:
         try:
-            pencereler = hizmet.pencereleri_getir(self.vt)
+            hizmet.pencereleri_getir(self.vt)
         except HizmetHatasi as hata:
             kart = self._kart("Evrak ve teslim")
             ttk.Label(kart, text=str(hata), style="Kart.TLabel",
@@ -1178,12 +1511,16 @@ class Uygulama:
         kart = self._kart()
         ust = tk.Frame(kart, bg=RENK["kart"])
         ust.pack(fill=X, padx=15, pady=(12, 4))
-        ttk.Label(ust, text="Pencere", style="Kart.TLabel").pack(side=LEFT)
+        ttk.Label(ust, text="Dönem", style="Kart.TLabel").pack(side=LEFT)
+        self._evrak_secenekleri = [(ad.split("  ")[0], kod, tur)
+                                   for ad, kod, tur in self._donem_secenekleri()]
         self.evrak_pencere = ttk.Combobox(
-            ust, state="readonly", width=12,
-            values=[pencere_adi(kod) for kod in pencereler])
-        self.evrak_pencere.current(0)
-        self._evrak_pencere_kodlari = list(pencereler)
+            ust, state="readonly", width=30, values=[s[0] for s in self._evrak_secenekleri])
+        # Evrak sınavdan sonra toplanır: varsayılan, başlamış son dönemdir.
+        secim = (getattr(self, "evrak_secimi", None)
+                 or (hizmet.varsayilan_pencere(self.vt, gecmise_bak=True), PlanTuru.OLAGAN))
+        self.evrak_pencere.current(next(
+            (i for i, s in enumerate(self._evrak_secenekleri) if (s[1], s[2]) == tuple(secim)), 0))
         self.evrak_pencere.pack(side=LEFT, padx=6)
         self.evrak_durum = ttk.Label(ust, text="", style="Soluk.TLabel")
         self.evrak_durum.pack(side=LEFT, padx=12)
@@ -1196,15 +1533,21 @@ class Uygulama:
         defter.add(teslim, text="Teslim çizelgesi")
         self._evrak_uretim_sekmesi(uretim)
         self._evrak_teslim_sekmesi(teslim)
-        self.evrak_pencere.bind("<<ComboboxSelected>>", lambda _e: self._sayfa_goster(7))
+
+        def degisti(_olay=None) -> None:
+            _, kod, tur = self._evrak_secenekleri[self.evrak_pencere.current()]
+            self.evrak_secimi = (kod, tur)
+            self._sayfa_goster(7)
+
+        self.evrak_pencere.bind("<<ComboboxSelected>>", degisti)
         self._evrak_plani_bul()
 
     def _evrak_plani_bul(self) -> int | None:
-        kod = self._evrak_pencere_kodlari[self.evrak_pencere.current()]
-        plan_id = hizmet.son_plani_getir(self.vt, kod)
+        _, kod, tur = self._evrak_secenekleri[self.evrak_pencere.current()]
+        plan_id = hizmet.son_plani_getir(self.vt, kod, tur)
         if plan_id is None:
             self.evrak_durum.configure(
-                text="Bu pencerede kayıtlı plan yok. Önce Sınav Planı adımında planı kaydedin.",
+                text="Bu dönemde kayıtlı plan yok. Önce Sınav Planı adımında planı kaydedin.",
                 foreground=RENK["engel"])
         else:
             ozet = hizmet.teslim_ozeti(self.vt, plan_id)
@@ -1310,8 +1653,13 @@ class Uygulama:
 
         alt = tk.Frame(ana, bg=RENK["kart"])
         alt.pack(fill=X, padx=12, pady=(0, 12))
+        # Teslim çoğu zaman ertesi gün işlenir; tarih elle düzeltilebilir.
+        ttk.Label(alt, text="Teslim tarihi", style="Kart.TLabel").pack(side=LEFT)
+        self.teslim_tarihi = ttk.Entry(alt, width=11)
+        self.teslim_tarihi.insert(0, tarih_yaz(date.today()))
+        self.teslim_tarihi.pack(side=LEFT, padx=(5, 10))
         ttk.Label(alt, text="Açıklama", style="Kart.TLabel").pack(side=LEFT)
-        self.teslim_aciklama = ttk.Entry(alt, width=44)
+        self.teslim_aciklama = ttk.Entry(alt, width=34)
         self.teslim_aciklama.pack(side=LEFT, padx=5)
         ttk.Button(alt, text="Seçili evrakı teslim al", style="Ana.TButton",
                    command=self._teslim_kaydet).pack(side=LEFT, padx=8)
@@ -1354,7 +1702,8 @@ class Uygulama:
                 int(self.teslim_eden.get().split(" | ")[0]),
                 int(self.teslim_alan.get().split(" | ")[0]),
                 int(adet_metni) if adet_metni else None,
-                self.teslim_aciklama.get())
+                self.teslim_aciklama.get(),
+                tarih_coz(self.teslim_tarihi.get()) if self.teslim_tarihi.get().strip() else None)
         except (HizmetHatasi, ValueError) as hata:
             self._hata("Teslim kaydedilemedi", hata)
             return
@@ -1374,7 +1723,7 @@ class Uygulama:
             return
         self._teslim_tazele()
 
-    # ============================================================ 08 yardım
+    # ============================================================ 09 yardım
 
     def _sayfa_yardim(self) -> None:
         kart = self._kart()
@@ -1423,7 +1772,7 @@ class Uygulama:
                  bg=RENK["chip"], fg=RENK["engel"], font=("Segoe UI Semibold", 9),
                  anchor="w", justify=LEFT, wraplength=980).pack(fill=X, padx=12, pady=(0, 9))
 
-    # ============================================================ 09 lisans
+    # ============================================================ 10 lisans
 
     def _sayfa_lisans(self) -> None:
         kart = self._kart()
