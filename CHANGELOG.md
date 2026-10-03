@@ -28,6 +28,16 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [0.6.1] — 03.10.2026
+
+### Düzeltildi
+- Kesinleşmiş sınavın takvim kartındaki kilit işareti bir emojiydi
+  (U+1F512). Tk Linux'ta renkli emoji çizemiyor, varsayılan DejaVu yazı
+  tipinde de bu karakter yok; kart Pardus'un tabanı olan Debian 12'de ders
+  adının yanında boş bir kareyle görünüyordu. İşaret ✓ oldu; kesin kartın
+  rengi değişmedi. Arayüz ve evrak kaynaklarında emoji kalmadığını bir test
+  denetler.
+
 ## [0.6.0] — 03.10.2026
 
 03.10.2026 tarihli ayrıntılı gözden geçirmenin (mevzuat, mimari, arayüz,
