@@ -34,8 +34,6 @@ CHANGELOG 0.6.0 başlığında).
 
 ## Bilinen borçlar
 
-- **Ölü şema:** `kural_karari` tablosu ve `v_gorev_sayaci` görünümü
-  kullanılmıyor (sayaçlar artık `etkin_planlar` üzerinden).
 - **SG-05 nakil kaynağı okunmuyor:** OOK12001R010 ayrıştırıcısı kaydın
   nakil/geçiş kaynaklı olup olmadığını okumuyor; raporda böyle bir sütun var
   mı, gerçek bir dosyada bakılmalı.

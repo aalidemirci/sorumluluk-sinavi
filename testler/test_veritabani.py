@@ -24,6 +24,34 @@ def test_goc_uygulanir_ve_yinelenmez(tmp_path: Path) -> None:
     assert veritabani.gocleri_uygula() == 0
 
 
+def test_olu_sema_009_ile_kaldirilir(tmp_path: Path) -> None:
+    """kural_karari hiç yazılmadı; v_gorev_sayaci taslak planları da sayıyordu.
+
+    8. sürümde nesneler vardır (olumsuz senaryo); 009 göçünden sonra yoktur.
+    """
+    import shutil
+
+    import veri.veritabani as modul
+    kaynak = Path(modul.__file__).parent / "gocler"
+    sekize_kadar = tmp_path / "gocler_008"
+    sekize_kadar.mkdir()
+    for dosya in kaynak.glob("[0-9][0-9][0-9]_*.sql"):
+        if int(dosya.name[:3]) <= 8:
+            shutil.copy(dosya, sekize_kadar / dosya.name)
+    veritabani = Veritabani(tmp_path / "sorumluluk.db")
+    veritabani.gocleri_uygula(sekize_kadar)
+
+    def nesneler() -> set[str]:
+        with veritabani.baglan() as b:
+            return {r[0] for r in b.execute("SELECT name FROM sqlite_master")}
+
+    olu = {"kural_karari", "ix_kural_acik", "v_gorev_sayaci"}
+    assert olu <= nesneler()
+    veritabani.gocleri_uygula()
+    assert veritabani.surum() >= 9
+    assert not olu & nesneler()
+
+
 def test_yabanci_anahtar_butunlugu_saglam(vt: Veritabani) -> None:
     with vt.baglan() as b:
         assert list(b.execute("PRAGMA foreign_key_check")) == []

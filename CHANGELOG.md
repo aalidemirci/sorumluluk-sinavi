@@ -43,6 +43,11 @@ derlenir.
 - Servis katmanı (`veri/hizmet.py`, ~2 400 satır) konu modüllerine bölündü
   (`veri/hizmet/` paketi). Davranış değişmedi.
 
+### Kaldırıldı
+- Hiç kullanılmayan `kural_karari` tablosu ve görevleri taslak planlarla
+  birlikte sayan `v_gorev_sayaci` görünümü (şema göçü
+  `009_olu_sema.sql`; göç öncesi yedek kendiliğinden alınır).
+
 ## [0.6.2] — 03.10.2026
 
 ### Eklendi
