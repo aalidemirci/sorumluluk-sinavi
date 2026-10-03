@@ -169,6 +169,67 @@ def test_icerik_degisince_yeni_surum_acilir(hazir) -> None:
     assert surumler == [1, 2]
 
 
+# ============================================== onaylı sürüm ve değişiklik föyü
+
+def _surumler(vt: Veritabani, plan_id: int, tur: str) -> list[tuple]:
+    """(sürüm, onaylı mı, föy var mı) üçlüleri."""
+    with vt.baglan() as b:
+        return [tuple(r) for r in b.execute(
+            "SELECT surum, onaylandi_mi, degisiklik_foyu IS NOT NULL FROM belge_surumu"
+            " WHERE kayit_anahtari=? AND tur=? ORDER BY surum", (str(plan_id), tur))]
+
+
+def test_taslak_plandan_uretilen_belge_onayli_sayilmaz(hazir) -> None:
+    """Olumsuz senaryo: müdür onayı yoksa sürüm onaylı değildir, föy oluşmaz."""
+    vt, plan_id, tmp_path = hazir
+    uretici.evrak_uret(vt, plan_id, tmp_path / "evrak", ["03_gorevlendirme_cizelgesi"])
+    assert _surumler(vt, plan_id, "03_gorevlendirme_cizelgesi") == [(1, 0, 0)]
+    assert hizmet.onayli_belge_degisiklikleri(vt, str(plan_id)) == []
+
+
+def test_kesin_plandan_uretilen_belge_onayli_surumdur(hazir) -> None:
+    vt, plan_id, tmp_path = hazir
+    hizmet.plan_kesinlestir(vt, plan_id, "2026/17")
+    uretici.evrak_uret(vt, plan_id, tmp_path / "evrak", ["03_gorevlendirme_cizelgesi"])
+    assert _surumler(vt, plan_id, "03_gorevlendirme_cizelgesi") == [(1, 1, 0)]
+
+
+def test_onayli_belge_degisince_foy_kaydedilir(hazir) -> None:
+    """Kesin planda görevli değişince imzalanmış çizelge geçerliliğini yitirir.
+
+    0.6.2'ye kadar hiçbir sürüm onaylı işaretlenmediği için föy hiç oluşmuyordu.
+    """
+    from cekirdek.modeller import GorevRolu
+    vt, plan_id, tmp_path = hazir
+    hizmet.plan_kesinlestir(vt, plan_id, "2026/17")
+    uretici.evrak_uret(vt, plan_id, tmp_path / "evrak", ["03_gorevlendirme_cizelgesi"])
+    plan, _ = hizmet.plan_yukle(vt, plan_id)
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    gozcu = next(g for g in plan.oturum_gorevleri(oturum.anahtar) if g.rol is GorevRolu.GOZCU)
+    aday = next(a for a in hizmet.gorevli_adaylari(vt, plan, oturum.anahtar, GorevRolu.GOZCU,
+                                                     gozcu.personel_kimligi) if a["uygun_mu"])
+    hizmet.kesin_plan_gorevli_degistir(vt, plan_id, oturum.anahtar, gozcu.personel_kimligi,
+                                       aday["kimlik"], "2026/18", "Başka görevde")
+    uretici.evrak_uret(vt, plan_id, tmp_path / "evrak", ["03_gorevlendirme_cizelgesi"])
+    assert _surumler(vt, plan_id, "03_gorevlendirme_cizelgesi") == [(1, 1, 0), (2, 1, 1)]
+    foyler = hizmet.onayli_belge_degisiklikleri(vt, str(plan_id))
+    assert [(f["tur"], f["surum"]) for f in foyler] == [("03_gorevlendirme_cizelgesi", 2)]
+    assert "önceki sürüm 1" in foyler[0]["foy"]
+
+
+def test_ayni_icerik_onaylaninca_surum_artmaz_onayli_isaretlenir(tmp_path: Path) -> None:
+    """Taslakken üretilen içerik kesinleşmeden sonra aynı çıkarsa yeni sürüm açılmaz."""
+    vt = Veritabani(tmp_path / "s.db")
+    vt.gocleri_uygula()
+    yol = tmp_path / "belge.docx"
+    ilk = hizmet.evrak_surumu_kaydet(vt, "01_sinav_programi", "7", yol, "abc")
+    ikinci = hizmet.evrak_surumu_kaydet(vt, "01_sinav_programi", "7", yol, "abc", onayli=True)
+    assert ilk == ikinci
+    with vt.baglan() as b:
+        assert [tuple(r) for r in b.execute(
+            "SELECT surum, onaylandi_mi FROM belge_surumu")] == [(1, 1)]
+
+
 # ============================================================ teslim takibi
 
 def test_cizelge_her_oturum_icin_beklenen_evraki_listeler(hazir) -> None:

@@ -34,9 +34,6 @@ CHANGELOG 0.6.0 başlığında).
 
 ## Bilinen borçlar
 
-- **Belge onayı işlemiyor:** `belge_surumu.onaylandi_mi` hiçbir yerde
-  doldurulmuyor, bu yüzden "onaylanmış belge değişti" föyü hiç oluşmuyor.
-  Plan kesinleşmesine bağlanabilir.
 - **Ölü şema:** `kural_karari` tablosu ve `v_gorev_sayaci` görünümü
   kullanılmıyor (sayaçlar artık `etkin_planlar` üzerinden).
 - **SG-05 nakil kaynağı okunmuyor:** OOK12001R010 ayrıştırıcısı kaydın

@@ -72,8 +72,8 @@ from .evrak_sorgulari import (
     BEKLENEN_EVRAK, EVRAK_ADLARI, EVRAK_TURLERI, OGRENCI_GOSTERIM_ADLARI, OGRENCI_GOSTERIMI,
     TESLIM_SURESI_IS_GUNU, TeslimSatiri, evrak_gecmisi, evrak_surumu_kaydet, gorev_sayaclari,
     gorevli_listesi, ilan_ogrenci_cizelgesi, ilan_takvimi, kisi_bazli_gorevler,
-    ogrenci_etiketi_uret, oturum_ogrencileri, plan_oturumlari, teslim_cizelgesi,
-    teslim_geri_al, teslim_kaydet, teslim_ozeti,
+    ogrenci_etiketi_uret, onayli_belge_degisiklikleri, oturum_ogrencileri,
+    plan_oturumlari, teslim_cizelgesi, teslim_geri_al, teslim_kaydet, teslim_ozeti,
 )
 
 # Cephe: yeniden verilen adlar (statik denetim bunları kullanılmış sayar).
@@ -104,6 +104,6 @@ __all__ = [
     "OGRENCI_GOSTERIM_ADLARI", "OGRENCI_GOSTERIMI", "TESLIM_SURESI_IS_GUNU", "TeslimSatiri",
     "evrak_gecmisi", "evrak_surumu_kaydet", "gorev_sayaclari", "gorevli_listesi",
     "ilan_ogrenci_cizelgesi", "ilan_takvimi", "kisi_bazli_gorevler", "ogrenci_etiketi_uret",
-    "oturum_ogrencileri", "plan_oturumlari", "teslim_cizelgesi", "teslim_geri_al",
-    "teslim_kaydet", "teslim_ozeti",
+    "onayli_belge_degisiklikleri", "oturum_ogrencileri", "plan_oturumlari",
+    "teslim_cizelgesi", "teslim_geri_al", "teslim_kaydet", "teslim_ozeti",
 ]

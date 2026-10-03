@@ -613,10 +613,14 @@ def evrak_uret(vt: Veritabani, plan_id: int, hedef_klasor: Path,
     """Seçilen evrakları üretir; (dosya yolu, SHA-256) listesi döndürür.
 
     Üretilen her belge `belge_surumu` ve `evrak_kaydi` tablolarına işlenir;
-    aynı belge yeniden üretilirse sürüm numarası artar.
+    içerik değişmişse yeni sürüm açılır. Kesinleşmiş plandan üretilen sürüm
+    onaylı sayılır; onaylı bir belge sonradan değişirse değişiklik föyü
+    kaydedilir (bkz. `hizmet.evrak_surumu_kaydet`).
     """
     hedef_klasor = Path(hedef_klasor)
     hedef_klasor.mkdir(parents=True, exist_ok=True)
+    _, bilgi = hizmet.plan_yukle(vt, plan_id)
+    onayli = bool(bilgi["kesin_mi"])
     istenen = list(secilenler) if secilenler else [e.anahtar for e in EVRAKLAR]
     dosya_adlari = {e.anahtar: e.dosya_adi for e in EVRAKLAR}
     uretilen: list[tuple[Path, str]] = []
@@ -628,6 +632,6 @@ def evrak_uret(vt: Veritabani, plan_id: int, hedef_klasor: Path,
         yol = hedef_klasor / dosya_adlari[anahtar]
         ozet = (gosterimli(vt, plan_id, yol, ogrenci_gosterimi) if gosterimli
                 else uretici(vt, plan_id, yol))
-        hizmet.evrak_surumu_kaydet(vt, anahtar, str(plan_id), yol, ozet)
+        hizmet.evrak_surumu_kaydet(vt, anahtar, str(plan_id), yol, ozet, onayli=onayli)
         uretilen.append((yol, ozet))
     return uretilen

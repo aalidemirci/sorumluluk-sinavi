@@ -1609,6 +1609,9 @@ class Uygulama:
         klasor = filedialog.askdirectory(title="Evrakın yazılacağı klasör")
         if not klasor:
             return
+        # Bu üretimde yeni doğan değişiklik föyleri: önce/sonra karşılaştırılır.
+        onceki_foyler = {(f["tur"], f["surum"])
+                         for f in hizmet.onayli_belge_degisiklikleri(self.vt, str(plan_id))}
         try:
             self.kok.configure(cursor="watch")
             self.kok.update_idletasks()
@@ -1625,6 +1628,17 @@ class Uygulama:
             self.evrak_sonuc.insert("", END, values=(yol.name, ozet[:32] + "…"))
         messagebox.showinfo("Evrak üretildi",
                             f"{len(uretilenler)} belge şu klasöre yazıldı:\n{klasor}")
+        yeni_foyler = [f for f in hizmet.onayli_belge_degisiklikleri(self.vt, str(plan_id))
+                       if (f["tur"], f["surum"]) not in onceki_foyler]
+        if yeni_foyler:
+            adlar = {e.anahtar: e.ad for e in uretici.EVRAKLAR}
+            satirlar = "\n".join(f"• {adlar.get(f['tur'], f['tur'])} (sürüm {f['surum']})"
+                                 for f in yeni_foyler)
+            messagebox.showwarning(
+                "Onaylı belge değişti",
+                "Kesinleşmiş planın şu belgeleri, daha önce onaylı olarak üretilen sürümden "
+                f"farklı:\n{satirlar}\n\nİmzalanmış eski çıktıların yerine yeni sürümü imzaya "
+                "sunun. Değişiklik föyü belge geçmişine kaydedildi.")
 
     def _evrak_teslim_sekmesi(self, ana: tk.Frame) -> None:
         ttk.Label(ana, text="Sınav sonrası komisyondan geri alınan evrak burada izlenir. "

@@ -28,6 +28,21 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Düzeltildi
+- **Onaylı belge değişince uyarı.** Belge sürümleri hiçbir zaman "onaylı"
+  işaretlenmediği için onaylı bir belgenin sonradan değiştiğini kaydeden
+  değişiklik föyü hiç oluşmuyordu. Artık kesinleşmiş plandan üretilen belge
+  onaylı sürüm sayılır. Kesin planda örneğin görevli değişikliğinden sonra
+  evrak yeniden üretilince değişen belgeler için föy kaydedilir ve evrak
+  ekranı imzalanmış eski çıktıların yerine yeni sürümün imzaya sunulmasını
+  söyler.
+
+### Değiştirildi
+- Servis katmanı (`veri/hizmet.py`, ~2 400 satır) konu modüllerine bölündü
+  (`veri/hizmet/` paketi). Davranış değişmedi.
+
 ## [0.6.2] — 03.10.2026
 
 ### Eklendi

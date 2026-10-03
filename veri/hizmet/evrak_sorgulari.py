@@ -212,12 +212,17 @@ def gorev_sayaclari(vt: Veritabani) -> list[dict]:
 
 
 def evrak_surumu_kaydet(vt: Veritabani, tur: str, kayit_anahtari: str,
-                        dosya_yolu: Path, sha256: str) -> int:
+                        dosya_yolu: Path, sha256: str, onayli: bool = False) -> int:
     """Üretilen belgenin sürümünü ve dosya kaydını işler.
 
     Aynı içerik yeniden üretilirse yeni sürüm açılmaz. Onaylanmış bir belge
     sonradan değişirse yeni sürüm açılır ve değişiklik föyü metni saklanır;
     böylece hangi çıktının hangi içerikten geldiği denetlenebilir.
+
+    `onayli`: belge müdür onayıyla kesinleşmiş plandan üretildi. 0.6.2'ye kadar
+    bu bilgi hiç verilmiyordu, onaylı sürüm olmadığı için föy de hiç
+    oluşmuyordu. Aynı içerik önce taslakken üretilmişse yeni sürüm açılmaz,
+    var olan sürüm onaylı işaretlenir.
     """
     with vt.baglan() as b:
         onceki = b.execute(
@@ -226,22 +231,39 @@ def evrak_surumu_kaydet(vt: Veritabani, tur: str, kayit_anahtari: str,
             (tur, kayit_anahtari)).fetchone()
         if onceki and onceki[2] == sha256:
             surum_id = int(onceki[0])
+            if onayli and not onceki[3]:
+                b.execute("UPDATE belge_surumu SET onaylandi_mi=1 WHERE id=?", (surum_id,))
         else:
             surum = int(onceki[1]) + 1 if onceki else 1
-            foy = (f"Onaylanmış belge değişti — önceki SHA-256: {onceki[2]}, "
-                   f"yeni SHA-256: {sha256}") if onceki and onceki[3] else None
+            foy = (f"Onaylanmış belge değişti — önceki sürüm {onceki[1]} "
+                   f"(SHA-256 {onceki[2]}), yeni sürüm {surum} (SHA-256 {sha256})"
+                   ) if onceki and onceki[3] else None
             surum_id = int(b.execute(
                 "INSERT INTO belge_surumu(tur,kayit_anahtari,surum,sha256,kaynak_sha256,"
-                "onceki_surum_id,degisiklik_foyu,olusturma_tarihi)"
-                " VALUES(?,?,?,?,?,?,?,?)",
+                "onceki_surum_id,onaylandi_mi,degisiklik_foyu,olusturma_tarihi)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
                 (tur, kayit_anahtari, surum, sha256, sha256,
-                 onceki[0] if onceki else None, foy, simdi())).lastrowid)
+                 onceki[0] if onceki else None, int(onayli), foy, simdi())).lastrowid)
         b.execute(
             "INSERT INTO evrak_kaydi(tur,kayit_anahtari,dosya_yolu,belge_surumu_id,uretildi_at)"
             " VALUES(?,?,?,?,?)",
             (tur, kayit_anahtari, str(dosya_yolu), surum_id, simdi()))
         vt.denetim_yaz(b, "evrak_kaydi", surum_id, "uretildi", tur)
         return surum_id
+
+
+def onayli_belge_degisiklikleri(vt: Veritabani, kayit_anahtari: str) -> list[dict]:
+    """Onaylı bir sürümden sonra içeriği değişen belgeler (değişiklik föyleri).
+
+    Kesin planda görevli değişikliği gibi bir düzeltmeden sonra evrak yeniden
+    üretilince imzalanmış eski çıktı geçerliliğini yitirir; arayüz bu listeyle
+    kullanıcıyı uyarır.
+    """
+    with vt.baglan() as b:
+        return [{"tur": r[0], "surum": r[1], "foy": r[2], "tarih": r[3]} for r in b.execute(
+            "SELECT tur,surum,degisiklik_foyu,olusturma_tarihi FROM belge_surumu"
+            " WHERE kayit_anahtari=? AND degisiklik_foyu IS NOT NULL ORDER BY tur,surum",
+            (kayit_anahtari,))]
 
 
 def evrak_gecmisi(vt: Veritabani, kayit_anahtari: str) -> list[tuple]:
