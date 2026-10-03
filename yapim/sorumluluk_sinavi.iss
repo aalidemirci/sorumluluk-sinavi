@@ -66,7 +66,10 @@ CloseApplications=yes
 CloseApplicationsFilter=*.exe
 
 [Languages]
-Name: "turkce"; MessagesFile: "compiler:Default.isl"
+; Sihirbazın kendi metinleri (İleri, Kur, Hedef klasör…) Türkçe dil
+; dosyasından gelir; Default.isl İngilizcedir. Turkish.isl Inno Setup 6 ile
+; birlikte kurulur.
+Name: "turkce"; MessagesFile: "compiler:Languages\Turkish.isl"
 
 [CustomMessages]
 turkce.KisayolOlustur=Masaüstü kısayolu oluştur

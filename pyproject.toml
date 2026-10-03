@@ -11,7 +11,6 @@ requires-python = ">=3.11"
 dependencies = [
   "openpyxl>=3.1,<4",
   "python-docx>=1.1,<2",
-  "PyYAML>=6,<7",
   "xlrd==2.0.2",
   "tzdata>=2026.1",
 ]

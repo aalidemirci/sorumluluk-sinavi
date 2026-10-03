@@ -12,7 +12,6 @@ kendi dağıtımlarındadır:
 - openpyxl (MIT) — .xlsx okuma
 - xlrd (BSD) — .xls okuma
 - python-docx (MIT) — .docx üretimi
-- PyYAML (MIT) — yapılandırma
 - tzdata (Apache-2.0) — IANA saat dilimi verisi
 
 Uygulama simgesi ve evrak düzeni bu projeye aittir; üçüncü taraf görsel
