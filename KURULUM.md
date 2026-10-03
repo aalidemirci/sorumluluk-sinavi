@@ -330,8 +330,9 @@ yükleme elle yapılır:
    özellik varsa `/sorumluluk-sinavi/**` sayfaları. `npm run build`
    `check-releases` ile sürümü GitHub'la karşılaştırır.
 
-Sitedeki ekran görüntüleri ve örnek evrak gerçek veriyle değil uydurma bir
-okulla üretilir: `araclar/site_ornekleri.py` okulu, evrakı ve PDF
+Sitedeki ekran görüntüleri ve örnek evrak gerçek veriyle değil örnek bir
+okulla ("Örnek Anadolu Lisesi"; kişi yerinde "Adı SOYADI" ya da görev adı)
+üretilir: `araclar/site_ornekleri.py` okulu, evrakı ve PDF
 önizlemelerini; `araclar/site_ekranlari.py` Debian 12 kabında ekranları
 üretir. Komutlar betiklerin başında yazılıdır. Arayüz ya da evrak değiştiyse
 yeni sürümle birlikte yeniden üretin; dosyalar sitede

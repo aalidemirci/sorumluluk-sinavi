@@ -3,7 +3,8 @@
 Gerçek ekran yakalanmaz. Windows masaüstü kilitliyken görüntü siyah gelir;
 gerçek ekranı yakalamak da üstteki başka bir penceredeki veriyi alabilir.
 Kap ikisini de ortadan kaldırır, görünüm de Pardus'unkine yakın olur (DejaVu).
-Veri araclar/site_ornekleri.py'nin kurduğu uydurma okuldur.
+Veri araclar/site_ornekleri.py'nin kurduğu örnek okuldur ("Örnek Anadolu
+Lisesi").
 
 Kullanım, depo kökünde (Git Bash; <cikti> site_ornekleri.py'nin klasörü):
 
@@ -122,7 +123,7 @@ def main(cikti: Path) -> None:
 
     uyg._sayfa_goster(1)
     bekle()
-    kisi = next(k for k in uyg.personel_kayitlari if k["ad"] == "Uydurma Matematikçi")
+    kisi = next(k for k in uyg.personel_kayitlari if k["ad"] == "Matematik Öğretmeni 1")
     pencere = MusaitlikPenceresi(uyg, kisi)
     kaydet("ekran-musaitlik", ust_uste(ogretmen, yakala("pencere-musaitlik", pencere)))
     pencere.destroy()

@@ -32,7 +32,7 @@ derlenir.
 
 ### Eklendi
 - Site görselleri için iki yardımcı betik: `araclar/site_ornekleri.py`
-  (uydurma okul, örnek evrak ve PDF önizlemeleri) ve
+  (örnek okul, belgeler ve PDF önizlemeleri) ve
   `araclar/site_ekranlari.py` (Debian 12 kabında sanal ekrandan ekran
   görüntüleri). Yayım sonrası indirme alanı ve site adımları KURULUM.md'ye
   yazıldı. Programın davranışı değişmedi.

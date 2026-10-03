@@ -1,9 +1,13 @@
 """okulapp.org için örnek okul, örnek evrak ve evrak önizlemeleri üretir.
 
 Sitedeki ekran görüntüleri ve örnek belgeler gerçek veriyle değil, bu betiğin
-kurduğu açıkça uydurma bir okulla gösterilir ("Uydurma Anadolu Lisesi",
-"UYDURMA İLÇE", "Uydurma Matematikçi"…). Gerçekçi görünen ad üretilmez
-(CLAUDE.md → KVKK).
+kurduğu örnek bir okulla gösterilir. Adlar şablon dilindedir (kullanıcı
+kararı, 03.10.2026): okul "Örnek Anadolu Lisesi", antet "ÖRNEK İLÇE
+KAYMAKAMLIĞI", imza yerleri ve öğrenciler "Adı SOYADI" / "Adı Soyadı".
+Öğretmenler "Matematik Öğretmeni 1" gibi görev adıyla yazılır: hepsi "Adı
+SOYADI" olsa komisyon ve gözcü satırları okunmaz, personel raporu da sicil
+numarası olmadan aynı adlı iki kişiyi kabul etmez. Gerçekçi görünen ad
+üretilmez (CLAUDE.md → KVKK).
 
 Kullanım, depo kökünde:
 
@@ -35,41 +39,48 @@ from pathlib import Path
 
 DEPO = Path(__file__).resolve().parents[1]
 
-SAYILAR = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
-ONLAR = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Seksen", "Doksan"]
+OKUL = "Örnek Anadolu Lisesi"
+OGRENCI_ADI = "Adı Soyadı"
+IMZA_ADI = "Adı SOYADI"
 
+# (ad, görev, kadro, branş). Ad kısa görev adıdır; "Türk Dili ve Edebiyatı
+# Öğretmeni 1" gibi uzun adlar evrakın dar sütunlarını taşırırdı.
 PERSONEL = [
-    ("Uydurma Müdür", "Müdür", "Kadrolu", "Coğrafya"),
-    ("Uydurma Yardımcı", "Müdür Yardımcısı", "Kadrolu", "Tarih"),
-    ("Uydurma Yardımcı İki", "Müdür Yardımcısı", "Kadrolu", "Kimya"),
-    ("Uydurma Matematikçi", "Öğretmen", "Kadrolu", "Matematik"),
-    ("Uydurma Matematikçi İki", "Öğretmen", "Kadrolu", "Matematik"),
-    ("Uydurma Matematikçi Üç", "Öğretmen", "Sözleşmeli", "Matematik"),
-    ("Uydurma Fizikçi", "Öğretmen", "Kadrolu", "Fizik"),
-    ("Uydurma Fizikçi İki", "Öğretmen", "Kadrolu", "Fizik"),
-    ("Uydurma Kimyacı", "Öğretmen", "Kadrolu", "Kimya"),
-    ("Uydurma Kimyacı İki", "Öğretmen", "Kadrolu", "Kimya"),
-    ("Uydurma Biyolog", "Öğretmen", "Kadrolu", "Biyoloji"),
-    ("Uydurma Biyolog İki", "Öğretmen", "Sözleşmeli", "Biyoloji"),
-    ("Uydurma Edebiyatçı", "Öğretmen", "Kadrolu", "Türk Dili ve Edebiyatı"),
-    ("Uydurma Edebiyatçı İki", "Öğretmen", "Kadrolu", "Türk Dili ve Edebiyatı"),
-    ("Uydurma Edebiyatçı Üç", "Öğretmen", "Sözleşmeli", "Türk Dili ve Edebiyatı"),
-    ("Uydurma İngilizceci", "Öğretmen", "Kadrolu", "İngilizce"),
-    ("Uydurma İngilizceci İki", "Öğretmen", "Kadrolu", "İngilizce"),
-    ("Uydurma Almancacı", "Öğretmen", "Kadrolu", "Almanca"),
-    ("Uydurma Almancacı İki", "Öğretmen", "Kadrolu", "Almanca"),
-    ("Uydurma Tarihçi", "Öğretmen", "Kadrolu", "Tarih"),
-    ("Uydurma Tarihçi İki", "Öğretmen", "Kadrolu", "Tarih"),
-    ("Uydurma Coğrafyacı", "Öğretmen", "Kadrolu", "Coğrafya"),
-    ("Uydurma Coğrafyacı İki", "Öğretmen", "Kadrolu", "Coğrafya"),
-    ("Uydurma Felsefeci", "Öğretmen", "Kadrolu", "Felsefe"),
-    ("Uydurma Felsefeci İki", "Öğretmen", "Kadrolu", "Felsefe"),
-    ("Uydurma Din Kültürcü", "Öğretmen", "Kadrolu", "Din Kültürü ve Ahlak Bilgisi"),
-    ("Uydurma Din Kültürcü İki", "Öğretmen", "Kadrolu", "Din Kültürü ve Ahlak Bilgisi"),
-    ("Uydurma Beden Eğitimci", "Öğretmen", "Kadrolu", "Beden Eğitimi ve Spor"),
-    ("Uydurma Müzikçi", "Öğretmen", "Kadrolu", "Müzik"),
-    ("Uydurma Rehber", "Öğretmen", "Kadrolu", "Rehberlik"),
+    ("Okul Müdürü", "Müdür", "Kadrolu", "Coğrafya"),
+    ("Müdür Yardımcısı 1", "Müdür Yardımcısı", "Kadrolu", "Tarih"),
+    ("Müdür Yardımcısı 2", "Müdür Yardımcısı", "Kadrolu", "Kimya"),
+    ("Matematik Öğretmeni 1", "Öğretmen", "Kadrolu", "Matematik"),
+    ("Matematik Öğretmeni 2", "Öğretmen", "Kadrolu", "Matematik"),
+    ("Matematik Öğretmeni 3", "Öğretmen", "Sözleşmeli", "Matematik"),
+    ("Fizik Öğretmeni 1", "Öğretmen", "Kadrolu", "Fizik"),
+    ("Fizik Öğretmeni 2", "Öğretmen", "Kadrolu", "Fizik"),
+    ("Kimya Öğretmeni 1", "Öğretmen", "Kadrolu", "Kimya"),
+    ("Kimya Öğretmeni 2", "Öğretmen", "Kadrolu", "Kimya"),
+    ("Biyoloji Öğretmeni 1", "Öğretmen", "Kadrolu", "Biyoloji"),
+    ("Biyoloji Öğretmeni 2", "Öğretmen", "Sözleşmeli", "Biyoloji"),
+    ("Edebiyat Öğretmeni 1", "Öğretmen", "Kadrolu", "Türk Dili ve Edebiyatı"),
+    ("Edebiyat Öğretmeni 2", "Öğretmen", "Kadrolu", "Türk Dili ve Edebiyatı"),
+    ("Edebiyat Öğretmeni 3", "Öğretmen", "Sözleşmeli", "Türk Dili ve Edebiyatı"),
+    ("İngilizce Öğretmeni 1", "Öğretmen", "Kadrolu", "İngilizce"),
+    ("İngilizce Öğretmeni 2", "Öğretmen", "Kadrolu", "İngilizce"),
+    ("Almanca Öğretmeni 1", "Öğretmen", "Kadrolu", "Almanca"),
+    ("Almanca Öğretmeni 2", "Öğretmen", "Kadrolu", "Almanca"),
+    ("Tarih Öğretmeni 1", "Öğretmen", "Kadrolu", "Tarih"),
+    ("Tarih Öğretmeni 2", "Öğretmen", "Kadrolu", "Tarih"),
+    ("Coğrafya Öğretmeni 1", "Öğretmen", "Kadrolu", "Coğrafya"),
+    ("Coğrafya Öğretmeni 2", "Öğretmen", "Kadrolu", "Coğrafya"),
+    ("Felsefe Öğretmeni 1", "Öğretmen", "Kadrolu", "Felsefe"),
+    ("Felsefe Öğretmeni 2", "Öğretmen", "Kadrolu", "Felsefe"),
+    ("Din Kültürü Öğretmeni 1", "Öğretmen", "Kadrolu", "Din Kültürü ve Ahlak Bilgisi"),
+    ("Din Kültürü Öğretmeni 2", "Öğretmen", "Kadrolu", "Din Kültürü ve Ahlak Bilgisi"),
+    ("Beden Eğitimi Öğretmeni", "Öğretmen", "Kadrolu", "Beden Eğitimi ve Spor"),
+    ("Müzik Öğretmeni", "Öğretmen", "Kadrolu", "Müzik"),
+    ("Rehber Öğretmen", "Öğretmen", "Kadrolu", "Rehberlik"),
 ]
+
+# testler/yardimci.py ile aynı OOK12001R010 düzeni; oradaki yazıcı okul adını
+# "Uydurma …" diye sabit yazdığı için burada ayrıca tutulur.
+SORUMLULUK_BASLIK = ["", "Öğrenci No", "Adı Soyadı", "", "", "", "", "", "Sınıfı", "Dersi"]
 
 DERS_BRANS = {
     "MATEMATİK": "Matematik", "FİZİK": "Fizik", "KİMYA": "Kimya", "BİYOLOJİ": "Biyoloji",
@@ -91,35 +102,31 @@ DUZEY_DERSLERI = {
 SUBELER = {"10/A": 22, "10/B": 20, "10/C": 18, "11/A": 20, "11/B": 18, "12/A": 16, "12/B": 14}
 
 AYARLAR = {
-    "okul_adi": "Uydurma Anadolu Lisesi",
-    "mudur_adi": "Uydurma Müdür",
-    "il": "UYDURMA İL",
-    "ilce": "UYDURMA İLÇE",
+    "okul_adi": OKUL,
+    "mudur_adi": IMZA_ADI,
+    "il": "Örnek İl",
+    "ilce": "Örnek İlçe",
     "ogretim_yili": "2026-2027",
     "birinci_donem_baslangic": "14.09.2026",
     "ikinci_donem_baslangic": "08.02.2027",
     "ikinci_donem_bitis": "25.06.2027",
-    "duzenleyen_adi": "Uydurma Yardımcı",
+    "duzenleyen_adi": IMZA_ADI,
     "duzenleyen_unvani": "Müdür Yardımcısı",
 }
 
 
-def sayi_adi(n: int) -> str:
-    yuz = "Yüz" if n >= 100 else ""
-    n %= 100
-    return " ".join(p for p in (yuz, ONLAR[n // 10], SAYILAR[n % 10]) if p)
-
-
 def ogrenciler() -> dict[str, list]:
-    """Sabit tohumlu uydurma öğrenci listesi; 9. sınıfta sorumluluk olmaz."""
+    """Sabit tohumlu örnek öğrenci listesi; 9. sınıfta sorumluluk olmaz.
+
+    Bütün öğrenciler "Adı Soyadı"dır: program öğrenciyi okul numarasıyla
+    tanır, ilan çizelgesinde de ad maskelenir ("A** S*****").
+    """
     rastgele = random.Random(2026)
-    sira = 0
     sonuc: dict[str, list] = {}
     for sube, adet in SUBELER.items():
         duzey = int(sube.split("/")[0])
         liste = []
         for i in range(adet):
-            sira += 1
             dersler: list[tuple[int, str]] = []
             hedef = rastgele.choices([1, 2, 3, 4], weights=[5, 4, 2, 1])[0]
             while len(dersler) < hedef:
@@ -129,9 +136,30 @@ def ogrenciler() -> dict[str, list]:
                 if (ders_duzeyi, ders) not in dersler:
                     dersler.append((ders_duzeyi, ders))
             no = f"{duzey}{'ABC'.index(sube[-1]) + 1}{i + 1:02d}"
-            liste.append((no, f"Uydurma Öğrenci {sayi_adi(sira)}", sorted(dersler)))
+            liste.append((no, OGRENCI_ADI, sorted(dersler)))
         sonuc[sube] = liste
     return sonuc
+
+
+def sorumluluk_raporu_yaz(hedef: Path, subeler: dict[str, list]) -> Path:
+    """OOK12001R010 düzeninde örnek rapor (testler/yardimci.py'deki yazıcının eşi)."""
+    import csv
+
+    satirlar: list[list[object]] = []
+    for sube, ogrenci_listesi in subeler.items():
+        duzey, sube_adi = sube.split("/", 1)
+        satirlar.append([f"{OKUL} - {duzey}. Sınıf / {sube_adi} Şubesi"] + [""] * 9)
+        satirlar.append(list(SORUMLULUK_BASLIK))
+        for okul_no, ad_soyad, dersler in ogrenci_listesi:
+            for sira, (ders_duzeyi, ders_adi) in enumerate(dersler):
+                satir = [""] * 10
+                if sira == 0:
+                    satir[1], satir[2] = okul_no, ad_soyad
+                satir[8], satir[9] = str(ders_duzeyi), ders_adi
+                satirlar.append(satir)
+    with hedef.open("w", encoding="utf-8-sig", newline="") as akim:
+        csv.writer(akim).writerows(satirlar)
+    return hedef
 
 
 def okul_kur(kok: Path) -> None:
@@ -140,7 +168,7 @@ def okul_kur(kok: Path) -> None:
 
     from cekirdek.modeller import GorevRolu, IkiAsamaliSayim, PlanParametreleri, PlanTuru
     from evrak import uretici
-    from testler.yardimci import personel_satirlari, sorumluluk_csv_yaz
+    from testler.yardimci import personel_satirlari
     from veri import hizmet
     from veri.veritabani import Veritabani
 
@@ -161,8 +189,8 @@ def okul_kur(kok: Path) -> None:
         kitap.active.append(satir)
     kitap.save(kok / "personel.xlsx")
     hizmet.personel_onayla(vt, hizmet.personel_onizle(vt, kok / "personel.xlsx").aktarim_id)
-    csv = sorumluluk_csv_yaz(kok / "sorumluluk.csv", ogrenciler())
-    hizmet.sorumluluk_onayla(vt, hizmet.sorumluluk_onizle(vt, csv).aktarim_id)
+    rapor = sorumluluk_raporu_yaz(kok / "sorumluluk.csv", ogrenciler())
+    hizmet.sorumluluk_onayla(vt, hizmet.sorumluluk_onizle(vt, rapor).aktarim_id)
 
     havuz = {ad for _, ad, _ in hizmet.brans_havuzu_listele(vt)}
     for ders_id, ad, *_ in hizmet.dersleri_listele(vt):
@@ -176,9 +204,9 @@ def okul_kur(kok: Path) -> None:
                                          yabanci_dil_mi=ad != "TÜRK DİLİ VE EDEBİYATI")
 
     kisiler = {p.ad: p.kimlik for p in hizmet.personelleri_getir(vt)}
-    hizmet.musaitlik_ekle(vt, kisiler["Uydurma Matematikçi"], hafta_gunu=2,
+    hizmet.musaitlik_ekle(vt, kisiler["Matematik Öğretmeni 1"], hafta_gunu=2,
                           bas_saat=time(8, 0), bit_saat=time(12, 0), aciklama="Ders programı")
-    hizmet.musaitlik_ekle(vt, kisiler["Uydurma Fizikçi İki"], bas_tarih=date(2026, 9, 17),
+    hizmet.musaitlik_ekle(vt, kisiler["Fizik Öğretmeni 2"], bas_tarih=date(2026, 9, 17),
                           bit_tarih=date(2026, 9, 18), aciklama="İl dışı görev")
 
     # OKY md.58/2-d: duyuru, işaretler ve başvurular plandan önce. Son başvuru
@@ -225,7 +253,7 @@ def okul_kur(kok: Path) -> None:
     for sira, satir in enumerate(hizmet.teslim_cizelgesi(vt, plan_id)):
         if sira not in (3, 4, 5):
             hizmet.teslim_kaydet(vt, satir.oturum_id, satir.evrak_turu, komisyon[satir.oturum_id],
-                                 kisiler["Uydurma Yardımcı"], teslim_tarihi=satir.tarih)
+                                 kisiler["Müdür Yardımcısı 1"], teslim_tarihi=satir.tarih)
 
     # Tek ders sınavı (OKY md.58/6): bir 12. sınıf öğrencisi için, kesinleşmiş.
     adaylar = hizmet.tek_ders_adaylari(vt, "P1")

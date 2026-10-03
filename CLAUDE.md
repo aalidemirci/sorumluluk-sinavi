@@ -90,6 +90,12 @@ herhangi bir dış hizmete **girmez**. Test ve örnek verisi uydurmadır; bu
 depodaki alışkanlık "Uydurma Anadolu Lisesi", "Uydurma Matematikçi" gibi
 açıkça sahte adlardır — gerçekçi görünen ad üretmeyin.
 
+Siteye giden örnekler (ekran görüntüsü, örnek evrak) ise şablon dilinde
+yazılır, "Uydurma" ön eki kullanılmaz (kullanıcı kararı, 03.10.2026): okul
+"Örnek Anadolu Lisesi", imza yerleri ve öğrenciler "Adı SOYADI" /
+"Adı Soyadı", öğretmenler "Matematik Öğretmeni 1" gibi görev adıyla.
+Üreticileri `araclar/site_ornekleri.py` ve `araclar/site_ekranlari.py`.
+
 `.gitignore` biçim bazlı çalışır: veri taşıyabilecek bütün uzantılar
 (tablolar, belgeler, PDF, arşivler, JSON, **görseller**) baştan yoksayılır,
 izlenmesi gereken birkaç dosya tek tek beyaz listeye alınır. Gerçek veriyle
