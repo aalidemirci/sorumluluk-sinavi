@@ -13,8 +13,12 @@ kazanır**; tutarsızlık görürseniz sorun.
 Bunlar tartışmaya açık değildir. Bir değişiklik bunlardan birini bozuyorsa
 değişiklik yanlıştır.
 
-1. **Çevrimdışı.** Uygulama hiçbir ağ isteği yapmaz. `requests`, `urllib`,
-   telemetri, güncelleme denetimi, bulut yedeği eklenmez.
+1. **Çevrimdışı.** Uygulama veri taşıyan hiçbir ağ isteği yapmaz ve
+   internetsiz eksiksiz çalışır. Tek istisna yeni sürüm denetimidir (karar
+   0015): yalnız `veri/guncelleme.py` GitHub'dan son yayımı okur, kişisel ya
+   da okul verisi göndermez, kapatılabilir. Başka modüle ağ kodu, telemetri,
+   hata bildirimi, bulut yedeği ya da Qt'nin ağ modülü eklenmez;
+   `testler/test_ag_yalitimi.py` bunu denetler.
 2. **Veri kurumda kalır.** Çalışma zamanı verisi
    `%LOCALAPPDATA%\SorumlulukSinavi\plan` altındadır, depoda değildir.
 3. **Kural motoru veritabanı görmez.** `cekirdek/` katmanı `veri/`yi içe
@@ -67,6 +71,11 @@ Sürüm numarası tek yerde durur: `cekirdek/surum.py` içindeki `SURUM`.
 `pyproject.toml`, `SorumlulukSinavi.spec`, `yapim/sorumluluk_sinavi.iss` ve
 arayüz bu değeri oradan okur. Ayrıntı ve tuzaklar için KURULUM.md →
 "Sürüm yükseltmek".
+
+Yayımdaki dosya adları programın güncelleme denetiminin sözleşmesidir:
+`vX.Y.Z` etiketi, `SorumlulukSinavi-Kurulum-X.Y.Z.exe` ve üç paketi kapsayan
+`SHA256SUMS-X.Y.Z.txt`. Değişirse kurulu programlar yeni sürümü bulur ama
+indiremez (karar 0015).
 
 ## okulapp.org yayını (ortak yayın alanı)
 

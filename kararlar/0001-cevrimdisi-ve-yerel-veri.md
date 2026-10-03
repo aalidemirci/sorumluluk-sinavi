@@ -1,6 +1,8 @@
 # 0001 — Çevrimdışı çalışma, veri kurumda kalır
 
-**Durum:** Kabul — 26.08.2026
+**Durum:** Kabul — 26.08.2026. Kısmen değiştirildi (bkz.
+[0015](0015-guncelleme-denetimi.md)): yeni sürüm denetimi eklendi; veri
+taşımayan bu tek istek dışında karar geçerlidir.
 
 ## Bağlam
 
@@ -25,7 +27,8 @@ kalkar. Ayrıca okul ağının çalışmadığı anlarda da uygulama çalışır
 ## Sonuçlar
 
 - Telemetri, çevrimiçi güncelleme denetimi, uzak yedek ve hata bildirimi
-  eklenemez. Bunlar istenirse yeni bir karar kaydı gerekir.
+  eklenemez. Bunlar istenirse yeni bir karar kaydı gerekir. (Güncelleme
+  denetimi 03.10.2026'da [0015](0015-guncelleme-denetimi.md) ile eklendi.)
 - e-Okul girişi kullanıcı tarafından elle yapılır; otomasyon yoktur.
 - Yedekleme kullanıcının sorumluluğundadır; KURULUM.md bunu anlatır.
 - Saat dilimi verisi (`tzdata`) pakete gömülmek zorundadır; Windows Python

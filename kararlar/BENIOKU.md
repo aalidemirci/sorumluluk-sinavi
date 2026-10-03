@@ -13,7 +13,7 @@ Durum, Bağlam, Karar, Gerekçe, Sonuçlar.
 
 | No | Karar | Durum |
 |---|---|---|
-| [0001](0001-cevrimdisi-ve-yerel-veri.md) | Çevrimdışı çalışma, veri kurumda kalır | Kabul |
+| [0001](0001-cevrimdisi-ve-yerel-veri.md) | Çevrimdışı çalışma, veri kurumda kalır | Kısmen değiştirildi (bkz. 0015) |
 | [0002](0002-kural-motoru-veritabani-gormez.md) | Kural motoru veritabanı görmez | Kabul |
 | [0003](0003-belgeler-koddan-uretilir.md) | Belgeler koddan üretilir, şablondan değil | Kabul |
 | [0004](0004-sema-goclerle-ilerler.md) | Şema göçlerle ilerler, veri ayrı klasörde | Kabul |
@@ -27,3 +27,4 @@ Durum, Bağlam, Karar, Gerekçe, Sonuçlar.
 | [0012](0012-planlayici-kisit-yayilimli-arama.md) | Planlayıcı kısıt yayılımıyla arar, bütçe düğümle tutulur | Kabul |
 | [0013](0013-ucret-siniri-askisi-tarihe-bagli.md) | Ücret sınırı askısı görev tarihine bağlıdır | Kabul |
 | [0014](0014-gunluk-sinav-siniri.md) | Günlük sınav sınırı: kısa takvim, mevzuat ölçüsü görünür | Kabul |
+| [0015](0015-guncelleme-denetimi.md) | Yeni sürüm GitHub'dan denetlenir; istek veri taşımaz | Kabul |
