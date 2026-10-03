@@ -639,6 +639,9 @@ class Uygulama:
                                           style="Kart.TLabel")
         self.sorumluluk_durum.pack(side=LEFT, padx=10)
 
+        # Önizleme uyarısı (ör. okunmayan sütunlar, SG-05); yalnız varsa görünür.
+        self.sorumluluk_uyari = ttk.Label(kart, text="", style="Soluk.TLabel",
+                                          wraplength=980, justify=LEFT)
         self.sorumluluk_tablosu = self._tablo(
             kart, ("no", "ad", "sube", "duzey", "ders", "eylem"),
             ("Okul no", "Adı Soyadı", "Şube", "Düzey", "Ders", "Değişiklik"),
@@ -667,6 +670,12 @@ class Uygulama:
         self.sorumluluk_durum.configure(
             text=f"{ozet.toplam} kayıt  •  {ogrenciler} öğrenci  •  +{ozet.eklenen} yeni  "
                  f"~{ozet.guncellenen} değişen  −{ozet.cikan} düşecek")
+        if ozet.uyarilar:
+            self.sorumluluk_uyari.configure(text="\n".join(ozet.uyarilar))
+            self.sorumluluk_uyari.pack(anchor="w", padx=15, pady=(0, 4),
+                                       before=self.sorumluluk_tablosu.master)
+        else:
+            self.sorumluluk_uyari.pack_forget()
         self.sorumluluk_tablosu.delete(*self.sorumluluk_tablosu.get_children())
         for satir in ozet.satirlar[:2000]:
             self.sorumluluk_tablosu.insert("", END, values=satir)

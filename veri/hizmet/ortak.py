@@ -175,6 +175,8 @@ class AktarimOzeti:
     degismedi: int = 0
     cikan: int = 0
     satirlar: list[tuple] = field(default_factory=list)
+    # Aktarımı durdurmayan ama kullanıcının görmesi gereken notlar.
+    uyarilar: list[str] = field(default_factory=list)
 
     @property
     def toplam(self) -> int:

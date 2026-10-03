@@ -66,6 +66,16 @@ def sorumluluk_onizle(vt: Veritabani, yol: Path) -> AktarimOzeti:
             ozet.satirlar.append((kayit.okul_no, kayit.ad_soyad, kayit.sube,
                                   kayit.sinif_duzeyi, kayit.ders_adi, eylem))
         ozet.cikan = sum(1 for a in mevcut if a not in gelen)
+        if rapor.okunmayan_basliklar:
+            # SG-05: nakil/geçiş kaynağının raporda bir sütunu olup olmadığı
+            # gerçek bir dosyada henüz görülmedi; görülene kadar kullanıcıya
+            # okunmayan başlıklar gösterilir. Yalnız başlık adı, kişisel veri değil.
+            ozet.uyarilar.append(
+                "Raporda programın okumadığı sütunlar var: "
+                + ", ".join(rapor.okunmayan_basliklar)
+                + ". Biri nakil ya da geçiş kaynağını gösteriyorsa geliştiriciye yalnız "
+                "sütun adını bildirin; program şimdilik bütün kayıtları başarısızlık "
+                "kaynaklı sayar (SG-05).")
         b.execute("UPDATE ice_aktarim SET eklenen=?,guncellenen=?,degismedi=?,cikan=?"
                   " WHERE id=?",
                   (ozet.eklenen, ozet.guncellenen, ozet.degismedi, ozet.cikan, aktarim_id))

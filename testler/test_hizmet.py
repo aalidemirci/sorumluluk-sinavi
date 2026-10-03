@@ -201,6 +201,23 @@ def test_tam_liste_onayinda_dosyada_olmayanlar_pasife_alinir(vt: Veritabani, tmp
     assert len(hizmet.sorumluluk_kayitlari(vt)) == 1
 
 
+def test_onizleme_okunmayan_sutunu_bildirir(vt: Veritabani, tmp_path: Path) -> None:
+    """SG-05: nakil kaynağı sütunu var mı, ilk gerçek aktarımda görülsün diye."""
+    import csv
+    yol = tmp_path / "sutunlu.csv"
+    with yol.open("w", encoding="utf-8-sig", newline="") as akim:
+        csv.writer(akim).writerows([
+            ["Uydurma Anadolu Lisesi - 9. Sınıf / A Şubesi"] + [""] * 9,
+            ["", "Öğrenci No", "Adı Soyadı", "", "", "Açıklama", "", "", "Sınıfı", "Dersi"],
+            ["", "101", "Uydurma Öğrenci Bir", "", "", "", "", "", "9", "MATEMATİK"],
+        ])
+    ozet = hizmet.sorumluluk_onizle(vt, yol)
+    assert len(ozet.uyarilar) == 1
+    assert "Açıklama" in ozet.uyarilar[0] and "SG-05" in ozet.uyarilar[0]
+    # Olumsuz senaryo: bilinen düzendeki rapor uyarı üretmez.
+    assert hizmet.sorumluluk_onizle(vt, _sorumluluk_csv(tmp_path)).uyarilar == []
+
+
 # ================================================================ ders/branş
 
 def test_havuzda_olmayan_brans_eslenemez(vt: Veritabani, tmp_path: Path) -> None:

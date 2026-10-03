@@ -63,6 +63,24 @@ def test_excel_sayisal_ogrenci_no_ondaliktan_arindirilir() -> None:
     assert rapor.kayitlar[0].sinif_duzeyi == 9
 
 
+def test_okunmayan_sutun_basliklari_bildirilir() -> None:
+    """SG-05: nakil kaynağı sütunu gerçek raporda görülene kadar başlıklar gösterilir."""
+    satirlar = [
+        ["Uydurma Lisesi - 9. Sınıf / A Şubesi"],
+        ["", "Öğrenci No", "Adı Soyadı", "", "", "Açıklama", "", "", "Sınıfı", "Dersi"],
+        ["", "101", "Uydurma Öğrenci", "", "", "bir not", "", "", "9", "MATEMATİK"],
+    ]
+    rapor = sorumluluk_raporu_coz(satirlar, "ozet")
+    assert rapor.okunmayan_basliklar == ("Açıklama",)
+    assert len(rapor.kayitlar) == 1          # okuma değişmedi
+
+
+def test_bilinen_duzende_okunmayan_baslik_yoktur(tmp_path: Path) -> None:
+    """Olumsuz senaryo: bilinen düzendeki raporda uyarı çıkmaz, hücre içeriği taranmaz."""
+    rapor = sorumluluk_raporu_oku(ornek_sorumluluk_csv(tmp_path / "ornek.csv"))
+    assert rapor.okunmayan_basliklar == ()
+
+
 def test_sube_basligi_olmayan_dosya_anlasilir_hata_verir() -> None:
     with pytest.raises(RaporHatasi, match="OOK12001R010"):
         sorumluluk_raporu_coz([["rastgele"], ["içerik"]], "ozet")

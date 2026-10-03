@@ -28,6 +28,7 @@ SUT_OGRENCI_NO = 1
 SUT_AD_SOYAD = 2
 SUT_SINIF = 8
 SUT_DERS = 9
+OKUNAN_SUTUNLAR = frozenset({SUT_OGRENCI_NO, SUT_AD_SOYAD, SUT_SINIF, SUT_DERS})
 
 
 class RaporHatasi(ValueError):
@@ -91,6 +92,12 @@ class SorumlulukRaporu:
     kayitlar: tuple[SorumlulukKaydi, ...]
     dosya_ozeti: str
     subeler: tuple[str, ...]
+    # Başlık satırında okunan dört sütunun dışında dolu görülen başlıklar.
+    # Raporun nakil/geçiş kaynağını gösteren bir sütunu olup olmadığı gerçek
+    # bir dosyada henüz görülmedi (SG-05); önizleme bunları kullanıcıya
+    # gösterir ki soru ilk gerçek aktarımda cevaplansın. Yalnız başlık adı
+    # tutulur, hücre içeriği değil.
+    okunmayan_basliklar: tuple[str, ...] = ()
 
     @property
     def ogrenci_sayisi(self) -> int:
@@ -125,6 +132,7 @@ def sorumluluk_raporu_coz(satirlar: list[list[object]], dosya_ozeti: str) -> Sor
     """
     kayitlar: list[SorumlulukKaydi] = []
     subeler: list[str] = []
+    okunmayan: list[str] = []
     etkin_sube = ""
     okul_no = ""
     ad_soyad = ""
@@ -147,6 +155,10 @@ def sorumluluk_raporu_coz(satirlar: list[list[object]], dosya_ozeti: str) -> Sor
 
         # Tablo başlığı satırları
         if no_hucresi == "Öğrenci No" or sinif_hucresi == "Sınıfı" or ders_hucresi == "Dersi":
+            for sira, hucre in enumerate(hucreler):
+                baslik = sadelestir(hucre)
+                if baslik and sira not in OKUNAN_SUTUNLAR and baslik not in okunmayan:
+                    okunmayan.append(baslik)
             continue
         if no_hucresi:
             okul_no = _sayiyi_temizle(no_hucresi)
@@ -165,7 +177,7 @@ def sorumluluk_raporu_coz(satirlar: list[list[object]], dosya_ozeti: str) -> Sor
             "Dosyada sorumluluk kaydı bulunamadı. e-Okul'dan OOK12001R010 raporunu "
             "biçimlendirmeden dışa aktardığınızdan emin olun."
         )
-    return SorumlulukRaporu(tuple(kayitlar), dosya_ozeti, tuple(subeler))
+    return SorumlulukRaporu(tuple(kayitlar), dosya_ozeti, tuple(subeler), tuple(okunmayan))
 
 
 def sorumluluk_raporu_oku(yol: Path) -> SorumlulukRaporu:

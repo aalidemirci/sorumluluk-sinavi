@@ -30,6 +30,11 @@ derlenir.
 
 ## [Yayımlanmamış]
 
+### Eklendi
+- Sorumluluk raporu önizlemesi, programın okumadığı sütun başlıklarını
+  gösterir. Raporda nakil/geçiş kaynağını gösteren bir sütun olup olmadığı
+  (SG-05) ilk gerçek aktarımda görülsün diye; yalnız başlık adı gösterilir.
+
 ### Düzeltildi
 - **Onaylı belge değişince uyarı.** Belge sürümleri hiçbir zaman "onaylı"
   işaretlenmediği için onaylı bir belgenin sonradan değiştiğini kaydeden
