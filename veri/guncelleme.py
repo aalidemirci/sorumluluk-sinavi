@@ -329,7 +329,9 @@ def son_kurulumu_indir(*, zorla: bool = False) -> Path:
     beklenen = _beklenen_ozet(yayim)
     icerik = _adresi_oku(kurulum.indirme_adresi, azami_bayt=AZAMI_KURULUM_BAYTI)
     if hashlib.sha256(icerik).hexdigest() != beklenen:
-        raise GuncellemeHatasi("İndirilen kurulum dosyasının SHA-256 doğrulaması başarısız.")
+        # Kullanıcıya görünen iletide teknik terim (SHA-256) geçmez (karar 0015).
+        raise GuncellemeHatasi("İndirilen kurulum dosyası doğrulanamadı: içeriği yayımlanan "
+                               "dosyayla aynı değil. Dosya kullanılmadı; yeniden deneyin.")
 
     klasor = guncelleme_klasoru()
     klasor.mkdir(parents=True, exist_ok=True)

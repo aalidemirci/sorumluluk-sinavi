@@ -25,8 +25,8 @@ from cekirdek.kaynak import varlik_yolu
 from cekirdek.surum import SURUM
 from veri import guncelleme
 
-MEB_IPUCU = ("Okul ağında GitHub'a erişim kapalı olabilir. Yeni sürümü okulapp.org/sorumluluk-"
-             "sinavi adresinden de indirebilirsiniz.")
+MEB_IPUCU = ("Okul ağı güncelleme sunucusuna erişimi engelliyor olabilir. Yeni sürümü "
+             "okulapp.org/sorumluluk-sinavi adresinden de indirebilirsiniz.")
 
 
 def _boyut(bayt: int) -> str:

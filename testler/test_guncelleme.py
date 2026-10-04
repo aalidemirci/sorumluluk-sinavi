@@ -357,7 +357,7 @@ def test_kurulum_sha256_dogrulanarak_onbellege_yazilir(monkeypatch: pytest.Monke
 def test_ozeti_tutmayan_kurulum_yazilmaz(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     yayim = _yayim(ozet=f"sha256:{'0' * 64}")
     _indirme_ortami(monkeypatch, tmp_path, yayim, {yayim.kurulum.indirme_adresi: b"farkli"})
-    with pytest.raises(guncelleme.GuncellemeHatasi, match="SHA-256"):
+    with pytest.raises(guncelleme.GuncellemeHatasi, match="doğrulanamadı"):
         guncelleme.son_kurulumu_indir()
     assert not (tmp_path / "guncelleme").exists()
 

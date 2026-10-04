@@ -711,3 +711,29 @@ def test_personel_durumu_degismezse_basari_bildirmez(uygulama, monkeypatch) -> N
     monkeypatch.setattr(hizmet, "personel_durumu_degistir", bozul)
     sayfa.durum_degistir()
     assert uygulama.ileti.turden("hata") and bildirimler == []
+
+
+def test_guncelleme_paneli_teknik_terim_kullanmaz(uygulama) -> None:
+    """Kardeş projelerle aynı dil (karar 0015): panelin hiçbir durumunda GitHub,
+    Release, kurucu ya da SHA-256 geçmez. Ağ engeli ipucunda "GitHub'a erişim"
+    yazıyordu."""
+    import re
+    from veri import guncelleme
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    yasak = re.compile(r"GitHub|Release|kurucu|SHA-256", re.IGNORECASE)
+    metinler = []
+    for durum in (dict(GUNCEL_DURUM),
+                  {**GUNCEL_DURUM, "platform": "linux", "indirilebilir": False},
+                  {**GUNCEL_DURUM, "guncelleme_var": False, "son_surum": "0.8.0"},
+                  {**GUNCEL_DURUM, "indirilebilir": False}):
+        sayfa.durumu_goster(durum)
+        metinler.append(sayfa.sonuc.metin.text())
+    sayfa._denetlenemedi(guncelleme.GuncellemeHatasi("Güncelleme sunucusuna ulaşılamadı."))
+    metinler.append(sayfa.sonuc.metin.text())
+    sayfa._indirilemedi(guncelleme.GuncellemeHatasi("Güncelleme dosyası doğrulanamadı."))
+    metinler.append(sayfa.sonuc.metin.text())
+    uygulama.guncelleme_durumu_geldi(dict(GUNCEL_DURUM))
+    metinler.append(uygulama.guncelleme_seridi.metin.text())
+    bulunan = [m for m in metinler if yasak.search(m)]
+    assert not bulunan, bulunan
