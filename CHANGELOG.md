@@ -28,6 +28,31 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [0.8.3] — 04.10.2026
+
+0.8.2'nin gerçek bir makinede programın kendi güncelleme düğmeleriyle
+kurulduğu denemede görülen kusurları gideren yama sürümü. Şema değişmedi;
+veritabanına dokunulmaz.
+
+### Değişti
+- İndirme sürerken Hakkında sayfasındaki bekleme örtüsü inen ve toplam
+  boyutu gösterir ("6,0 MB / 24,0 MB"), çubuk dolar. Önceden yalnız dönen bir
+  çubuk vardı; yavaş okul ağında program takıldı sanılabiliyordu.
+- Program açılırken güncelleme önbelleğindeki
+  (`%LOCALAPPDATA%\SorumlulukSinavi\guncelleme`) kurulu sürümden yeni
+  olmayan kurulum dosyalarını ve yarım kalmış indirmeleri siler. Kurulumdan
+  sonra işe yaramayan dosya her güncellemede ~25 MB birikiyordu. Ağa çıkmaz;
+  güncelleme denetimi kapalıyken de yapılır.
+
+### Düzeltildi
+- Kurulum sihirbazının lisans sayfası LICENSE'ı Markdown kaynağı olarak
+  gösteriyordu (`#`, `##`, bağlantı ve vurgu işaretleri). Artık aynı metnin
+  düz hâli gösterilir; lisansın sözcükleri değişmedi.
+- 0.6.0'dan önceki bir sürümden yükseltilen makinelerde Başlat menüsünde iki
+  kaldırma kısayolu kalıyordu: eski sihirbazın kurduğu İngilizce "Uninstall
+  Sorumluluk Sınavı" ve Türkçe "Sorumluluk Sınavı uygulamasını kaldır".
+  Kurulum eskisini siler.
+
 ## [0.8.2] — 04.10.2026
 
 0.8.1'deki bir görünüm kusurunu düzelten yama sürümü. Şema değişmedi;

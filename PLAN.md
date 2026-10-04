@@ -5,10 +5,10 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.2 yayımı; ardından güncelleme akışı bu
-makinede yayımlanmış paketlerle denendi). Kodla yapılabilecek açık iş yalnız
-o denemeden çıkan küçük işler; kalanlar gerçek veri, okul makinesi, gerçek
-Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
+Son gözden geçirme: 04.10.2026 (0.8.3 yayımı; güncelleme denemesinden
+çıkan küçük işler giderildi). Bu dosyadaki açık işlerin kodla yapılabilen
+kısmı bitti; kalanlar gerçek veri, okul makinesi ya da ağı, gerçek Pardus
+kurulumu ya da takvim (Ağustos 2027) bekliyor.
 
 ## Şimdi
 
@@ -41,27 +41,14 @@ Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
       Ayarlar → Uygulamalar kaydının 0.4.0'da kalmış olduğu görüldü
       (dosyalar 0.7.0'dı); 0.8.1 ve 0.8.2 kurulumları kaydı yeniledi.
       Eskide kalmasının nedeni bulunamadı, durum yeniden üretilemedi.
-- [ ] **Güncelleme denemesinden çıkan küçük işler** (04.10.2026; sonraki
-      sürüme). Başlat menüsünde iki kaldırma kısayolu kalıyor: 0.6.0'dan
-      önceki sihirbaz İngilizce iletilerle (Default.isl) "Uninstall
-      Sorumluluk Sınavı"nı kurmuştu; Türkçe sihirbaz "Sorumluluk Sınavı
-      uygulamasını kaldır"ı ekliyor, eskisini silmiyor. `[InstallDelete]`
-      eski adı da silmeli. İndirme sürerken ilerleme görünmüyor, yalnız
-      belirsiz bekleme çubuğu dönüyor; yavaş okul ağında program takıldı
-      sanılabilir, inen ve toplam MB gösterilebilir. İndirilen kurulum
-      dosyası `%LOCALAPPDATA%\SorumlulukSinavi\guncelleme` altında hiç
-      silinmeden birikiyor (sürüm başına ~25 MB); kurulu sürümden yeni
-      olmayanlar açılışta silinebilir. Sihirbazın lisans sayfası LICENSE'ı
-      Markdown kaynağı olarak gösteriyor (`#`, `##`, bağlantı sözdizimi);
-      sihirbaza düz metin verilebilir.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.2;
+      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.3;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
       veritabanı ilk açılışta şema 9'a geçer (öncesinde yedek alınır); 0.5.x
       ya da daha eskisinden gelen makinede geçişten sonra tatil günleri
       girilmeli. 0.8.0'dan sonraki sürümleri program kendisi haber verir.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0 – 0.8.2) yalnız `debian:12` kabında (GitHub Actions ve yerelde
+      (0.5.0 – 0.8.3) yalnız `debian:12` kabında (GitHub Actions ve yerelde
       Docker) kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
