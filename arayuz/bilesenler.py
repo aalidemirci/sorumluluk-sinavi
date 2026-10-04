@@ -822,14 +822,14 @@ class MesgulOrtusu(QFrame):
         self.metin = QLabel()
         self.metin.setObjectName("MesgulMetin")
         self.metin.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cubuk = QProgressBar()
-        cubuk.setRange(0, 0)
-        cubuk.setTextVisible(False)
-        cubuk.setFixedWidth(260)
+        self.cubuk = QProgressBar()
+        self.cubuk.setRange(0, 0)
+        self.cubuk.setTextVisible(False)
+        self.cubuk.setFixedWidth(260)
         duzen = QVBoxLayout(self)
         duzen.addStretch(1)
         duzen.addWidget(self.metin, 0, Qt.AlignmentFlag.AlignCenter)
-        duzen.addWidget(cubuk, 0, Qt.AlignmentFlag.AlignCenter)
+        duzen.addWidget(self.cubuk, 0, Qt.AlignmentFlag.AlignCenter)
         duzen.addStretch(1)
         ust.installEventFilter(self)
         self.hide()
@@ -841,9 +841,20 @@ class MesgulOrtusu(QFrame):
 
     def ac(self, metin: str) -> None:
         self.metin.setText(metin)
+        # Her iş belirsiz çubukla başlar; ilerlemeyi bilen iş kendisi doldurur.
+        self.cubuk.setRange(0, 0)
         self.setGeometry(self.parentWidget().rect())
         self.show()
         self.raise_()
+
+    def ilerleme(self, deger: int, toplam: int, metin: str) -> None:
+        """Boyutu bilinen işte (indirme) çubuk dolar; toplam 0 ise belirsiz döner."""
+        self.metin.setText(metin)
+        if toplam > 0:
+            self.cubuk.setRange(0, 1000)
+            self.cubuk.setValue(min(1000, deger * 1000 // toplam))
+        else:
+            self.cubuk.setRange(0, 0)
 
     def kapat(self) -> None:
         self.hide()

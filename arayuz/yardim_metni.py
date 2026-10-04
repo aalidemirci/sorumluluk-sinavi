@@ -347,9 +347,10 @@ BOLUMLER = [
             "için şeridi kapatır. Hakkında sayfasında \"Şimdi denetle\" ile elle "
             "denetleyebilir, açılıştaki denetimi kapatabilirsiniz.",
             "Windows'ta \"Doğrula ve indir\" kurulum dosyasını indirir ve yayımlanan "
-            "SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz. \"Kurulumu "
-            "başlat\" programı kapatıp kurulumu açar. Kurulum eski sürümün üzerine yapılır, "
-            "veritabanına ve ayarlara dokunmaz.",
+            "SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz. İndirme "
+            "sürerken inen ve toplam boyut görünür. \"Kurulumu başlat\" programı kapatıp "
+            "kurulumu açar. Kurulum eski sürümün üzerine yapılır, veritabanına ve ayarlara "
+            "dokunmaz; indirilen dosya, kurulan sürüm açılırken silinir.",
             "Pardus'ta yeni paket okulapp.org indirme sayfasından alınır ve "
             "\"sudo apt install ./sorumluluk-sinavi_<sürüm>_amd64.deb\" ile kurulur.",
             "Kurum genelinde denetimi kapatmak için SORUMLULUK_GUNCELLEME_DENETIMI ortam "

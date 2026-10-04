@@ -24,7 +24,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -40,7 +40,13 @@ KULLANICI_AJANI = "Sorumluluk-Sinavi-Guncelleyici"
 # GitHub engelli ağlarda (MEB) paket buradan indirilir; arayüz bu adresi önerir.
 INDIRME_SAYFASI = "https://okulapp.org/sorumluluk-sinavi/#indir"
 KURULUM_DESENI = re.compile(r"^SorumlulukSinavi-Kurulum-[0-9A-Za-z.\-]+\.exe$", re.IGNORECASE)
+# Önbellekte silinebilecek dosyalar: indirilmiş kurulum ve yarım kalmış indirmesi.
+ONBELLEK_DOSYASI = re.compile(
+    r"^SorumlulukSinavi-Kurulum-(?P<surum>[0-9A-Za-z.\-]+)\.exe(?P<yarim>\.part)?$",
+    re.IGNORECASE)
 AZAMI_KURULUM_BAYTI = 250 * 1024 * 1024
+# Okuma parçası küçük tutulur: yavaş okul ağında da ilerleme sık güncellenir.
+PARCA_BAYTI = 256 * 1024
 ZAMAN_ASIMI_SN = 20
 ONBELLEK_SN = 15 * 60
 
@@ -129,20 +135,26 @@ def _istek(adres: str) -> Request:
     )
 
 
-def _adresi_oku(adres: str, *, azami_bayt: int) -> bytes:
-    """Yanıtı parça parça okur; sınır aşılırsa belleği doldurmadan keser."""
+def _adresi_oku(adres: str, *, azami_bayt: int,
+                ilerleme: Callable[[int], None] | None = None) -> bytes:
+    """Yanıtı parça parça okur; sınır aşılırsa belleği doldurmadan keser.
+
+    `ilerleme` her parçadan sonra o ana dek okunan baytla çağrılır.
+    """
     try:
         with urlopen(_istek(adres), timeout=ZAMAN_ASIMI_SN) as yanit:  # noqa: S310
             parcalar: list[bytes] = []
             toplam = 0
             while True:
-                parca = yanit.read(min(1024 * 1024, azami_bayt + 1 - toplam))
+                parca = yanit.read(min(PARCA_BAYTI, azami_bayt + 1 - toplam))
                 if not parca:
                     break
                 toplam += len(parca)
                 if toplam > azami_bayt:
                     raise GuncellemeHatasi("Güncelleme dosyası beklenen boyut sınırını aşıyor.")
                 parcalar.append(parca)
+                if ilerleme is not None:
+                    ilerleme(toplam)
             return b"".join(parcalar)
     except HTTPError as hata:
         if hata.code == 404:
@@ -307,11 +319,16 @@ def _beklenen_ozet(yayim: YayimBilgisi) -> str:
     raise GuncellemeHatasi("Özet dosyasında Windows kurulum dosyası bulunmuyor.")
 
 
-def son_kurulumu_indir(*, zorla: bool = False) -> Path:
+def son_kurulumu_indir(*, zorla: bool = False,
+                       ilerleme: Callable[[int, int], None] | None = None) -> Path:
     """Yeni sürümün kurulum dosyasını doğrulayarak önbelleğe indirir.
 
     Doğrulanamayacak dosya ağdan hiç çekilmez; özeti tutmayan dosya diske
     yazılmaz. Sürüm düşürme yolu yoktur: eski sürüm yeni şemalı veriyi açamaz.
+
+    `ilerleme(inen, toplam)` indirmeyi yapan iş parçacığından çağrılır;
+    toplam yayım kaydındaki boyuttur, bilinmiyorsa 0. Yalnız dönen bir çubuk
+    yavaş okul ağında programın takıldığını düşündürüyordu (04.10.2026).
     """
     if not kurulum_destekleniyor_mu():
         raise GuncellemeHatasi(
@@ -327,7 +344,10 @@ def son_kurulumu_indir(*, zorla: bool = False) -> Path:
         raise GuncellemeHatasi("Kurulum dosyası güvenli boyut sınırını aşıyor.")
 
     beklenen = _beklenen_ozet(yayim)
-    icerik = _adresi_oku(kurulum.indirme_adresi, azami_bayt=AZAMI_KURULUM_BAYTI)
+    toplam = kurulum.boyut
+    icerik = _adresi_oku(
+        kurulum.indirme_adresi, azami_bayt=AZAMI_KURULUM_BAYTI,
+        ilerleme=(lambda inen: ilerleme(inen, toplam)) if ilerleme is not None else None)
     if hashlib.sha256(icerik).hexdigest() != beklenen:
         # Kullanıcıya görünen iletide teknik terim (SHA-256) geçmez (karar 0015).
         raise GuncellemeHatasi("İndirilen kurulum dosyası doğrulanamadı: içeriği yayımlanan "
@@ -340,3 +360,34 @@ def son_kurulumu_indir(*, zorla: bool = False) -> Path:
     gecici.write_bytes(icerik)
     gecici.replace(hedef)
     return hedef
+
+
+def eski_kurulumlari_temizle(calisan_surum: str | None = None) -> int:
+    """Önbellekte kurulu sürümden yeni olmayan kurulum dosyalarını siler.
+
+    Kurulumdan sonra indirilen dosya işe yaramaz (sürüm düşürme yolu yoktur)
+    ama silinmiyordu; her güncellemede ~25 MB birikiyordu (04.10.2026
+    denemesi). Yarım kalmış indirmeler (.part) de silinir. Klasör
+    SORUMLULUK_GUNCELLEME_KLASORU ile başka bir yere çevrilmiş olabileceği için
+    yalnız kurulum dosyası adına uyanlara dokunulur. Silinemeyen dosya (kurulum
+    sürerken kilitlidir) sonraki açılışa kalır. Ağa çıkmaz; denetim kapalıyken
+    de çalışır. Silinen dosya sayısını döndürür.
+    """
+    calisan = surum_anahtari(calisan_surum or SURUM)
+    try:
+        adaylar = list(guncelleme_klasoru().iterdir())
+    except OSError:
+        return 0
+    silinen = 0
+    for yol in adaylar:
+        eslesme = ONBELLEK_DOSYASI.fullmatch(yol.name)
+        if eslesme is None or not yol.is_file():
+            continue
+        if not eslesme["yarim"] and surum_anahtari(eslesme["surum"]) > calisan:
+            continue
+        try:
+            yol.unlink()
+        except OSError:
+            continue
+        silinen += 1
+    return silinen

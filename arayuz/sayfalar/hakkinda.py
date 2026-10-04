@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QTextBrowser, QVBoxLayout
 
@@ -34,10 +34,14 @@ def _boyut(bayt: int) -> str:
 
 
 class HakkindaSayfasi(Sayfa):
+    # İndirme iş parçacığında yayılır; Qt yuvayı ana iş parçacığında çalıştırır.
+    indirme_ilerledi = Signal(int, int)
+
     def __init__(self, uyg) -> None:
         super().__init__(uyg)
         self.durum: dict[str, Any] | None = None
         self.indirilen: Path | None = None
+        self.indirme_ilerledi.connect(self._indirme_ilerlemesi)
 
         ust = Kart(kenar=(18, 16, 18, 16))
         satir = yatay()
@@ -168,7 +172,19 @@ class HakkindaSayfasi(Sayfa):
     def indir(self) -> None:
         self.indir_dugmesi.setEnabled(False)
         self.uyg.mesgul_ac("Kurulum dosyası indiriliyor ve doğrulanıyor…")
-        arka_planda(guncelleme.son_kurulumu_indir, self._indirildi, self._indirilemedi)
+        arka_planda(lambda: guncelleme.son_kurulumu_indir(ilerleme=self.indirme_ilerledi.emit),
+                    self._indirildi, self._indirilemedi)
+
+    def _indirme_ilerlemesi(self, inen: int, toplam: int) -> None:
+        """İnen ve toplam boyut gösterilir: okul ağında 24 MB dakikalar sürebilir ve
+        yalnız dönen bir çubuk programın takıldığını düşündürüyordu."""
+        if toplam > 0 and inen >= toplam:
+            metin = "Kurulum dosyası doğrulanıyor…"
+        elif toplam > 0:
+            metin = f"Kurulum dosyası indiriliyor: {_boyut(inen)} / {_boyut(toplam)}"
+        else:
+            metin = f"Kurulum dosyası indiriliyor: {_boyut(inen)}"
+        self.uyg.mesgul.ilerleme(inen, toplam, metin)
 
     def _indirilemedi(self, hata: BaseException) -> None:
         self.uyg.mesgul_kapat()

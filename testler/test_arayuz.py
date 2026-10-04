@@ -510,6 +510,69 @@ def test_kurum_kapattiysa_secenek_kapali_gorunur(uygulama) -> None:
     assert uygulama.ayarlar.value("guncelleme/acilista_denetle", type=bool) is True
 
 
+def test_indirme_ilerlemesi_boyutla_gosterilir(uygulama) -> None:
+    """0.8.2'ye kadar indirme sürerken yalnız dönen bir çubuk vardı; 24 MB okul
+    ağında dakikalar sürebilir. Olumsuz senaryo: boyut bilinmiyorsa çubuk belirsiz
+    kalır ve sonraki iş yine belirsiz çubukla başlar."""
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    cubuk = uygulama.mesgul.cubuk
+    uygulama.mesgul_ac("Kurulum dosyası indiriliyor ve doğrulanıyor…")
+    assert cubuk.maximum() == 0
+    sayfa._indirme_ilerlemesi(6 * 1024 * 1024, 24 * 1024 * 1024)
+    assert "6,0 MB / 24,0 MB" in uygulama.mesgul.metin.text()
+    assert cubuk.value() * 4 == cubuk.maximum() > 0
+    sayfa._indirme_ilerlemesi(24 * 1024 * 1024, 24 * 1024 * 1024)
+    assert "doğrulanıyor" in uygulama.mesgul.metin.text() and cubuk.value() == cubuk.maximum()
+    sayfa._indirme_ilerlemesi(5 * 1024 * 1024, 0)
+    assert cubuk.maximum() == 0 and uygulama.mesgul.metin.text().endswith("5,0 MB")
+    sayfa._indirme_ilerlemesi(6 * 1024 * 1024, 24 * 1024 * 1024)
+    uygulama.mesgul_ac("Plan üretiliyor…")
+    assert cubuk.maximum() == 0
+
+
+def test_indirme_ilerlemesi_is_parcacigindan_ortuye_ulasir(uygulama, qtbot, monkeypatch,
+                                                           tmp_path) -> None:
+    """İlerleme indirmeyi yapan iş parçacığından gelir; Qt sinyali ana iş
+    parçacığına sıraya koyar ve indirme bitmeden önce teslim eder."""
+    from veri import guncelleme
+    indirilen = tmp_path / "SorumlulukSinavi-Kurulum-0.9.0.exe"
+    indirilen.write_bytes(b"x")
+
+    def sahte_indir(*, ilerleme=None, **_k):
+        ilerleme(1024 * 1024, 2 * 1024 * 1024)
+        return indirilen
+
+    monkeypatch.setattr(guncelleme, "son_kurulumu_indir", sahte_indir)
+    uygulama.sayfa_goster(sayfa_sirasi("Hakkında"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Hakkında")]
+    sayfa.durumu_goster(dict(GUNCEL_DURUM))
+    sayfa.indir()
+    qtbot.waitUntil(lambda: sayfa.indirilen == indirilen, timeout=10_000)
+    assert "1,0 MB / 2,0 MB" in uygulama.mesgul.metin.text()
+    assert not uygulama.mesgul.isVisible() and sayfa.baslat_dugmesi.isVisibleTo(sayfa)
+
+
+def test_acilista_eski_kurulum_dosyalari_silinir(qtbot, tmp_path, monkeypatch) -> None:
+    """Kurulumdan sonra indirilen dosya önbellekte kalıyordu. Temizlik ağa çıkmaz;
+    açılış denetimi kapalıyken de (conftest) yapılır. Olumsuz senaryo: kurulu
+    sürümden yeni kurulum dosyası silinmez."""
+    from cekirdek.surum import SURUM
+    klasor = tmp_path / "guncelleme"
+    klasor.mkdir()
+    kurulan = klasor / f"SorumlulukSinavi-Kurulum-{SURUM}.exe"
+    yenisi = klasor / "SorumlulukSinavi-Kurulum-99.0.0.exe"
+    for yol in (kurulan, yenisi):
+        yol.write_bytes(b"x")
+    monkeypatch.setenv("SORUMLULUK_VERI_KLASORU", str(tmp_path / "veri"))
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_KLASORU", str(klasor))
+    pencere = Uygulama()
+    pencere.ileti = KayitliIleti()
+    qtbot.addWidget(pencere)
+    qtbot.waitUntil(lambda: not kurulan.exists(), timeout=10_000)
+    assert yenisi.exists()
+
+
 # ================================================================== bileşen
 
 def test_tablo_turkce_siralar_ve_harf_duyarsiz_arar(qtbot) -> None:

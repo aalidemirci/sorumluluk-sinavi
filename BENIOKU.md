@@ -237,8 +237,9 @@ pencerenin üstünde bir şerit çıkar. İstek yalnız sürüm bilgisini alır,
 
 Windows'ta **Hakkında** sayfasındaki **Doğrula ve indir** kurulum dosyasını
 indirir ve yayımlanan SHA-256 özetiyle karşılaştırır; özet tutmayan dosya
-kullanılmaz. Kurulumu kullanıcı başlatır, program kendiliğinden kurmaz.
-Pardus'ta yeni paket indirme sayfasından alınır.
+kullanılmaz. Kurulumu kullanıcı başlatır, program kendiliğinden kurmaz;
+indirilen dosya, kurulan sürüm açılırken silinir. Pardus'ta yeni paket
+indirme sayfasından alınır.
 
 Denetim Hakkında sayfasından kapatılabilir; kurum genelinde kapatmak için
 `SORUMLULUK_GUNCELLEME_DENETIMI=0` ortam değişkeni kullanılır. Gerekçe:

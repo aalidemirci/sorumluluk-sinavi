@@ -106,8 +106,10 @@ engelliyorsa denetim sessizce geçer, program çalışmaya devam eder.
 
 - **Windows:** Hakkında sayfasındaki **Doğrula ve indir**, kurulum dosyasını
   `%LOCALAPPDATA%\SorumlulukSinavi\guncelleme` altına indirir ve yayımlanan
-  SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz.
-  **Kurulumu başlat** programı kapatıp kurulumu açar.
+  SHA-256 özetiyle karşılaştırır; özet tutmayan dosya kullanılmaz. İndirme
+  sürerken inen ve toplam boyut görünür. **Kurulumu başlat** programı
+  kapatıp kurulumu açar. Program açılırken bu klasördeki, kurulu sürümden
+  yeni olmayan kurulum dosyalarını siler; klasörde birikme olmaz.
 - **Pardus:** yeni paket indirme sayfasından alınıp yukarıdaki gibi kurulur;
   `sudo` gerektiren kurulumu program kendisi yapmaz.
 

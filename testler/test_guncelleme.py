@@ -217,6 +217,27 @@ def test_yanit_boyut_sinirinda_kesilir(monkeypatch: pytest.MonkeyPatch) -> None:
         guncelleme._adresi_oku("https://github.com/x", azami_bayt=10)  # noqa: SLF001
 
 
+def test_okunan_bayt_parca_parca_bildirilir(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Yalnız dönen bir çubuk yavaş okul ağında programın takıldığını düşündürüyordu."""
+    monkeypatch.setattr(guncelleme, "PARCA_BAYTI", 4)
+    monkeypatch.setattr(guncelleme, "urlopen", lambda *_a, **_k: _SahteYanit(b"x" * 10))
+    gorulen: list[int] = []
+    assert guncelleme._adresi_oku("https://github.com/x", azami_bayt=100,  # noqa: SLF001
+                                  ilerleme=gorulen.append) == b"x" * 10
+    assert gorulen == [4, 8, 10]
+
+
+def test_sinir_asilinca_asan_parca_bildirilmez(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Olumsuz senaryo: sınırı aşan yanıt kesilir; ilerleme sınırın ötesini göstermez."""
+    monkeypatch.setattr(guncelleme, "PARCA_BAYTI", 4)
+    monkeypatch.setattr(guncelleme, "urlopen", lambda *_a, **_k: _SahteYanit(b"x" * 11))
+    gorulen: list[int] = []
+    with pytest.raises(guncelleme.GuncellemeHatasi, match="boyut sınırını aşıyor"):
+        guncelleme._adresi_oku("https://github.com/x", azami_bayt=10,  # noqa: SLF001
+                               ilerleme=gorulen.append)
+    assert gorulen == [4, 8]
+
+
 @pytest.mark.parametrize(("kod", "beklenen"), [(403, "geçici olarak sınırlandı"),
                                                (429, "geçici olarak sınırlandı"),
                                                (500, "HTTP 500")])
@@ -333,8 +354,10 @@ def _indirme_ortami(monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
                     calisan: str = "0.7.0") -> list[str]:
     istenen: list[str] = []
 
-    def sahte(adres: str, *, azami_bayt: int) -> bytes:
+    def sahte(adres: str, *, azami_bayt: int, ilerleme: Any = None) -> bytes:
         istenen.append(adres)
+        if ilerleme is not None:
+            ilerleme(len(yanitlar[adres]))
         return yanitlar[adres]
 
     monkeypatch.setattr(guncelleme, "son_yayim", lambda **_k: yayim)
@@ -352,6 +375,22 @@ def test_kurulum_sha256_dogrulanarak_onbellege_yazilir(monkeypatch: pytest.Monke
     hedef = guncelleme.son_kurulumu_indir()
     assert hedef.read_bytes() == icerik and hedef.parent == tmp_path / "guncelleme"
     assert not hedef.with_suffix(hedef.suffix + ".part").exists()
+
+
+def test_kurulum_indirilirken_yayimdaki_boyutla_ilerleme_bildirilir(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Toplam yayım kaydındaki boyuttur; özet dosyasının okunması ilerleme sayılmaz."""
+    icerik = b"kurulum"
+    ozet_dosyasi = guncelleme.YayimVarligi("SHA256SUMS-0.9.0.txt",
+                                           f"{YAYIM_TABANI}/SHA256SUMS-0.9.0.txt", 300, "")
+    yayim = _yayim(ozet_dosyasi=ozet_dosyasi)
+    _indirme_ortami(monkeypatch, tmp_path, yayim, {
+        ozet_dosyasi.indirme_adresi: f"{hashlib.sha256(icerik).hexdigest()} *{KURULUM_ADI}\n"
+                                     .encode(),
+        yayim.kurulum.indirme_adresi: icerik})
+    gorulen: list[tuple[int, int]] = []
+    guncelleme.son_kurulumu_indir(ilerleme=lambda inen, toplam: gorulen.append((inen, toplam)))
+    assert gorulen == [(len(icerik), yayim.kurulum.boyut)]
 
 
 def test_ozeti_tutmayan_kurulum_yazilmaz(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -427,3 +466,52 @@ def test_guncelleme_klasoru_veri_klasorunun_disindadir(monkeypatch: pytest.Monke
     monkeypatch.setattr(sys, "platform", platform)
     klasor = guncelleme.guncelleme_klasoru()
     assert klasor == beklenen and "plan" not in klasor.parts
+
+
+# ======================================================== önbellek temizliği
+
+def test_kurulu_surumden_yeni_olmayan_kurulumlar_silinir(monkeypatch: pytest.MonkeyPatch,
+                                                         tmp_path: Path) -> None:
+    """Kurulumdan sonra indirilen dosya işe yaramaz (sürüm düşürme yolu yoktur) ama
+    her güncellemede ~25 MB birikiyordu. Sürümler sayıyla karşılaştırılır: 0.10.0,
+    0.9.0'dan yenidir; ön sürüm aynı numaralı kararlı sürümden eskidir. Yarım
+    kalmış indirme her durumda silinir."""
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_KLASORU", str(tmp_path))
+    for ad in ("SorumlulukSinavi-Kurulum-0.8.3.exe", "SorumlulukSinavi-Kurulum-0.9.0.exe",
+               "SorumlulukSinavi-Kurulum-0.9.0-beta.1.exe", "SorumlulukSinavi-Kurulum-0.10.0.exe",
+               "SorumlulukSinavi-Kurulum-0.10.0.exe.part"):
+        (tmp_path / ad).write_bytes(b"x")
+    assert guncelleme.eski_kurulumlari_temizle("0.9.0") == 4
+    assert [y.name for y in tmp_path.iterdir()] == ["SorumlulukSinavi-Kurulum-0.10.0.exe"]
+
+
+def test_onbellek_temizligi_yabanci_dosyaya_dokunmaz(monkeypatch: pytest.MonkeyPatch,
+                                                     tmp_path: Path) -> None:
+    """Olumsuz senaryo: klasör SORUMLULUK_GUNCELLEME_KLASORU ile kullanıcının bir
+    klasörüne çevrilmiş olabilir; yalnız kurulum dosyası adına uyanlar silinir."""
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_KLASORU", str(tmp_path))
+    yabancilar = ("notlar.txt", "SorumlulukSinavi.exe", "Kurulum-0.1.0.exe", "sorumluluk.db",
+                  "SorumlulukSinavi-Kurulum-0.1.0.msi", "eski-SorumlulukSinavi-Kurulum-0.1.0.exe")
+    for ad in yabancilar:
+        (tmp_path / ad).write_bytes(b"x")
+    (tmp_path / "SorumlulukSinavi-Kurulum-0.1.0.exe").mkdir()      # dosya değil, klasör
+    assert guncelleme.eski_kurulumlari_temizle("0.9.0") == 0
+    assert len(list(tmp_path.iterdir())) == len(yabancilar) + 1
+
+
+def test_onbellek_yoksa_ya_da_dosya_kilitliyse_sessiz_gecer(monkeypatch: pytest.MonkeyPatch,
+                                                           tmp_path: Path) -> None:
+    """Kurulum sihirbazının "Bitti" ile açtığı programda kurulum dosyası bir süre
+    kilitli kalır; silinemeyen dosya sonraki açılışa kalır, hata verilmez."""
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_KLASORU", str(tmp_path / "yok"))
+    assert guncelleme.eski_kurulumlari_temizle("0.9.0") == 0
+    monkeypatch.setenv("SORUMLULUK_GUNCELLEME_KLASORU", str(tmp_path))
+    kilitli = tmp_path / "SorumlulukSinavi-Kurulum-0.8.0.exe"
+    kilitli.write_bytes(b"x")
+
+    def kullanimda(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("dosya kullanımda")
+
+    monkeypatch.setattr(Path, "unlink", kullanimda)
+    assert guncelleme.eski_kurulumlari_temizle("0.9.0") == 0
+    assert kilitli.exists()

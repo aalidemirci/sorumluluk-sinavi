@@ -153,6 +153,7 @@ class Uygulama(QMainWindow):
         self._kisayollar()
         self._boyutlandir()
         self.sayfa_goster(0)
+        QTimer.singleShot(2500, self._eski_kurulumlari_temizle)
         QTimer.singleShot(2500, self._acilis_guncelleme_denetimi)
 
     # ------------------------------------------------------------------ kabuk
@@ -345,6 +346,17 @@ class Uygulama(QMainWindow):
         self.mesgul.kapat()
 
     # ------------------------------------------------------------- güncelleme
+    def _eski_kurulumlari_temizle(self) -> None:
+        """Kurulumdan sonra indirilen dosya önbellekte kalmasın.
+
+        Açılıştan birkaç saniye sonra yapılır: kurulum sihirbazı "Bitti" ile
+        programı açtığında kurulum dosyası bir süre daha kilitlidir. Ağa
+        çıkmadığı için güncelleme denetimi kapalıyken de yapılır.
+        """
+        silinen = guncelleme.eski_kurulumlari_temizle()
+        if silinen:
+            logging.info("Güncelleme önbelleğinden %d eski kurulum dosyası silindi.", silinen)
+
     def _acilis_guncelleme_denetimi(self) -> None:
         if not acilis_denetimi_acik_mi(self.ayarlar):
             return
