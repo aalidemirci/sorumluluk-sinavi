@@ -28,6 +28,14 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Düzeltildi
+- Plan sayfasının sağ paneli 0.8.1'de her şey sığarken de (1440×900'de
+  sekiz satırlık görevli listesiyle) kaydırma çubuğu gösteriyordu; kural
+  tablosunun tercih edilen boyu paneli şişiriyordu. Tablo artık kalan yeri
+  doldurur, yer yoksa üç satıra iner; panel ancak o da sığmazsa kayar.
+
 ## [0.8.1] — 04.10.2026
 
 0.8.0'ın arayüz kusurlarını düzelten sürüm. Şema değişmedi; veritabanına

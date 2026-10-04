@@ -12,7 +12,8 @@ from datetime import date, time
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QSplitter, QVBoxLayout, QWidget,
+    QCheckBox, QHBoxLayout, QLabel, QLineEdit, QSizePolicy, QSpinBox, QSplitter, QVBoxLayout,
+    QWidget,
 )
 
 from arayuz.bilesenler import (
@@ -69,6 +70,10 @@ def kart_bilgisi(oturum, saatler: list[time], salon_adlari: dict[int, str]) -> d
         "tur": oturum.oturum_turu.value, "kilitli": oturum.kilitli_mi,
         "suren_saatler": suren,
     }
+
+
+# Kural tablosunun en az boyu: başlık ve üç satır.
+KURAL_TABLOSU_EN_AZ = 130
 
 
 class PlanSayfasi(Sayfa):
@@ -167,6 +172,15 @@ class PlanSayfasi(Sayfa):
             zemin=lambda i: CIDDIYET_ZEMINI.get(i.ciddiyet.value),
             bos_metin="Engel ya da uyarı yok.")
         self.ihlal_tablosu.gorunum.setWordWrap(True)
+        # Kaydırma alanı içeriğin tercih edilen boyunu ister; tablonun varsayılan
+        # tercih boyu (192 piksel) yüzünden her şey sığarken bile (1440×900)
+        # kaydırma çubuğu çıkıyordu. Tablo yer kaldıkça uzar, yer yoksa en
+        # küçük boyuna iner; panel ancak o da sığmazsa kayar. "Ignored" Qt'nin
+        # hesapladığı en küçük boyu da yok saydığından taban açıkça verilir:
+        # yoksa %150 ölçekte tablo yalnız başlığa iner, bulgu görünmezdi.
+        self.ihlal_tablosu.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                         QSizePolicy.Policy.Ignored)
+        self.ihlal_tablosu.setMinimumHeight(KURAL_TABLOSU_EN_AZ)
         denetim.ekle(self.ihlal_tablosu, 1)
         duzen.addWidget(denetim, 1)
         self._secimi_temizle()
@@ -176,6 +190,7 @@ class PlanSayfasi(Sayfa):
         alan.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         alan.setMinimumWidth(330)
         alan.setMaximumWidth(430)
+        self.yan_alan = alan
         return alan
 
     def _alt_cubuk(self) -> QHBoxLayout:

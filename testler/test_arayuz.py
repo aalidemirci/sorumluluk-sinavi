@@ -594,7 +594,9 @@ def test_takvim_hucresi_kisa_ekranda_kartlari_sikistirmaz(qtbot) -> None:
 def test_plan_yan_paneli_kisa_ekranda_metni_kirpmaz(uygulama, qtbot) -> None:
     """%150 ölçekte (1280×680) seçili sınavın görevli listesi kırpılıyordu."""
     sayfa = plan_uret(uygulama, qtbot)
-    uygulama.show()
+    # Ekransız ekran küçük olduğundan pencere büyütülmüş açılır; boyut
+    # ancak normal pencerede ayarlanır.
+    uygulama.showNormal()
     uygulama.resize(1280, 680)
     sayfa.takvim.secildi(sayfa.plan_sonucu.plan.oturumlar[0].anahtar)
     qtbot.wait(50)
@@ -737,3 +739,25 @@ def test_guncelleme_paneli_teknik_terim_kullanmaz(uygulama) -> None:
     metinler.append(uygulama.guncelleme_seridi.metin.text())
     bulunan = [m for m in metinler if yasak.search(m)]
     assert not bulunan, bulunan
+
+
+def test_plan_yan_paneli_yalniz_sigmayinca_kayar(uygulama, qtbot) -> None:
+    """0.8.1'de kural tablosunun tercih boyu (192 piksel) yüzünden içerik sığarken
+    de kaydırma çubuğu çıkıyordu: 1440×900'de dokuz satırlık seçimle eski kod ~19
+    piksel kaydırıyor (sekiz satırdan başlayarak), yenisi ~40 piksel boş bırakıyor
+    (on iki satırdan önce kaymaz). Olumsuz senaryo: sığmayınca kayar ve kural
+    tablosu en küçük boyunun altına inmez. Seçim metni sabit uzunlukta verilir ki
+    sonuç veriye bağlı olmasın."""
+    from arayuz.sayfalar.plan import KURAL_TABLOSU_EN_AZ
+    sayfa = plan_sayfasi(uygulama)
+    # Ekransız ekran küçük olduğundan pencere büyütülmüş açılır; boyut
+    # ancak normal pencerede ayarlanır.
+    uygulama.showNormal()
+    uygulama.resize(1440, 900)
+    sayfa.secim_etiketi.setText("\n".join(f"satır {i}" for i in range(9)))
+    qtbot.wait(50)
+    assert sayfa.yan_alan.verticalScrollBar().maximum() == 0
+    uygulama.resize(1280, 620)
+    qtbot.wait(50)
+    assert sayfa.yan_alan.verticalScrollBar().maximum() > 0
+    assert sayfa.ihlal_tablosu.height() >= KURAL_TABLOSU_EN_AZ
