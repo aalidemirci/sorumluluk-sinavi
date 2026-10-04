@@ -5,8 +5,9 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.3'ten sonra: gerçek veri kopyasıyla
-tur, Pardus 23/25 kap denemesi, 2026-2027 tatilleri girildi). Bu dosyadaki
+Son gözden geçirme: 04.10.2026 (0.8.4 yayımı: gerçek veri kopyasıyla
+turda bulunan kusurlar giderildi; Pardus 23/25 kap denemesi; 2026-2027
+tatilleri girildi). Bu dosyadaki
 açık işlerin kodla yapılabilen kısmı bitti; kalanlar kullanıcının gözle
 turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
 
@@ -20,11 +21,10 @@ turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
       bir saniyenin altında üretildi; görevli değiştirme, kaydetme, evrak,
       teslim çizelgesi, Türkçe harfli ve harfsiz arama, bütün öğrencilere
       toplu işaret ve numara listesi çalıştı. Turda üç kusur bulunup
-      düzeltildi (CHANGELOG, Yayımlanmamış): hafta sonuna sürükleme hep geri
-      alınıyordu, dolu salona taşıma boş salona geçmiyordu, plan iletisi işe
-      yaramayan bir öneride bulunuyordu. Kalan: kullanıcının gözle turu;
-      özellikle bu düzeltmeler yayımlanınca hafta sonuna taşımadaki gerekçe
-      sorusu ve boş salona geçişin elde nasıl durduğu.
+      düzeltildi (0.8.4): hafta sonuna sürükleme hep geri alınıyordu, dolu
+      salona taşıma boş salona geçmiyordu, plan iletisi işe yaramayan bir
+      öneride bulunuyordu. Kalan: kullanıcının gözle turu; özellikle 0.8.4'teki
+      hafta sonuna taşıma gerekçesi ve boş salona geçişin elde nasıl durduğu.
 - [ ] **Güncelleme denetimini okul ağında dene.** Denetim 0.8.0'la geldi
       (karar 0015). GitHub'ın engelli olduğu okul ağında açılışın sessiz
       kaldığı, elle denetimin anlaşılır ileti ve indirme sayfası düğmesi
@@ -48,15 +48,15 @@ turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
       önbellekteki iki kurulum dosyası (0.8.2 ve az önce kullanılan 0.8.3)
       silindi; kurulum dosyasının kilidi 4 saniye içinde kalkmıştı.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.3;
+      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.4;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
       veritabanı ilk açılışta şema 9'a geçer (öncesinde yedek alınır); 0.5.x
       ya da daha eskisinden gelen makinede geçişten sonra tatil günleri
       girilmeli. 0.8.0'dan sonraki sürümleri program kendisi haber verir.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0 – 0.8.3) yalnız kapta kuruldu ve xvfb altında açıldı:
-      `debian:12` (GitHub Actions ve yerelde Docker), 0.8.3 ayrıca resmî
-      Pardus 23 ve Pardus 25 görüntülerinde. Okulda bir Pardus 23
+      (0.5.0 – 0.8.4) yalnız kapta kuruldu ve xvfb altında açıldı:
+      `debian:12` (GitHub Actions ve yerelde Docker), 0.8.3'ten beri ayrıca
+      resmî Pardus 23 ve Pardus 25 görüntülerinde. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
       görünüşüne de bakılsın (0.6.0'daki kilit emojisi kapta kare çıkmıştı).

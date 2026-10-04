@@ -28,10 +28,10 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.8.4] — 04.10.2026
 
-Gerçek bir okul verisinin geçici kopyasında ekransız yapılan turda
-bulunanlar. Şema değişmedi.
+Gerçek bir okul verisinin geçici kopyasında ekransız yapılan turda bulunan
+kusurları gideren yama sürümü. Şema değişmedi; veritabanına dokunulmaz.
 
 ### Düzeltildi
 - Hafta sonuna sürüklenen kart her zaman geri alınıyordu: hafta sonu oturumu
