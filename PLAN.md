@@ -5,8 +5,9 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.2 yayımı). Bu dosyadaki açık işlerin
-kodla yapılabilen kısmı bitti; kalanlar gerçek veri, okul makinesi, gerçek
+Son gözden geçirme: 04.10.2026 (0.8.2 yayımı; ardından güncelleme akışı bu
+makinede yayımlanmış paketlerle denendi). Kodla yapılabilecek açık iş yalnız
+o denemeden çıkan küçük işler; kalanlar gerçek veri, okul makinesi, gerçek
 Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
 
 ## Şimdi
@@ -24,22 +25,35 @@ Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
       çizelgesi ve toplu işlemlerin akışı teste girdi; toplu işlemde hata
       sonrası başarı bildirimi hatası bulunup düzeltildi. Gerçek veriyle tur
       hâlâ bekliyor (`/yerel/` boş).
-- [ ] **Güncelleme denetimini yayımda dene.** Denetim 0.8.0'la geldi;
-      ilk gerçek deneme artık yapılabilir: 0.8.0 ya da 0.8.1'in kurulu
-      olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
-      dosyayı indirip özetini doğruladığı ve "Kurulumu başlat"ın kurulumu
-      açtığı görülmeli (karar 0015). GitHub'ın engelli olduğu okul ağında
-      sessiz kaldığı da görülsün.
-      04.10.2026: akış arayüzden 0.8.0 yayımıyla uçtan uca denendi (program
-      0.7.0 sayıldı; kurulum dosyası indirildi, doğrulandı, çalıştırılmadı)
-      ve ulaşılamayan vekille GitHub engeli taklit edildi: açılış sessiz,
-      elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
-      0.8.1 yayımlanınca yayımlanmış 0.8.0 taşınabilir paketi ekransız
-      açıldı; günlükte "kurulu 0.8.0, yayımlanan 0.8.1": denetim gerçek
-      yayımı buldu (0.8.2 yayımında 0.8.1 paketiyle de aynı sonuç). Kalan: 0.8.x kurulu bir makinede şeridi görüp Hakkında'da
-      "Doğrula ve indir" → "Kurulumu başlat"ı tıklamak. Kurulu sürümü 0.7.0
-      olan bir makinede kolay yol: 0.8.1 taşınabilir paketini açıp aynı
-      düğmelerle 0.8.2'yi kurmak; kurulum eski sürümün üzerine yapılır.
+- [ ] **Güncelleme denetimini okul ağında dene.** Denetim 0.8.0'la geldi
+      (karar 0015). GitHub'ın engelli olduğu okul ağında açılışın sessiz
+      kaldığı, elle denetimin anlaşılır ileti ve indirme sayfası düğmesi
+      gösterdiği görülmeli; bugüne dek yalnız ulaşılamayan vekille taklit
+      edildi.
+      04.10.2026: akışın geri kalanı yayımlanmış paketlerle uçtan uca
+      denendi. Bu makinede 0.7.0'ın üzerine 0.8.1 kuruldu; kurulu 0.8.1 boş
+      bir deneme veri klasörüyle açılınca şeridi gösterdi. Hakkında'da
+      "Doğrula ve indir" 0.8.2 kurulum dosyasını (24 MB, yaklaşık 40
+      saniye) indirip doğruladı; "Kurulumu başlat" programı kapatıp
+      sihirbazı açtı. Sihirbaz kurulum klasörünü ve masaüstü kısayolu
+      seçimini önceki kurulumdan aldı; 0.8.2 kuruldu, açıldı, "Program
+      güncel" dedi. Gerçek veri klasörüne dokunulmadı. Aynı denemede
+      Ayarlar → Uygulamalar kaydının 0.4.0'da kalmış olduğu görüldü
+      (dosyalar 0.7.0'dı); 0.8.1 ve 0.8.2 kurulumları kaydı yeniledi.
+      Eskide kalmasının nedeni bulunamadı, durum yeniden üretilemedi.
+- [ ] **Güncelleme denemesinden çıkan küçük işler** (04.10.2026; sonraki
+      sürüme). Başlat menüsünde iki kaldırma kısayolu kalıyor: 0.6.0'dan
+      önceki sihirbaz İngilizce iletilerle (Default.isl) "Uninstall
+      Sorumluluk Sınavı"nı kurmuştu; Türkçe sihirbaz "Sorumluluk Sınavı
+      uygulamasını kaldır"ı ekliyor, eskisini silmiyor. `[InstallDelete]`
+      eski adı da silmeli. İndirme sürerken ilerleme görünmüyor, yalnız
+      belirsiz bekleme çubuğu dönüyor; yavaş okul ağında program takıldı
+      sanılabilir, inen ve toplam MB gösterilebilir. İndirilen kurulum
+      dosyası `%LOCALAPPDATA%\SorumlulukSinavi\guncelleme` altında hiç
+      silinmeden birikiyor (sürüm başına ~25 MB); kurulu sürümden yeni
+      olmayanlar açılışta silinebilir. Sihirbazın lisans sayfası LICENSE'ı
+      Markdown kaynağı olarak gösteriyor (`#`, `##`, bağlantı sözdizimi);
+      sihirbaza düz metin verilebilir.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.2;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
