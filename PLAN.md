@@ -36,7 +36,7 @@ Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
       elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
       0.8.1 yayımlanınca yayımlanmış 0.8.0 taşınabilir paketi ekransız
       açıldı; günlükte "kurulu 0.8.0, yayımlanan 0.8.1": denetim gerçek
-      yayımı buldu. Kalan: 0.8.x kurulu bir makinede şeridi görüp Hakkında'da
+      yayımı buldu (0.8.2 yayımında 0.8.1 paketiyle de aynı sonuç). Kalan: 0.8.x kurulu bir makinede şeridi görüp Hakkında'da
       "Doğrula ve indir" → "Kurulumu başlat"ı tıklamak. Kurulu sürümü 0.7.0
       olan bir makinede kolay yol: 0.8.1 taşınabilir paketini açıp aynı
       düğmelerle 0.8.2'yi kurmak; kurulum eski sürümün üzerine yapılır.
