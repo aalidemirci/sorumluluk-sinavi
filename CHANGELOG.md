@@ -28,6 +28,25 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Düzeltildi
+- Kısa ekranda (1366×768, Full HD %150 ölçek) plan takviminde aynı saatteki
+  iki sınavın kartları üst üste biniyordu; takvim artık sıkışmak yerine
+  kayar. Plan sayfasının sağ paneli (seçili sınavın görevlileri, kural
+  denetimi) kırpılmak yerine kayar.
+- Dar ekranda tabloların son sütunları ancak yatay kaydırmayla görünüyordu
+  (öğretmen listesinde görev sayısı, ders sayfasında kayıt sayısı, teslim
+  çizelgesinde durum). Sabit sütunlar artık orantılı daralır; elle
+  boyutlandırılan sütuna dokunulmaz.
+- Toplu işlemde hata çıkınca hata gösterildikten sonra yine de başarı
+  bildirimi geliyordu (ör. teslim eden ile alan aynı kişi seçilince "N evrak
+  teslim alındı"). Artık işlem durur; çoklu seçimde hatadan önce kaç satırın
+  işlendiği iletide yazılır. Teslimi geri alma, toplu "başvurmadı" kararı,
+  öğretmen durumu ve başvuru işaretinin geri alınması da aynı biçimde.
+- Güncelleme panelinin iki iletisinde teknik terim vardı ("GitHub", "SHA-256");
+  sade dille yazıldı.
+
 ## [0.8.0] — 04.10.2026
 
 Arayüz baştan yazıldı (Tkinter → Qt) ve yeni sürüm denetimi eklendi. Şema

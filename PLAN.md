@@ -5,8 +5,8 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.0 yayımı: Qt arayüzü ve güncelleme
-denetimi; ayrıntı CHANGELOG 0.8.0 başlığında, kararlar 0015 ve 0016).
+Son gözden geçirme: 04.10.2026 (0.8.0 yayımı ve sonrasında açık işlerin
+taranması; düzeltmeler CHANGELOG "Yayımlanmamış" başlığında).
 
 ## Şimdi
 
@@ -16,14 +16,24 @@ denetimi; ayrıntı CHANGELOG 0.8.0 başlığında, kararlar 0015 ve 0016).
       listesiyle (yerel `/yerel/`
       klasöründe) başvuru işaretleme (arama, toplu işaret, numara listesi),
       plan ekranında sürükle-bırak ve görevli değiştirme, evrak üretimi ve
-      teslim çizelgesi bir tur yürütülsün. 125 % ve 150 % ekran ölçeğinde
-      görünüşe bakılsın.
+      teslim çizelgesi bir tur yürütülsün.
+      04.10.2026: bütün sayfalar Full HD %125, %150 ve 1366×768'de
+      incelendi; plan takviminde sıkışan kartlar, kırpılan yan panel ve
+      yatay kaydırma isteyen tablolar düzeltildi. Evrak üretimi, teslim
+      çizelgesi ve toplu işlemlerin akışı teste girdi; toplu işlemde hata
+      sonrası başarı bildirimi hatası bulunup düzeltildi. Gerçek veriyle tur
+      hâlâ bekliyor (`/yerel/` boş).
 - [ ] **Güncelleme denetimini yayımda dene.** Denetim 0.8.0'la geldi; ilk
       gerçek deneme 0.8.1 ya da 0.9.0 yayımlanınca yapılabilir: 0.8.0'ın
       kurulu olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
       dosyayı indirip özetini doğruladığı ve "Kurulumu başlat"ın kurulumu
       açtığı görülmeli (karar 0015). GitHub'ın engelli olduğu okul ağında
       sessiz kaldığı da görülsün.
+      04.10.2026: akış arayüzden 0.8.0 yayımıyla uçtan uca denendi (program
+      0.7.0 sayıldı; kurulum dosyası indirildi, doğrulandı, çalıştırılmadı)
+      ve ulaşılamayan vekille GitHub engeli taklit edildi: açılış sessiz,
+      elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
+      Kalan: 0.8.0 kurulu gerçek bir makinede bir sonraki sürümle.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.0;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
@@ -38,9 +48,28 @@ denetimi; ayrıntı CHANGELOG 0.8.0 başlığında, kararlar 0015 ve 0016).
       görünüşüne de bakılsın (0.6.0'daki kilit emojisi kapta kare çıkmıştı).
       Qt sürümüyle ayrıca: GNOME'un Wayland oturumunda XWayland üzerinden
       açılması, dosya seçme penceresinin (GTK teması) çalışması.
+      04.10.2026, temiz `debian:12` kabında 0.8.0 paketiyle: GNOME Wayland
+      oturumunun ortam değişkenleriyle program Wayland eklentisini bulamayıp
+      X11'e düştü ve açıldı (Weston kapta çöktüğü için X sunucusu Xvfb idi);
+      XFCE ortamında Qt GTK temasını yükledi, "Rapor seç ve önizle" GTK'nin
+      kendi dosya seçme penceresini açtı.
       İlk gerçek deneme sonucu buraya yazılsın.
 - [ ] **Tatil günlerini gir.** 2026-2027 için Kurum Ayarları'na resmî tatil
       ve idari izin günleri girilmeli; özellikle sınav pencerelerine düşenler.
+      04.10.2026'da resmî kaynaklardan derlenen liste (2429 sayılı Kanun;
+      Diyanet 2027 dinî günler takvimi; MEB 2026-2027 çalışma takvimi,
+      meb.gov.tr 13.06.2026):
+      29.10.2026 Cumhuriyet Bayramı · 01.01.2027 Yılbaşı ·
+      09–11.03.2027 Ramazan Bayramı · 23.04.2027 · 01.05.2027 (Cumartesi) ·
+      16–19.05.2027 Kurban Bayramı (19 Mayıs aynı güne düşer).
+      Arife yarım günleri (28.10.2026, 08.03.2027, 15.05.2027) öğleden önce
+      iş günüdür; tam gün girilirse o gün sınav konmaz. Hiçbiri 2026-2027
+      sınav pencerelerine düşmüyor. Ara tatiller ve yarıyıl tatili resmî
+      tatil değildir, idare çalışır; girilmez. İdari izin kararı çıkarsa
+      eklenir. Dikkat: Şubat penceresi 08.02.2027'de açıldığı için başvurunun
+      en geç günü (5 iş günü önce) yarıyıl tatiline, 01.02.2027'ye düşer;
+      duyuruyu yarıyıldan önce yayımlayıp başvuruyu okul kapanmadan toplamak
+      ya da yarıyılda dilekçe kabulünü düzenlemek gerekir.
 
 ## Takvime bağlı
 
