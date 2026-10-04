@@ -260,7 +260,7 @@ class PersonelSayfasi(Sayfa):
                 hizmet.personel_sil(self.vt, kisi["kimlik"])
                 silinen += 1
             except HizmetHatasi as hata:
-                self.hata(f"{kisi['ad']} silinemedi", hata)
+                self.hata("Personel silinemedi", hata, kim=kisi["ad"])
         self.listeyi_doldur()
         if silinen:
             self.bildir(f"{silinen} kişi silindi.")

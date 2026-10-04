@@ -824,6 +824,27 @@ def test_toplu_basvurmadi_kismen_kaydedilince_kac_kayit_islendigini_soyler(
     assert bildirimler == []
 
 
+def test_personel_silinemeyince_ad_gunluge_yazilmaz(uygulama, monkeypatch, caplog) -> None:
+    """KVKK: günlük sorun bildiriminde geliştiriciye gönderilir ve kişisel veri
+    içermediği söylenir. "… silinemedi" başlığına konan öğretmen adı günlüğe
+    giriyordu. Ad ekrandaki iletide kalır; günlükte başlık ve hata türü durur."""
+    import logging
+    uygulama.sayfa_goster(sayfa_sirasi("Öğretmen Listesi"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Öğretmen Listesi")]
+    kisi = sayfa.tablo.gorunen_satirlar()[0]
+    sayfa.tablo.sec(kisi["kimlik"])
+
+    def bozul(*a, **k):
+        raise hizmet.HizmetHatasi("Uydurma engel.")
+
+    monkeypatch.setattr(hizmet, "personel_sil", bozul)
+    with caplog.at_level(logging.WARNING):
+        sayfa.sil()
+    assert "Personel silinemedi: HizmetHatasi" in caplog.text
+    assert kisi["ad"] not in caplog.text
+    assert any(m.startswith(f"{kisi['ad']}: ") for m in uygulama.ileti.turden("hata"))
+
+
 def test_personel_durumu_degismezse_basari_bildirmez(uygulama, monkeypatch) -> None:
     uygulama.sayfa_goster(sayfa_sirasi("Öğretmen Listesi"))
     sayfa = uygulama.sayfalar[sayfa_sirasi("Öğretmen Listesi")]

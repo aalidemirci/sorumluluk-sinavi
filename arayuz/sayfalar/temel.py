@@ -34,8 +34,9 @@ class Sayfa(QWidget):
                eylem: Callable[[], Any] | None = None) -> None:
         self.uyg.bildir(metin, eylem_metni, eylem)
 
-    def hata(self, baslik: str, hata: BaseException | str) -> None:
-        self.uyg.hata_goster(baslik, hata)
+    def hata(self, baslik: str, hata: BaseException | str, kim: str = "") -> None:
+        """Başlık günlüğe yazılır, sabit olmalıdır; ad ya da numara `kim` ile verilir."""
+        self.uyg.hata_goster(baslik, hata, kim)
 
     def goster(self) -> None:
         """Sayfa her açıldığında çağrılır; veriyi tazeler."""

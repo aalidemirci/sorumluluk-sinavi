@@ -108,3 +108,25 @@ def test_yoksayma_kuralina_takilan_izlenen_dosya_yok() -> None:
                            encoding="utf-8", check=True)
     takilanlar = [s for s in sonuc.stdout.splitlines() if s]
     assert takilanlar == [], f"izlendiği hâlde yoksayma kuralına uyan: {takilanlar}"
+
+
+# Hata başlığı günlüğe yazılır (Uygulama.hata_goster); ad `kim` ile verilir.
+DINAMIK_HATA_BASLIGI = re.compile(r"\.hata\(\s*f[\"']")
+
+
+def test_gunluge_giden_hata_basliklari_sabittir() -> None:
+    """Günlük sorun bildiriminde geliştiriciye gönderilir ve kişisel veri
+    içermediği söylenir. Sayfaların hata başlığı günlüğe yazıldığı için başlığa
+    ad konmaz: "… silinemedi" başlıklarında öğretmen adı vardı (04.10.2026)."""
+    bulunan = [f"{yol.relative_to(KOK)}:{no}"
+               for yol in (KOK / "arayuz").rglob("*.py")
+               for no, satir in enumerate(yol.read_text(encoding="utf-8").splitlines(), 1)
+               if DINAMIK_HATA_BASLIGI.search(satir)]
+    assert not bulunan, bulunan
+
+
+def test_dinamik_hata_basligi_yakalanir() -> None:
+    """Olumsuz senaryo: eski biçim yakalanır, `kim` ile verilen ad yakalanmaz."""
+    assert DINAMIK_HATA_BASLIGI.search("self.hata(f\"{kisi['ad']} silinemedi\", hata)")
+    assert not DINAMIK_HATA_BASLIGI.search(
+        "self.hata(\"Personel silinemedi\", hata, kim=kisi[\"ad\"])")

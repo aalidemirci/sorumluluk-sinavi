@@ -333,11 +333,18 @@ class Uygulama(QMainWindow):
                eylem: Callable[[], Any] | None = None) -> None:
         self.bildirim.goster(metin, eylem_metni, eylem)
 
-    def hata_goster(self, baslik: str, hata: BaseException | str) -> None:
-        # Günlüğe yalnız hata türü yazılır: ileti öğrenci adı taşıyabilir (KVKK).
+    def hata_goster(self, baslik: str, hata: BaseException | str, kim: str = "") -> None:
+        """Hatayı ekranda gösterir, günlüğe yalnız başlığı ve hata türünü yazar.
+
+        Günlük sorun bildiriminde geliştiriciye gönderilir ve kişisel veri
+        içermediği söylenir (KVKK). Bu yüzden ileti günlüğe girmez; başlık da
+        sabit olmalıdır. Ad ya da numara `kim` ile yalnız ekrandaki iletiye
+        eklenir: "… silinemedi" başlıklarına öğretmen adı konuyordu ve ad
+        günlüğe yazılıyordu (04.10.2026).
+        """
         logging.warning("%s: %s", baslik, type(hata).__name__ if isinstance(hata, BaseException)
                         else "ileti")
-        self.ileti.hata(baslik, str(hata))
+        self.ileti.hata(baslik, f"{kim}: {hata}" if kim else str(hata))
 
     def mesgul_ac(self, metin: str) -> None:
         self.mesgul.ac(metin)

@@ -74,6 +74,6 @@ class SalonSayfasi(Sayfa):
             try:
                 hizmet.salon_sil(self.vt, salon.kimlik)
             except HizmetHatasi as hata:
-                self.hata(f"{salon.ad} silinemedi", hata)
+                self.hata("Salon silinemedi", hata, kim=salon.ad)
         self.ad.clear()
         self.goster()

@@ -28,6 +28,20 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Düzeltildi
+- Öğretmen ya da salon silinemediğinde hata başlığına adı konuyor ve başlık
+  günlüğe (`uygulama.log`) yazılıyordu; günlüğe öğretmen adı girebiliyordu.
+  Program sorun bildiriminde bu dosyayı geliştiriciye göndermeyi önerip kişisel
+  veri içermediğini söylüyor (KVKK). Başlık artık sabit; ad yalnız ekrandaki
+  iletide görünür. Bir test, sayfaların hata başlığına ad konmamasını koruyor.
+
+### Değişti
+- Windows kurulumu her çalıştığında `%TEMP%` altına günlük bırakır ("Setup
+  Log …"). Program içinden yapılan bir yükseltmede Ayarlar → Uygulamalar
+  kaydının eski sürümde kaldığı görüldü; günlük bunun nedenini bulmak için.
+
 ## [0.8.4] — 04.10.2026
 
 Gerçek bir okul verisinin geçici kopyasında ekransız yapılan turda bulunan
