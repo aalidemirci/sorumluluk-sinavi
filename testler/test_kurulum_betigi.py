@@ -43,6 +43,13 @@ def test_ingilizce_sihirbazdan_kalan_kaldirma_kisayolu_silinir() -> None:
     assert 'MessagesFile: "compiler:Languages\\Turkish.isl"' in BETIK
 
 
+def test_her_kurulum_gunluk_birakir() -> None:
+    """Kullanıcının başlattığı yükseltmelerde Ayarlar → Uygulamalar kaydı
+    yenilenmedi ve neden günlüksüz bulunamadı (04.10.2026, 0.8.4). Sonraki
+    yükseltmenin %TEMP% altındaki günlüğü kaydın neden yazılmadığını gösterecek."""
+    assert re.search(r"^SetupLogging=yes$", BETIK, re.MULTILINE)
+
+
 def test_silme_kurallari_veri_klasorune_uzanmaz() -> None:
     """Olumsuz senaryo: kurulum ve kaldırma yalnız kendi klasörünü ve Başlat menüsü
     grubunu siler; %LOCALAPPDATA%\\SorumlulukSinavi\\plan'a hiçbir kural uzanmaz."""

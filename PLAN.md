@@ -101,6 +101,18 @@ turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
 
 ## Bilinen borçlar
 
+- **Uygulamalar kaydı kullanıcının başlattığı yükseltmede yenilenmiyor.**
+  04.10.2026: kullanıcı bu makinede 0.8.3'ten programın kendi akışıyla 0.8.4'e
+  geçti; dosyalar, kısayollar ve kaldırma günlüğü 21.32'de yazıldı ama HKCU'daki
+  kaldırma kaydı 14.38'deki 0.8.3 değerlerinde kaldı (yönetici alanında kayıt
+  yok, izin sorunu yok). Aynı belirti 0.5.0 ve 0.7.0'da da vardı; bu oturumda
+  başlatılan üç kurulum (0.8.1 sessiz, 0.8.2 ve 0.8.3 sihirbazla) kaydı
+  yeniledi. Inno kaynağına göre kayıt, kaldırma günlüğü kaydedilmeden hemen
+  önce yazılır. Günlük olmadığından neden bulunamadı; `SetupLogging=yes`
+  eklendi: sonraki yükseltmeden sonra `%TEMP%\Setup Log …` dosyasına bakılacak.
+  Programın çalışmasını etkilemez; kurulu sürüm Hakkında sayfasında ve exe'nin
+  dosya özelliklerinde doğrudur (KURULUM.md'deki doğrulama komutu buna bakar).
+
 - **SG-05 nakil kaynağı — gerçek raporda bakılacak:** OOK12001R010'da
   nakil/geçiş kaynağını gösteren bir sütun olup olmadığı bilinmiyor; elde
   gerçek rapor yok. 03.10.2026'dan beri önizleme, okunan dört sütun dışındaki
