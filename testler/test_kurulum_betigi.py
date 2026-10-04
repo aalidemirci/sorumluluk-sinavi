@@ -44,9 +44,10 @@ def test_ingilizce_sihirbazdan_kalan_kaldirma_kisayolu_silinir() -> None:
 
 
 def test_her_kurulum_gunluk_birakir() -> None:
-    """Kullanıcının başlattığı yükseltmelerde Ayarlar → Uygulamalar kaydı
-    yenilenmedi ve neden günlüksüz bulunamadı (04.10.2026, 0.8.4). Sonraki
-    yükseltmenin %TEMP% altındaki günlüğü kaydın neden yazılmadığını gösterecek."""
+    """Kurulumda bir sorun olursa nedeni %TEMP% altındaki günlükten görülür.
+    04.10.2026'da bu günlük bir yanlış teşhisi düzeltti: Uygulamalar kaydı
+    doğru yazılıyordu, eski sürüm geliştirme aracının yalıtılmış kayıt
+    görünümündeydi."""
     assert re.search(r"^SetupLogging=yes$", BETIK, re.MULTILINE)
 
 

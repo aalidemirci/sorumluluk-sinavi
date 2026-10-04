@@ -66,11 +66,10 @@ ShowLanguageDialog=no
 LicenseFile=lisans.txt
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
-; Her kurulum %TEMP% altına "Setup Log yyyy-mm-dd #nnn.txt" günlüğü bırakır.
-; Kullanıcının başlattığı yükseltmelerde (0.5.0, 0.7.0 ve 04.10.2026'daki
-; program içi yükseltme) Ayarlar → Uygulamalar kaydı yenilenmedi; dosyalar ve
-; kısayollar yazılmıştı, kayıt eskide kaldı. Nedeni günlüksüz bulunamadı
-; (PLAN.md, Bilinen borçlar).
+; Her kurulum %TEMP% altına "Setup Log yyyy-mm-dd #nnn.txt" günlüğü bırakır;
+; kurulumda bir sorun olursa nedeni oradan görülür. 04.10.2026'da bu günlük,
+; "Uygulamalar kaydı yenilenmiyor" sanılan durumun kurulumdan değil, kaydı
+; okuyan geliştirme aracının yalıtılmış kayıt görünümünden geldiğini gösterdi.
 SetupLogging=yes
 
 [Languages]

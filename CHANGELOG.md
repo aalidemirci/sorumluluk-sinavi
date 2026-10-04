@@ -28,6 +28,15 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+### Düzeltildi
+- 0.8.5 notu ve KURULUM.md, bazı yükseltmelerde Ayarlar → Uygulamalar
+  kaydının eski sürümde kaldığını söylüyordu; bu yanlıştı. Kayıt her
+  yükseltmede doğru yazılıyor. Eski sürüm, kaydı okuyan geliştirme aracının
+  yalıtılmış kayıt görünümünde görünüyordu; kullanıcının Denetim Masası'nda
+  ve Gezgin bağlamından okunan kayıtta sürüm doğruydu. Notlar düzeltildi.
+
 ## [0.8.5] — 04.10.2026
 
 Günlük gizliliğini düzelten ve kurulum günlüğü ekleyen yama sürümü. Şema
@@ -42,8 +51,7 @@ değişmedi; veritabanına dokunulmaz.
 
 ### Değişti
 - Windows kurulumu her çalıştığında `%TEMP%` altına günlük bırakır ("Setup
-  Log …"). Program içinden yapılan bir yükseltmede Ayarlar → Uygulamalar
-  kaydının eski sürümde kaldığı görüldü; günlük bunun nedenini bulmak için.
+  Log …"); kurulumda bir sorun olursa nedeni oradan görülür.
 
 ## [0.8.4] — 04.10.2026
 
