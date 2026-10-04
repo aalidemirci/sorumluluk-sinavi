@@ -28,7 +28,10 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.8.1] — 04.10.2026
+
+0.8.0'ın arayüz kusurlarını düzelten sürüm. Şema değişmedi; veritabanına
+dokunulmaz. 0.8.0'ın güncelleme denetiminin haber verdiği ilk sürümdür.
 
 ### Düzeltildi
 - Kısa ekranda (1366×768, Full HD %150 ölçek) plan takviminde aynı saatteki

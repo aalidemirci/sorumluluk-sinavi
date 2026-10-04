@@ -5,8 +5,8 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.0 yayımı ve sonrasında açık işlerin
-taranması; düzeltmeler CHANGELOG "Yayımlanmamış" başlığında).
+Son gözden geçirme: 04.10.2026 (0.8.1 yayımı; 0.8.0 sonrasında açık işler
+tarandı, düzeltmeler CHANGELOG 0.8.1 başlığında).
 
 ## Şimdi
 
@@ -23,8 +23,8 @@ taranması; düzeltmeler CHANGELOG "Yayımlanmamış" başlığında).
       çizelgesi ve toplu işlemlerin akışı teste girdi; toplu işlemde hata
       sonrası başarı bildirimi hatası bulunup düzeltildi. Gerçek veriyle tur
       hâlâ bekliyor (`/yerel/` boş).
-- [ ] **Güncelleme denetimini yayımda dene.** Denetim 0.8.0'la geldi; ilk
-      gerçek deneme 0.8.1 ya da 0.9.0 yayımlanınca yapılabilir: 0.8.0'ın
+- [ ] **Güncelleme denetimini yayımda dene.** Denetim 0.8.0'la geldi;
+      0.8.1 yayımlandığı için ilk gerçek deneme artık yapılabilir: 0.8.0'ın
       kurulu olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
       dosyayı indirip özetini doğruladığı ve "Kurulumu başlat"ın kurulumu
       açtığı görülmeli (karar 0015). GitHub'ın engelli olduğu okul ağında
@@ -33,15 +33,15 @@ taranması; düzeltmeler CHANGELOG "Yayımlanmamış" başlığında).
       0.7.0 sayıldı; kurulum dosyası indirildi, doğrulandı, çalıştırılmadı)
       ve ulaşılamayan vekille GitHub engeli taklit edildi: açılış sessiz,
       elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
-      Kalan: 0.8.0 kurulu gerçek bir makinede bir sonraki sürümle.
+      Kalan: 0.8.0 kurulu gerçek bir makinede 0.8.1'le.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.0;
+      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.1;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
       veritabanı ilk açılışta şema 9'a geçer (öncesinde yedek alınır); 0.5.x
       ya da daha eskisinden gelen makinede geçişten sonra tatil günleri
       girilmeli. 0.8.0'dan sonraki sürümleri program kendisi haber verir.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0 – 0.8.0) yalnız `debian:12` kabında (GitHub Actions ve yerelde
+      (0.5.0 – 0.8.1) yalnız `debian:12` kabında (GitHub Actions ve yerelde
       Docker) kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
