@@ -28,7 +28,10 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.8.2] — 04.10.2026
+
+0.8.1'deki bir görünüm kusurunu düzelten yama sürümü. Şema değişmedi;
+veritabanına dokunulmaz.
 
 ### Düzeltildi
 - Plan sayfasının sağ paneli 0.8.1'de her şey sığarken de (1440×900'de

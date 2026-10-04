@@ -5,8 +5,9 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.1 yayımı; 0.8.0 sonrasında açık işler
-tarandı, düzeltmeler CHANGELOG 0.8.1 başlığında).
+Son gözden geçirme: 04.10.2026 (0.8.2 yayımı). Bu dosyadaki açık işlerin
+kodla yapılabilen kısmı bitti; kalanlar gerçek veri, okul makinesi, gerçek
+Pardus kurulumu ya da takvim (Ağustos 2027) bekliyor.
 
 ## Şimdi
 
@@ -24,8 +25,8 @@ tarandı, düzeltmeler CHANGELOG 0.8.1 başlığında).
       sonrası başarı bildirimi hatası bulunup düzeltildi. Gerçek veriyle tur
       hâlâ bekliyor (`/yerel/` boş).
 - [ ] **Güncelleme denetimini yayımda dene.** Denetim 0.8.0'la geldi;
-      0.8.1 yayımlandığı için ilk gerçek deneme artık yapılabilir: 0.8.0'ın
-      kurulu olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
+      ilk gerçek deneme artık yapılabilir: 0.8.0 ya da 0.8.1'in kurulu
+      olduğu makinede şeridin çıktığı, "Doğrula ve indir"in
       dosyayı indirip özetini doğruladığı ve "Kurulumu başlat"ın kurulumu
       açtığı görülmeli (karar 0015). GitHub'ın engelli olduğu okul ağında
       sessiz kaldığı da görülsün.
@@ -35,16 +36,18 @@ tarandı, düzeltmeler CHANGELOG 0.8.1 başlığında).
       elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
       0.8.1 yayımlanınca yayımlanmış 0.8.0 taşınabilir paketi ekransız
       açıldı; günlükte "kurulu 0.8.0, yayımlanan 0.8.1": denetim gerçek
-      yayımı buldu. Kalan: 0.8.0 kurulu bir makinede şeridi görüp Hakkında'da
-      "Doğrula ve indir" → "Kurulumu başlat"ı tıklamak.
+      yayımı buldu. Kalan: 0.8.x kurulu bir makinede şeridi görüp Hakkında'da
+      "Doğrula ve indir" → "Kurulumu başlat"ı tıklamak. Kurulu sürümü 0.7.0
+      olan bir makinede kolay yol: 0.8.1 taşınabilir paketini açıp aynı
+      düğmelerle 0.8.2'yi kurmak; kurulum eski sürümün üzerine yapılır.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
-      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.1;
+      makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.2;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
       veritabanı ilk açılışta şema 9'a geçer (öncesinde yedek alınır); 0.5.x
       ya da daha eskisinden gelen makinede geçişten sonra tatil günleri
       girilmeli. 0.8.0'dan sonraki sürümleri program kendisi haber verir.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0 – 0.8.1) yalnız `debian:12` kabında (GitHub Actions ve yerelde
+      (0.5.0 – 0.8.2) yalnız `debian:12` kabında (GitHub Actions ve yerelde
       Docker) kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
