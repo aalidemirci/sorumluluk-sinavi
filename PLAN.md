@@ -33,7 +33,10 @@ tarandı, düzeltmeler CHANGELOG 0.8.1 başlığında).
       0.7.0 sayıldı; kurulum dosyası indirildi, doğrulandı, çalıştırılmadı)
       ve ulaşılamayan vekille GitHub engeli taklit edildi: açılış sessiz,
       elle denetim anlaşılır ileti ve indirme sayfası düğmesi gösterdi.
-      Kalan: 0.8.0 kurulu gerçek bir makinede 0.8.1'le.
+      0.8.1 yayımlanınca yayımlanmış 0.8.0 taşınabilir paketi ekransız
+      açıldı; günlükte "kurulu 0.8.0, yayımlanan 0.8.1": denetim gerçek
+      yayımı buldu. Kalan: 0.8.0 kurulu bir makinede şeridi görüp Hakkında'da
+      "Doğrula ve indir" → "Kurulumu başlat"ı tıklamak.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.1;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
