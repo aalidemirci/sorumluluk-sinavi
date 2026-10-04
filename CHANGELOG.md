@@ -28,6 +28,17 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
+## [Yayımlanmamış]
+
+Gerçek bir okul verisinin geçici kopyasında ekransız yapılan turda
+bulunanlar. Şema değişmedi.
+
+### Düzeltildi
+- Plan, bir öğrencinin yükü günde üç sınavla (ÖDY md.5/1-k) bile pencereye
+  sığmadığı için üretilemediğinde ileti "günlük oturum saati ekleyin" de
+  diyordu; bu sınırı oturum saati değiştirmez. İleti artık en az kaç gün
+  gerektiğini yazar ve öneriyi bağlayan sınıra göre verir.
+
 ## [0.8.3] — 04.10.2026
 
 0.8.2'nin gerçek bir makinede programın kendi güncelleme düğmeleriyle

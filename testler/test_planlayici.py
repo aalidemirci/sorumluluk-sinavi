@@ -145,13 +145,20 @@ def test_gunluk_uc_sinavi_asan_sinir_reddedilir() -> None:
         ozet.kisisel_sinirlar(10, slot_sayisi=6, etiketler={"agir": "Uydurma Öğrenci"})
     except ValueError as hata:
         assert "Uydurma Öğrenci: 31 sınav" in str(hata)
+        # Tavan yönetmelikten geliyor: en az gün söylenir, oturum saati önerilmez
+        # (gerçek veride 31 sınavlı öğrenciye "oturum saati ekleyin" deniyordu).
+        assert "en az 11 gün" in str(hata)
+        assert "Hafta sonunu açın" in str(hata) and "oturum saati ekleyin" not in str(hata)
 
 
 def test_gunluk_slot_sayisini_asan_sinir_reddedilir() -> None:
+    """Olumsuz senaryo: bağlayan sınır slot sayısıysa oturum saati eklemek önerilir."""
     ozet = yuk_ozeti([], IkiAsamaliSayim.TEK, 2)
     ozet = type(ozet)({"agir": 9}, 2)
-    with pytest.raises(ValueError, match="oturum saati var"):
+    with pytest.raises(ValueError, match="oturum saati var") as hata:
         ozet.kisisel_sinirlar(3, slot_sayisi=2)   # 9/3 → günde 3, ama 2 slot var
+    assert "Günlük oturum saati ekleyin" in str(hata.value)
+    assert "en az 5 gün" in str(hata.value)       # günde en çok 2 sınavla 9 sınav
 
 
 def test_sinir_onizlemesi_uygulanamayan_secenegi_isaretler() -> None:

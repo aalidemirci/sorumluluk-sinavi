@@ -222,14 +222,23 @@ class YukOzeti:
                 etiketler = etiketler or {}
                 detay = "; ".join(f"{etiketler.get(o, o)}: {self.ogrenci_yukleri[o]} sınav, "
                                   f"günde {s} sınav gerekiyor" for o, s in asanlar.items())
+                en_az = max(ceil(self.ogrenci_yukleri[o] / tavan) for o in asanlar)
+                # Öneri bağlayan sınıra göre verilir: tavan yönetmelikten geliyorsa
+                # oturum saati eklemek işe yaramaz. Gerçek veride (04.10.2026) 31
+                # sınavlı öğrenci için "oturum saati ekleyin" öneriliyordu.
                 if tavan == GUNLUK_SINAV_TAVANI:
                     neden = (f"bir öğrenci günde en çok {GUNLUK_SINAV_TAVANI} sınava girebilir "
                              "(ÖDY md.5/1-k)")
+                    oneri = ("Hafta sonunu açın ya da gün sayısını artırın; oturum saati "
+                             "eklemek bu sınırı değiştirmez.")
                 else:
                     neden = f"günde {slot_sayisi} oturum saati var"
+                    oneri = (f"Günlük oturum saati ekleyin (öğrenci başına günde en çok "
+                             f"{GUNLUK_SINAV_TAVANI} sınav), hafta sonunu açın ya da gün "
+                             "sayısını artırın.")
                 raise ValueError(
-                    f"{gun_sayisi} günlük planda {neden}; {detay}. Gün sayısını artırın, "
-                    "hafta sonunu açın ya da günlük oturum saati ekleyin.")
+                    f"{gun_sayisi} günlük planda {neden}; {detay}. Bu yük en az {en_az} gün "
+                    f"ister. {oneri}")
         return yukseltilen
 
 
