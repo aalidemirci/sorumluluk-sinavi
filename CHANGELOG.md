@@ -28,10 +28,11 @@ derlenir.
 > 28.08.2026'da yeniden derlenen 0.3.0 farklıdır. Elinizde 0.3.0 varsa
 > ayırt etmeye uğraşmayın, 0.4.0 ile değiştirin.
 
-## [Yayımlanmamış]
+## [0.8.0] — 04.10.2026
 
 Arayüz baştan yazıldı (Tkinter → Qt) ve yeni sürüm denetimi eklendi. Şema
-değişmedi; veritabanına dokunulmaz.
+değişmedi; veritabanına dokunulmaz. 0.7.0'dan yükseltirken güncelleme elle
+yapılır; bu sürümden sonrakileri program kendisi haber verir.
 
 ### Eklendi
 - **Yeni sürüm denetimi** (karar 0015). Program açılışta yayımlanan son
