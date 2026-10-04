@@ -5,26 +5,26 @@ bağlı zorunluluklar. Yapılıp bitenler buradan silinir, CHANGELOG.md'ye
 geçer. Kapsam dışı olduğuna karar verilmiş şeyler en altta durur ki
 tekrar tekrar tartışılmasın.
 
-Son gözden geçirme: 04.10.2026 (0.8.3 yayımı; güncelleme denemesinden
-çıkan küçük işler giderildi). Bu dosyadaki açık işlerin kodla yapılabilen
-kısmı bitti; kalanlar gerçek veri, okul makinesi ya da ağı, gerçek Pardus
-kurulumu ya da takvim (Ağustos 2027) bekliyor.
+Son gözden geçirme: 04.10.2026 (0.8.3'ten sonra: gerçek veri kopyasıyla
+tur, Pardus 23/25 kap denemesi, 2026-2027 tatilleri girildi). Bu dosyadaki
+açık işlerin kodla yapılabilen kısmı bitti; kalanlar kullanıcının gözle
+turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
 
 ## Şimdi
 
 - [ ] **Qt arayüzünü gerçek kullanımda dene.** Arayüz 0.8.0'da baştan
-      yazıldı (karar 0016); testler, ekran görüntüleri ve paket denemeleri
-      yeşil ama gerçek kullanımda denenmedi. Windows'ta gerçek bir e-Okul
-      listesiyle (yerel `/yerel/`
-      klasöründe) başvuru işaretleme (arama, toplu işaret, numara listesi),
-      plan ekranında sürükle-bırak ve görevli değiştirme, evrak üretimi ve
-      teslim çizelgesi bir tur yürütülsün.
-      04.10.2026: bütün sayfalar Full HD %125, %150 ve 1366×768'de
-      incelendi; plan takviminde sıkışan kartlar, kırpılan yan panel ve
-      yatay kaydırma isteyen tablolar düzeltildi. Evrak üretimi, teslim
-      çizelgesi ve toplu işlemlerin akışı teste girdi; toplu işlemde hata
-      sonrası başarı bildirimi hatası bulunup düzeltildi. Gerçek veriyle tur
-      hâlâ bekliyor (`/yerel/` boş).
+      yazıldı (karar 0016). 04.10.2026: bütün sayfalar Full HD %125, %150 ve
+      1366×768'de incelendi. Aynı gün bu makinedeki gerçek veritabanının
+      geçici kopyasında ekransız tur yapıldı (kopya sonra silindi; çıktıya
+      yalnız süre, sayı ve hata türü yazıldı): bütün sayfalar açıldı, plan
+      bir saniyenin altında üretildi; görevli değiştirme, kaydetme, evrak,
+      teslim çizelgesi, Türkçe harfli ve harfsiz arama, bütün öğrencilere
+      toplu işaret ve numara listesi çalıştı. Turda üç kusur bulunup
+      düzeltildi (CHANGELOG, Yayımlanmamış): hafta sonuna sürükleme hep geri
+      alınıyordu, dolu salona taşıma boş salona geçmiyordu, plan iletisi işe
+      yaramayan bir öneride bulunuyordu. Kalan: kullanıcının gözle turu;
+      özellikle bu düzeltmeler yayımlanınca hafta sonuna taşımadaki gerekçe
+      sorusu ve boş salona geçişin elde nasıl durduğu.
 - [ ] **Güncelleme denetimini okul ağında dene.** Denetim 0.8.0'la geldi
       (karar 0015). GitHub'ın engelli olduğu okul ağında açılışın sessiz
       kaldığı, elle denetimin anlaşılır ileti ve indirme sayfası düğmesi
@@ -54,8 +54,9 @@ kurulumu ya da takvim (Ağustos 2027) bekliyor.
       ya da daha eskisinden gelen makinede geçişten sonra tatil günleri
       girilmeli. 0.8.0'dan sonraki sürümleri program kendisi haber verir.
 - [ ] **Pardus paketi gerçek bir makinede denenmedi.** Yayımlanan `.deb`'ler
-      (0.5.0 – 0.8.3) yalnız `debian:12` kabında (GitHub Actions ve yerelde
-      Docker) kuruldu ve xvfb altında açıldı. Okulda bir Pardus 23
+      (0.5.0 – 0.8.3) yalnız kapta kuruldu ve xvfb altında açıldı:
+      `debian:12` (GitHub Actions ve yerelde Docker), 0.8.3 ayrıca resmî
+      Pardus 23 ve Pardus 25 görüntülerinde. Okulda bir Pardus 23
       makinesinde kurulup menüden açılması, e-Okul raporu içe aktarılması ve
       evrak üretilmesi denenmeli; arayüzün o masaüstündeki yazı tipiyle
       görünüşüne de bakılsın (0.6.0'daki kilit emojisi kapta kare çıkmıştı).
@@ -66,25 +67,26 @@ kurulumu ya da takvim (Ağustos 2027) bekliyor.
       X11'e düştü ve açıldı (Weston kapta çöktüğü için X sunucusu Xvfb idi);
       XFCE ortamında Qt GTK temasını yükledi, "Rapor seç ve önizle" GTK'nin
       kendi dosya seçme penceresini açtı.
+      04.10.2026, 0.8.3 paketiyle resmî `pardus/yirmiuc` (Pardus 23, glibc
+      2.36) ve `pardus/yirmibes` (Pardus 25, glibc 2.41) görüntülerinde:
+      bağımlılıklar Pardus'un kendi deposundan çözüldü, menü dosyası
+      `desktop-file-validate`den geçti (tek ipucu: iki ana kategori, Ofis ve
+      Eğitim; bilerek), program açıldı ve veritabanını kurdu. Pardus 25'te
+      ilk deneme.
       İlk gerçek deneme sonucu buraya yazılsın.
-- [ ] **Tatil günlerini gir.** 2026-2027 için Kurum Ayarları'na resmî tatil
-      ve idari izin günleri girilmeli; özellikle sınav pencerelerine düşenler.
-      04.10.2026'da resmî kaynaklardan derlenen liste (2429 sayılı Kanun;
-      Diyanet 2027 dinî günler takvimi; MEB 2026-2027 çalışma takvimi,
-      meb.gov.tr 13.06.2026):
-      29.10.2026 Cumhuriyet Bayramı · 01.01.2027 Yılbaşı ·
-      09–11.03.2027 Ramazan Bayramı · 23.04.2027 · 01.05.2027 (Cumartesi) ·
-      16–19.05.2027 Kurban Bayramı (19 Mayıs aynı güne düşer).
-      Arife yarım günleri (28.10.2026, 08.03.2027, 15.05.2027) öğleden önce
-      iş günüdür; tam gün girilirse o gün sınav konmaz. Hiçbiri 2026-2027
-      sınav pencerelerine düşmüyor. Ara tatiller ve yarıyıl tatili resmî
-      tatil değildir, idare çalışır; girilmez. İdari izin kararı çıkarsa
-      eklenir. Dikkat: Şubat penceresi 08.02.2027'de açıldığı için başvurunun
-      en geç günü (5 iş günü önce) yarıyıl tatiline, 01.02.2027'ye düşer;
-      duyuruyu yarıyıldan önce yayımlayıp başvuruyu okul kapanmadan toplamak
-      ya da yarıyılda dilekçe kabulünü düzenlemek gerekir.
 
 ## Takvime bağlı
+
+- [ ] **Şubat 2027 dönemi (Ocak 2027'de bakılacak).** Pencere 08.02.2027'de
+      açıldığı için başvurunun en geç günü (5 iş günü önce) yarıyıl
+      tatiline, 01.02.2027'ye düşer: duyuruyu yarıyıldan önce yayımlayıp
+      başvuruyu okul kapanmadan toplamak ya da yarıyılda dilekçe kabulünü
+      düzenlemek gerekir. Bu okulun verisinde bir öğrencinin yükü 10 iş
+      gününe günde üç sınavla da sığmıyor; plan hafta sonu açılarak üretilir
+      (hafta sonu oturumları gerekçeli olur). 2026-2027 resmî tatilleri
+      04.10.2026'da bu makinede Kurum Ayarları'na girildi (2429 sayılı Kanun;
+      Diyanet 2027 takvimi; arife yarım günleri iş günü sayıldı, girilmedi);
+      idari izin kararı çıkarsa eklenir.
 
 - [ ] **9. Dönem Toplu Sözleşme (Ağustos 2027):** `cekirdek/kurallar.py`
       içindeki `SINIR_ASKILARI` güncellenmeli. 8. Dönem eğitim hizmet kolu
@@ -122,7 +124,9 @@ sağlanmıştır.
   (bkz. `kararlar/0007-surum-tek-kaynakta.md`).
 - **Planlayıcı bütçesi.** Düğüm bütçesi gerçekçi uydurma okullarla ayarlandı
   (`kararlar/0012`); çok daha büyük bir okulda son gün sayısı denemesi
-  bütçeye takılırsa plan "üretilemedi" der. Gerçek veriyle süre gözlenmeli.
+  bütçeye takılırsa plan "üretilemedi" der. 04.10.2026'da gerçek bir okulun
+  verisiyle plan bir saniyenin altında üretildi; çok daha büyük okulda yine
+  gözlenmeli.
 - **GitHub yayım düzeni.** Güncelleme denetimi `releases/latest` ucunu ve
   yayımdaki dosya adlarını okur (`kararlar/0015`). GitHub API'si ya da dosya
   adları değişirse denetim susar ya da indiremez; program etkilenmez.
