@@ -14,7 +14,7 @@ from arayuz.bilesenler import (
 )
 from arayuz.palet import RENK
 from arayuz.pencereler import MusaitlikPenceresi, PersonelEklePenceresi
-from arayuz.sayfalar.temel import Sayfa
+from arayuz.sayfalar.temel import Sayfa, kismi_ileti
 from veri import hizmet
 from veri.hizmet import HizmetHatasi
 from veri.rapor_okuma import RaporHatasi
@@ -232,14 +232,19 @@ class PersonelSayfasi(Sayfa):
 
     def durum_degistir(self) -> None:
         secili = self.tablo.secili_satirlar()
+        degisen = 0
         try:
             for kisi in secili:
                 hizmet.personel_durumu_degistir(self.vt, kisi["kimlik"], not kisi["aktif_mi"])
+                degisen += 1
         except HizmetHatasi as hata:
-            self.hata("Durum değiştirilemedi", hata)
+            self.listeyi_doldur()
+            self.hata("Durum değiştirilemedi",
+                      kismi_ileti(hata, degisen, "kişinin durumu değiştirildi"))
+            return
         self.listeyi_doldur()
-        if secili:
-            self.bildir(f"{len(secili)} kişinin durumu değiştirildi.")
+        if degisen:
+            self.bildir(f"{degisen} kişinin durumu değiştirildi.")
 
     def sil(self) -> None:
         secili = self.tablo.secili_satirlar()

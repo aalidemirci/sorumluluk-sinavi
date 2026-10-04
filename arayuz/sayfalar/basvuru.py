@@ -28,7 +28,7 @@ from arayuz.bilesenler import (
 )
 from arayuz.palet import RENK
 from arayuz.pencereler import NumaraListesiPenceresi
-from arayuz.sayfalar.temel import Sayfa
+from arayuz.sayfalar.temel import Sayfa, kismi_ileti
 from cekirdek.takvim import is_gunu_ekle, pencere_adi, tarih_yaz
 from veri import hizmet
 from veri.hizmet import HizmetHatasi
@@ -181,12 +181,16 @@ class BasvuruSayfasi(Sayfa):
             self.bildir("Değişen işaret yok.")
 
     def _geri_koy(self, onceki: list[tuple[int, bool, bool]]) -> None:
+        donen = 0
         try:
             for kimlik, mezun, devamsiz in onceki:
                 hizmet.ogrenci_bayraklarini_toplu_guncelle(
                     self.vt, [kimlik], mezun_olamayan=mezun, devamsizlik_tebligati=devamsiz)
+                donen += 1
         except HizmetHatasi as hata:
-            self.hata("Geri alınamadı", hata)
+            self.tazele()
+            self.hata("Geri alınamadı", kismi_ileti(hata, donen, "öğrencinin işareti döndü"))
+            return
         self.tazele()
         self.bildir("İşaretler eski hâline döndü.")
 
@@ -467,13 +471,18 @@ class BasvuruSayfasi(Sayfa):
                                f"{len(secili)} öğrenci bu dönem başvurmadı olarak kaydedilecek ve "
                                "plan dışı kalacak. Devam edilsin mi?", "Kaydet"):
             return
+        kaydedilen = 0
         try:
             for satir in secili:
                 hizmet.basvuru_kaydet(self.vt, satir["ogrenci_id"], self.kod, "basvurmadi")
+                kaydedilen += 1
         except HizmetHatasi as hata:
-            self.hata("Başvuru kaydedilemedi", hata)
+            self.tazele()
+            self.hata("Başvuru kaydedilemedi",
+                      kismi_ileti(hata, kaydedilen, "öğrenci başvurmadı olarak kaydedildi"))
+            return
         self.tazele()
-        self.bildir(f"{len(secili)} öğrenci başvurmadı olarak kaydedildi.")
+        self.bildir(f"{kaydedilen} öğrenci başvurmadı olarak kaydedildi.")
 
     def kisayol_kaydet(self) -> None:
         if self.sekmeler.currentIndex() == 1:

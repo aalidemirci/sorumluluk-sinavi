@@ -601,3 +601,113 @@ def test_plan_yan_paneli_kisa_ekranda_metni_kirpmaz(uygulama, qtbot) -> None:
     etiket = sayfa.secim_etiketi
     assert etiket.height() >= etiket.heightForWidth(etiket.width())
 
+
+# ============================================================ evrak ve teslim
+
+def _evrak_sayfasi(uyg, qtbot):
+    plan = plan_uret(uyg, qtbot)
+    plan.plan_kaydet()
+    uyg.sayfa_goster(sayfa_sirasi("Evrak ve Teslim"))
+    return uyg.sayfalar[sayfa_sirasi("Evrak ve Teslim")]
+
+
+def _bildirimleri_kaydet(uyg, monkeypatch) -> list[str]:
+    bildirimler: list[str] = []
+    monkeypatch.setattr(uyg, "bildir", lambda metin, *a, **k: bildirimler.append(metin))
+    return bildirimler
+
+
+def test_evrak_uretimi_secilen_klasore_yazar(uygulama, qtbot, tmp_path, monkeypatch) -> None:
+    evrak = _evrak_sayfasi(uygulama, qtbot)
+    hedef = tmp_path / "evrak"
+    hedef.mkdir()
+    monkeypatch.setattr("arayuz.sayfalar.evrak.QFileDialog.getExistingDirectory",
+                        lambda *a, **k: str(hedef))
+    evrak._hepsi(True)
+    evrak.uret()
+    qtbot.waitUntil(lambda: evrak.sonuc_tablosu.model.rowCount() > 0, timeout=PLAN_ZAMAN_ASIMI_MS)
+    assert len(list(hedef.glob("*.docx"))) == evrak.sonuc_tablosu.model.rowCount()
+    assert evrak.klasor_dugmesi.isEnabled() and not uygulama.mesgul.isVisible()
+
+
+def test_evrak_uretimi_secim_yoksa_uyarir(uygulama, qtbot, monkeypatch) -> None:
+    """Olumsuz senaryo: belge seçilmeden klasör sorulmaz."""
+    evrak = _evrak_sayfasi(uygulama, qtbot)
+    sorulan = []
+    monkeypatch.setattr("arayuz.sayfalar.evrak.QFileDialog.getExistingDirectory",
+                        lambda *a, **k: sorulan.append(1) or "")
+    evrak._hepsi(False)
+    evrak.uret()
+    assert not sorulan and uygulama.ileti.turden("uyari")
+
+
+def test_teslim_cizelgesinde_toplu_teslim_ve_geri_alma(uygulama, qtbot, monkeypatch) -> None:
+    evrak = _evrak_sayfasi(uygulama, qtbot)
+    evrak.sekmeler.setCurrentIndex(1)
+    bildirimler = _bildirimleri_kaydet(uygulama, monkeypatch)
+    satirlar = evrak.teslim_tablosu.gorunen_satirlar()[:2]
+    anahtarlar = {(s.oturum_id, s.evrak_turu) for s in satirlar}
+    _satir_sec(evrak.teslim_tablosu, anahtarlar)
+    evrak.teslim_eden.setCurrentIndex(1)
+    evrak.teslim_alan.setCurrentIndex(2)
+    evrak.teslim_al()
+    durum = {(s.oturum_id, s.evrak_turu): s.teslim_edildi_mi
+             for s in hizmet.teslim_cizelgesi(uygulama.vt, evrak.plan_id)}
+    assert all(durum[a] for a in anahtarlar) and bildirimler == ["2 evrak teslim alındı."]
+    _satir_sec(evrak.teslim_tablosu, anahtarlar)
+    evrak.teslimi_geri_al()
+    durum = {(s.oturum_id, s.evrak_turu): s.teslim_edildi_mi
+             for s in hizmet.teslim_cizelgesi(uygulama.vt, evrak.plan_id)}
+    assert not any(durum[a] for a in anahtarlar)
+
+
+def test_teslimde_ayni_kisi_hata_verir_basari_bildirmez(uygulama, qtbot, monkeypatch) -> None:
+    """Olumsuz senaryo (TS-03): hata gösterilip yine de "teslim alındı" deniyordu."""
+    evrak = _evrak_sayfasi(uygulama, qtbot)
+    bildirimler = _bildirimleri_kaydet(uygulama, monkeypatch)
+    satir = evrak.teslim_tablosu.gorunen_satirlar()[0]
+    _satir_sec(evrak.teslim_tablosu, {(satir.oturum_id, satir.evrak_turu)})
+    evrak.teslim_eden.setCurrentIndex(1)
+    evrak.teslim_alan.setCurrentIndex(1)
+    evrak.teslim_al()
+    assert any("TS-03" in m for m in uygulama.ileti.turden("hata")) and bildirimler == []
+    assert not any(s.teslim_edildi_mi for s in hizmet.teslim_cizelgesi(uygulama.vt, evrak.plan_id))
+
+
+def test_toplu_basvurmadi_kismen_kaydedilince_kac_kayit_islendigini_soyler(
+        uygulama, monkeypatch) -> None:
+    for no in ("101", "102"):
+        hizmet.ogrenci_bayrak_guncelle(uygulama.vt, _ogrenci_id(uygulama.vt, no), True, False)
+    hizmet.duyuru_kaydet(uygulama.vt, "P1", date(2026, 8, 28), date(2026, 9, 7),
+                         "Duyuru 2026/1", "Okul web sayfası")
+    sayfa = basvuru_sayfasi(uygulama)
+    bildirimler = _bildirimleri_kaydet(uygulama, monkeypatch)
+    _satir_sec(sayfa.karar_tablosu, {s["ogrenci_id"] for s in sayfa.karar_tablosu.gorunen_satirlar()})
+    asil = hizmet.basvuru_kaydet
+    cagri = []
+
+    def ikincide_bozul(*a, **k):
+        cagri.append(1)
+        if len(cagri) == 2:
+            raise hizmet.HizmetHatasi("Uydurma hata.")
+        return asil(*a, **k)
+
+    monkeypatch.setattr(hizmet, "basvuru_kaydet", ikincide_bozul)
+    sayfa.secilenleri_basvurmadi_say()
+    hatalar = uygulama.ileti.turden("hata")
+    assert hatalar and "1 öğrenci başvurmadı olarak kaydedildi; kalanlar işlenmedi" in hatalar[-1]
+    assert bildirimler == []
+
+
+def test_personel_durumu_degismezse_basari_bildirmez(uygulama, monkeypatch) -> None:
+    uygulama.sayfa_goster(sayfa_sirasi("Öğretmen Listesi"))
+    sayfa = uygulama.sayfalar[sayfa_sirasi("Öğretmen Listesi")]
+    bildirimler = _bildirimleri_kaydet(uygulama, monkeypatch)
+    sayfa.tablo.sec(sayfa.tablo.gorunen_satirlar()[0]["kimlik"])
+
+    def bozul(*a, **k):
+        raise hizmet.HizmetHatasi("Uydurma hata.")
+
+    monkeypatch.setattr(hizmet, "personel_durumu_degistir", bozul)
+    sayfa.durum_degistir()
+    assert uygulama.ileti.turden("hata") and bildirimler == []

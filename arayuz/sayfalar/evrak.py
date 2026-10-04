@@ -17,7 +17,7 @@ from arayuz.bilesenler import (
 )
 from arayuz.palet import RENK
 from arayuz.sayfalar.plan import donem_secenekleri
-from arayuz.sayfalar.temel import Sayfa
+from arayuz.sayfalar.temel import Sayfa, kismi_ileti
 from cekirdek.modeller import PlanTuru
 from cekirdek.takvim import tarih_yaz
 from evrak import uretici
@@ -243,27 +243,38 @@ class EvrakSayfasi(Sayfa):
             self.ileti.uyari("Görevli seçilmedi", "Teslim eden ve teslim alan görevliyi seçin.")
             return
         adet = self.teslim_adet.value() or None
+        kaydedilen = 0
         try:
             for satir in secili:
                 hizmet.teslim_kaydet(self.vt, satir.oturum_id, satir.evrak_turu, eden, alan,
                                      adet, self.teslim_aciklama.text(), self.teslim_tarihi.tarih())
+                kaydedilen += 1
         except HizmetHatasi as hata:
-            self.hata("Teslim kaydedilemedi", hata)
+            # Hata sonrası başarı bildirimi gösterilmez; kısmen kaydedildiyse kaç
+            # satırın işlendiği söylenir, çizelge gerçek durumu gösterir.
+            self._teslim_tazele()
+            self.hata("Teslim kaydedilemedi", kismi_ileti(hata, kaydedilen, "evrak teslim alındı"))
+            return
         self._teslim_tazele()
-        self.bildir(f"{len(secili)} evrak teslim alındı.")
+        self.bildir(f"{kaydedilen} evrak teslim alındı.")
 
     def teslimi_geri_al(self) -> None:
         secili = [s for s in self.teslim_tablosu.secili_satirlar() if s.teslim_edildi_mi]
         if not secili:
             self.ileti.bilgi("Kayıt yok", "Seçili satırlarda teslim kaydı bulunmuyor.")
             return
+        geri_alinan = 0
         try:
             for satir in secili:
                 hizmet.teslim_geri_al(self.vt, satir.oturum_id, satir.evrak_turu)
+                geri_alinan += 1
         except HizmetHatasi as hata:
-            self.hata("Teslim geri alınamadı", hata)
+            self._teslim_tazele()
+            self.hata("Teslim geri alınamadı",
+                      kismi_ileti(hata, geri_alinan, "teslim kaydı geri alındı"))
+            return
         self._teslim_tazele()
-        self.bildir(f"{len(secili)} teslim kaydı geri alındı.")
+        self.bildir(f"{geri_alinan} teslim kaydı geri alındı.")
 
     def _teslim_tazele(self) -> None:
         satirlar = hizmet.teslim_cizelgesi(self.vt, self.plan_id) if self.plan_id else []

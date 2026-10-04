@@ -43,3 +43,13 @@ class Sayfa(QWidget):
     def kapanabilir_mi(self) -> bool:
         """Pencere kapanırken ya da sayfadan çıkarken kaydedilmemiş iş var mı?"""
         return True
+
+
+def kismi_ileti(hata: Exception, yapilan: int, ne: str) -> str:
+    """Toplu işlem hatası için ileti; hatadan önce işlenen satır varsa söylenir.
+
+    Toplu işlem ilk hatada durur. Önceki sürüm hatayı gösterip yine de "N kayıt
+    işlendi" bildirimi veriyordu; kullanıcı hiçbir şeyin kaydedilmediğini
+    göremiyordu.
+    """
+    return f"{yapilan} {ne}; kalanlar işlenmedi. {hata}" if yapilan else str(hata)
