@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from arayuz.bilesenler import (
     AkisDuzeni, Kart, Serit, Sutun, Tablo, arka_planda, cip, dugme, etiket, etiketli,
-    secim_kutusu, yatay,
+    kaydirilabilir, secim_kutusu, yatay,
 )
 from arayuz.palet import RENK
 from arayuz.pencereler import GorevliDegistirPenceresi, TekDersPenceresi, YukCozumlemePenceresi
@@ -143,8 +143,6 @@ class PlanSayfasi(Sayfa):
 
     def _yan_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setMinimumWidth(330)
-        panel.setMaximumWidth(430)
         duzen = QVBoxLayout(panel)
         duzen.setContentsMargins(10, 0, 0, 0)
         duzen.setSpacing(12)
@@ -172,7 +170,13 @@ class PlanSayfasi(Sayfa):
         denetim.ekle(self.ihlal_tablosu, 1)
         duzen.addWidget(denetim, 1)
         self._secimi_temizle()
-        return panel
+        # Kısa ekranda (1366×768, %150 ölçek) seçili sınavın görevli listesi ve
+        # kural tablosu sığmıyor, metin kırpılıyordu: panel kırpılmak yerine kayar.
+        alan = kaydirilabilir(panel)
+        alan.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        alan.setMinimumWidth(330)
+        alan.setMaximumWidth(430)
+        return alan
 
     def _alt_cubuk(self) -> QHBoxLayout:
         self.geri_dugmesi = dugme("Geri al", "", "geri", "Ctrl+Z", self.geri_al)

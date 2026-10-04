@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date, time
 from typing import Any, Callable
 
-from PySide6.QtCore import QMimeData, QPoint, Qt
+from PySide6.QtCore import QMimeData, QPoint, QSize, Qt
 from PySide6.QtGui import QDrag, QMouseEvent
 from PySide6.QtWidgets import (
     QApplication, QFrame, QGridLayout, QLabel, QScrollArea, QVBoxLayout, QWidget,
@@ -27,6 +27,8 @@ from arayuz.bilesenler import turu_ayarla
 GUN_KISALTMALARI = ("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz")
 MIME_TURU = "application/x-sorumluluk-oturum"
 SUTUN_GENISLIGI = 188
+# Boş hücre de bırakma hedefi olacak kadar yüksek kalır.
+HUCRE_EN_AZ = 64
 
 
 class OturumKarti(QFrame):
@@ -95,7 +97,6 @@ class Hucre(QFrame):
         self.setProperty("hafta_sonu", tarih.weekday() >= 5)
         self.setProperty("hedef", False)
         self.setAcceptDrops(True)
-        self.setMinimumHeight(64)
         self.duzen = QVBoxLayout(self)
         self.duzen.setContentsMargins(5, 5, 5, 5)
         self.duzen.setSpacing(4)
@@ -103,6 +104,17 @@ class Hucre(QFrame):
 
     def ekle(self, oge: QWidget) -> None:
         self.duzen.insertWidget(self.duzen.count() - 1, oge)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        """Düzenin istediği yükseklik, en az HUCRE_EN_AZ.
+
+        setMinimumHeight(64) sabit bir taban koyup düzenin hesapladığını yok
+        sayıyordu: kısa ekranda (1366×768, %150 ölçek) ızgara bütün satırları
+        64 piksele indiriyor, iki kartlı hücrede kartlar üst üste biniyordu.
+        Böylece takvim sıkışmak yerine kayar.
+        """
+        ipucu = super().minimumSizeHint()
+        return QSize(ipucu.width(), max(ipucu.height(), HUCRE_EN_AZ))
 
     def dragEnterEvent(self, olay) -> None:  # noqa: N802
         if olay.mimeData().hasFormat(MIME_TURU):

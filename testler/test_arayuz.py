@@ -534,3 +534,70 @@ def test_tablo_yeniden_yuklemede_secimi_korur(qtbot) -> None:
     _satir_sec(tablo, {1, 3})
     tablo.yukle([{"no": i, "ad": f"Öğrenci {i} (güncel)"} for i in range(5)])
     assert [s["no"] for s in tablo.secili_satirlar()] == [1, 3]
+
+
+def test_tablo_dar_alanda_sutunlari_daraltir_genis_alanda_geri_acar(qtbot) -> None:
+    """%150 ölçekte ve 1366×768'de son sütunlar ancak yatay kaydırmayla
+    görünüyordu: sabit sütunlar artık orantılı daralır."""
+    from arayuz.bilesenler import SUTUN_EN_DAR, UZAYAN_EN_AZ, Sutun, Tablo
+    tablo = Tablo([Sutun("A", lambda s: s, 200), Sutun("B", lambda s: s, 200),
+                   Sutun("C", lambda s: s, 200), Sutun("D", lambda s: s, uzat=True)])
+    qtbot.addWidget(tablo)
+    tablo.yukle(["x"])
+    tablo.show()
+    tablo.resize(500, 300)
+    qtbot.waitUntil(lambda: tablo.gorunum.columnWidth(0) < 200)
+    genislik = tablo.gorunum.viewport().width()
+    sabit = sum(tablo.gorunum.columnWidth(i) for i in range(3))
+    assert sabit + UZAYAN_EN_AZ <= genislik + 3
+    assert min(tablo.gorunum.columnWidth(i) for i in range(3)) >= SUTUN_EN_DAR
+    tablo.resize(1400, 300)
+    qtbot.waitUntil(lambda: tablo.gorunum.columnWidth(0) == 200)
+    assert [tablo.gorunum.columnWidth(i) for i in range(3)] == [200, 200, 200]
+
+
+def test_tablo_elle_boyutlandirilan_sutuna_dokunmaz(qtbot) -> None:
+    """Olumsuz senaryo: kullanıcı sütunu elle ayarladıysa pencere değişince geri alınmaz."""
+    from arayuz.bilesenler import Sutun, Tablo
+    tablo = Tablo([Sutun("A", lambda s: s, 200), Sutun("B", lambda s: s, uzat=True)])
+    qtbot.addWidget(tablo)
+    tablo.show()
+    tablo.resize(900, 300)
+    qtbot.wait(20)
+    tablo.gorunum.horizontalHeader().resizeSection(0, 320)
+    tablo.resize(400, 300)
+    qtbot.wait(20)
+    assert tablo.gorunum.columnWidth(0) == 320
+
+
+def test_takvim_hucresi_kisa_ekranda_kartlari_sikistirmaz(qtbot) -> None:
+    """Hücreye sabit 64 piksellik taban konunca kısa ekranda iki kart üst üste
+    biniyordu; takvim artık sıkışmak yerine kayar."""
+    from arayuz.takvim import HUCRE_EN_AZ, SurukleBirakTakvim
+    gun, saat = date(2026, 9, 14), time(8, 0)
+    kartlar = [{"anahtar": f"k{i}", "baslik": f"Ders {i}", "alt": "5 öğrenci • 1 salon",
+                "tarih": gun, "saat": saat, "tur": "yazili", "kilitli": False}
+               for i in range(3)]
+    takvim = SurukleBirakTakvim([gun], [saat, time(9, 0), time(10, 0)], kartlar,
+                                lambda *a: None)
+    qtbot.addWidget(takvim)
+    takvim.show()
+    takvim.resize(400, 200)
+    qtbot.wait(20)
+    for kart in takvim.kart_widgetlari.values():
+        assert kart.height() >= kart.minimumSizeHint().height()
+    assert takvim.verticalScrollBar().maximum() > 0
+    # Olumsuz senaryo: boş hücre bırakma hedefi olacak kadar yüksek kalır.
+    assert takvim.hucre(gun, time(10, 0)).height() >= HUCRE_EN_AZ
+
+
+def test_plan_yan_paneli_kisa_ekranda_metni_kirpmaz(uygulama, qtbot) -> None:
+    """%150 ölçekte (1280×680) seçili sınavın görevli listesi kırpılıyordu."""
+    sayfa = plan_uret(uygulama, qtbot)
+    uygulama.show()
+    uygulama.resize(1280, 680)
+    sayfa.takvim.secildi(sayfa.plan_sonucu.plan.oturumlar[0].anahtar)
+    qtbot.wait(50)
+    etiket = sayfa.secim_etiketi
+    assert etiket.height() >= etiket.heightForWidth(etiket.width())
+

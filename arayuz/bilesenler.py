@@ -563,6 +563,13 @@ class SuzgecModeli(QSortFilterProxyModel):
         return model.siralama_anahtari(sol) < model.siralama_anahtari(sag)
 
 
+# Sütun genişlikleri tasarım genişliğidir. Tablo daha darsa (1366×768 ekran,
+# %150 ölçek) sabit sütunlar orantılı daralır ve uzayan sütuna en az
+# UZAYAN_EN_AZ kalır; yoksa son sütunlar ancak yatay kaydırmayla görünüyordu.
+UZAYAN_EN_AZ = 110
+SUTUN_EN_DAR = 48
+
+
 class Tablo(QWidget):
     """Arama, Türkçe sıralama ve seçim koruması olan tablo."""
 
@@ -609,6 +616,12 @@ class Tablo(QWidget):
                 baslik.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         if not uzayan:
             baslik.setStretchLastSection(True)
+        self._genislikler = [s.genislik for s in sutunlar]
+        # Uzayan sütun yoksa son sütun uzar; daralmada payı o alır.
+        self._esnek = set(uzayan) or {len(sutunlar) - 1}
+        self._elle_boyutlandi = False
+        self._sigdiriyor = False
+        baslik.sectionResized.connect(self._sutun_boyutlandi)
         # Varsayılan: servisin verdiği sıra korunur (ör. işaretliler önde);
         # kullanıcı başlığa tıklayınca o sütuna göre sıralanır.
         if siralama is None:
@@ -639,6 +652,7 @@ class Tablo(QWidget):
     def eventFilter(self, nesne: QObject, olay: QEvent) -> bool:  # noqa: N802
         if nesne is self.gorunum.viewport() and olay.type() == QEvent.Type.Resize:
             self.bos.setGeometry(self.gorunum.viewport().rect().adjusted(20, 20, -20, -20))
+            self._sutunlari_sigdir()
         if (nesne is self.gorunum and olay.type() == QEvent.Type.KeyPress
                 and isinstance(olay, QKeyEvent) and olay.key() == Qt.Key.Key_Space):
             indeks = self.gorunum.currentIndex()
@@ -649,6 +663,29 @@ class Tablo(QWidget):
                 self.suzgec.setData(indeks, yeni.value, Qt.ItemDataRole.CheckStateRole)
                 return True
         return super().eventFilter(nesne, olay)
+
+    def _sutun_boyutlandi(self, indeks: int, _eski: int, _yeni: int) -> None:
+        # Kullanıcı bir sütunu elle genişletti ya da daralttı: tercihi korunur,
+        # pencere boyu değişince sütunlar artık kendiliğinden ayarlanmaz.
+        if not self._sigdiriyor and indeks not in self._esnek:
+            self._elle_boyutlandi = True
+
+    def _sutunlari_sigdir(self) -> None:
+        if self._elle_boyutlandi:
+            return
+        sabit = [i for i in range(len(self._genislikler)) if i not in self._esnek]
+        toplam = sum(self._genislikler[i] for i in sabit)
+        if not toplam:
+            return
+        alan = self.gorunum.viewport().width() - UZAYAN_EN_AZ * len(self._esnek)
+        olcek = max(0.0, min(1.0, alan / toplam))
+        self._sigdiriyor = True
+        try:
+            for i in sabit:
+                self.gorunum.setColumnWidth(
+                    i, max(SUTUN_EN_DAR, int(self._genislikler[i] * olcek)))
+        finally:
+            self._sigdiriyor = False
 
     def _cift_tiklama(self, indeks: QModelIndex) -> None:
         self.cift_tiklandi.emit(self.suzgec.data(indeks, NESNE_ROLU))
