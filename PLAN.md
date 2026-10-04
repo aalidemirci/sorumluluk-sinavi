@@ -41,6 +41,8 @@ kurulumu ya da takvim (Ağustos 2027) bekliyor.
       Ayarlar → Uygulamalar kaydının 0.4.0'da kalmış olduğu görüldü
       (dosyalar 0.7.0'dı); 0.8.1 ve 0.8.2 kurulumları kaydı yeniledi.
       Eskide kalmasının nedeni bulunamadı, durum yeniden üretilemedi.
+      0.8.3 yayımlanınca kurulu 0.8.2 de yeni sürümü buldu, kurulum
+      dosyasını 9 saniyede indirip doğruladı ve sihirbazı açtı.
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.3;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
