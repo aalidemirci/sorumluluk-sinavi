@@ -47,6 +47,8 @@ turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
       görüldü: eski İngilizce kaldırma kısayolu silindi, ilk açılışta
       önbellekteki iki kurulum dosyası (0.8.2 ve az önce kullanılan 0.8.3)
       silindi; kurulum dosyasının kilidi 4 saniye içinde kalkmıştı.
+      0.8.4 yayımlanınca yayımlanmış 0.8.3 taşınabilir paketi ekransız
+      açıldı; günlükte "kurulu 0.8.3, yayımlanan 0.8.4".
 - [ ] **Okuldaki makineleri güncelle.** Yordam KURULUM.md → "Kurulu
       makineleri güncelleme" başlığında. 04.10.2026: yayımlanan sürüm 0.8.4;
       okul makineleri bekliyor. 0.6.x ya da daha eskisinden gelen makinede
@@ -67,7 +69,7 @@ turu, okul makinesi ya da ağı, gerçek Pardus kurulumu ya da takvim bekliyor.
       X11'e düştü ve açıldı (Weston kapta çöktüğü için X sunucusu Xvfb idi);
       XFCE ortamında Qt GTK temasını yükledi, "Rapor seç ve önizle" GTK'nin
       kendi dosya seçme penceresini açtı.
-      04.10.2026, 0.8.3 paketiyle resmî `pardus/yirmiuc` (Pardus 23, glibc
+      04.10.2026, 0.8.3 ve 0.8.4 paketleriyle resmî `pardus/yirmiuc` (Pardus 23, glibc
       2.36) ve `pardus/yirmibes` (Pardus 25, glibc 2.41) görüntülerinde:
       bağımlılıklar Pardus'un kendi deposundan çözüldü, menü dosyası
       `desktop-file-validate`den geçti (tek ipucu: iki ana kategori, Ofis ve
