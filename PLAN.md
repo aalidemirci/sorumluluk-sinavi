@@ -36,9 +36,10 @@ kurulumu ya da takvim bekliyor.
       saniye) indirip doğruladı; "Kurulumu başlat" programı kapatıp
       sihirbazı açtı. Sihirbaz kurulum klasörünü ve masaüstü kısayolu
       seçimini önceki kurulumdan aldı; 0.8.2 kuruldu, açıldı, "Program
-      güncel" dedi. Gerçek veri klasörüne dokunulmadı. (O gün Ayarlar →
-      Uygulamalar kaydının eski sürümde kaldığı sanıldı; kayıt doğruydu,
-      eski sürüm kaydı okuyan geliştirme aracının yalıtılmış görünümündeydi.)
+      güncel" dedi. Gerçek veri klasörüne dokunulmadı. (Aynı denemede
+      Uygulamalar kaydının 0.4.0'da kaldığı sanılmıştı; değer, kaydı okuyan
+      geliştirme aracının yalıtılmış görünümünden okunmuştu, gerçek kayıt
+      büyük olasılıkla doğruydu. 0.8.4 ve 0.8.5'te gerçek kayıt doğrulandı.)
       0.8.3 yayımlanınca kurulu 0.8.2 de yeni sürümü buldu, kurulum
       dosyasını 9 saniyede indirip doğruladı ve sihirbazı açtı; kurulumu
       kullanıcı tamamladı. 0.8.3'ün düzeltmeleri bu gerçek yükseltmede
