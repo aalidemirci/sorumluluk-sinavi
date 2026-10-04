@@ -77,6 +77,12 @@ yapılır; bu sürümden sonrakileri program kendisi haber verir.
 - Windows kurulumu yükseltmede eski sürümün `_internal` klasörünü önce
   siler; artık kullanılmayan dosyalar (ör. Tcl/Tk) geride kalmaz.
 
+### Düzeltildi
+- Beklenmeyen bir hata artık ekranda gösterilir. Paketlenmiş programda
+  konsol olmadığı için önceden (Tk sürümünde de) sessizce kayboluyordu.
+  Günlüğe yalnız hata türü ve çağrı yığını yazılır; ileti öğrenci adı
+  taşıyabileceği için yazılmaz.
+
 ## [0.7.0] — 03.10.2026
 
 PLAN.md'deki bilinen borçların kapatılması. Şema göçü 009 (kullanılmayan bir
