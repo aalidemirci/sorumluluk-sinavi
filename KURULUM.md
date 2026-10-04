@@ -92,6 +92,12 @@ Bilinmesi gerekenler:
   Ayarlar → Uygulamalar listesinde kaldırılamayan bir kayıt kalır
   (`unins000.exe` bulunamaz). Üzerine yeni sürüm kurmak bu kaydı düzeltir;
   ayrıca bir şey yapmanız gerekmez.
+- **Uygulamalar listesindeki sürüm.** Bazı yükseltmelerde Ayarlar →
+  Uygulamalar listesi eski sürümü göstermeye devam etti (nedeni araştırılıyor);
+  program yine de yeni sürümdür. Kurulu sürümü Hakkında sayfasından ya da
+  yukarıdaki komutla doğrulayın. 0.8.5'ten beri her kurulum `%TEMP%` altına
+  `Setup Log …` adlı bir günlük bırakır; kurulumda bir sorun olursa nedeni
+  oradan görülür. Günlükte öğrenci verisi yoktur, Windows kullanıcı adı geçer.
 - **Kaldırma veritabanını silmez.** Veri `%LOCALAPPDATA%\SorumlulukSinavi\plan`
   altında kalır. Makineyi tamamen temizlemek istiyorsanız o klasörü elle
   silin — öncesinde aşağıdaki Yedekleme bölümünü okuyun.
