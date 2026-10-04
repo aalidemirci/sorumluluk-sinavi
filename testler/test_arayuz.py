@@ -35,6 +35,8 @@ class KayitliIleti:
     def __init__(self) -> None:
         self.kayitlar: list[tuple[str, str, str]] = []
         self.cevap = True
+        self.metin_cevabi: str | None = None      # None: önerilen metin kabul edilir
+        self.metin_vazgec = False
 
     def hata(self, baslik: str, metin: str, ust=None) -> None:
         self.kayitlar.append(("hata", baslik, metin))
@@ -49,6 +51,12 @@ class KayitliIleti:
              uyari: bool = False, ust=None) -> bool:
         self.kayitlar.append(("soru", baslik, metin))
         return self.cevap
+
+    def metin_iste(self, baslik: str, metin: str, varsayilan: str = "", ust=None) -> str | None:
+        self.kayitlar.append(("metin", baslik, metin))
+        if self.metin_vazgec:
+            return None
+        return varsayilan if self.metin_cevabi is None else self.metin_cevabi
 
     def turden(self, tur: str) -> list[str]:
         return [metin for t, _b, metin in self.kayitlar if t == tur]
@@ -197,6 +205,58 @@ def test_surukle_birak_gecerli_tasimayi_uygular_ve_geri_alinir(uygulama, qtbot) 
     assert not sayfa.geri_dugmesi.isEnabled()
     sayfa.ileri_al()
     assert plan.oturum_bul(oturum.anahtar).tarih == hedef
+
+
+def test_hafta_sonuna_surukleyince_gerekce_sorulur(uygulama, qtbot) -> None:
+    """SP-05 (OKY md.58/2-ç): hafta sonu oturumu gerekçe ister. Elle taşımada
+    girilecek yer olmadığından gerçek verinin kopyasıyla denemede hafta sonuna
+    her taşıma geri alınıyordu. Olumsuz senaryo: sorudan vazgeçilirse taşıma
+    yapılmaz ve "taşınamadı" uyarısı da çıkmaz."""
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    onceki, cumartesi = oturum.tarih, date(2026, 9, 19)
+    uygulama.ileti.metin_vazgec = True
+    sayfa.kart_birakildi(oturum.anahtar, cumartesi, oturum.saat)
+    assert oturum.tarih == onceki and not uygulama.ileti.turden("uyari")
+    assert any("OKY md.58/2-ç" in m for m in uygulama.ileti.turden("metin"))
+    uygulama.ileti.metin_vazgec = False
+    uygulama.ileti.metin_cevabi = "Uydurma gerekçe: hafta içi salon yok."
+    sayfa.kart_birakildi(oturum.anahtar, cumartesi, oturum.saat)
+    assert oturum.tarih == cumartesi
+    assert oturum.hafta_sonu_gerekcesi == "Uydurma gerekçe: hafta içi salon yok."
+    sayfa.geri_al()
+    assert oturum.tarih == onceki and oturum.hafta_sonu_gerekcesi == ""
+
+
+def test_salonu_degisen_tasima_bildirimde_yazilir(uygulama, qtbot, monkeypatch) -> None:
+    """Salon değişikliği evrakı (salon listeleri) etkiler; bildirim bunu söyler.
+    Olumsuz senaryo: salonu değişmeyen taşımada ek cümle yoktur."""
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
+    bildirimler = _bildirimleri_kaydet(uygulama, monkeypatch)
+    asil = hizmet.oturum_tasi
+    for degisti in (True, False):
+        def sahte(*a, **k):
+            sonuc = asil(*a, **k)
+            sonuc.salon_degisti = degisti and sonuc.uygulandi
+            return sonuc
+
+        monkeypatch.setattr(hizmet, "oturum_tasi", sahte)
+        oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+        sayfa.kart_birakildi(oturum.anahtar, _bos_is_gunu(plan), oturum.saat)
+        assert ("boş salona geçirildi" in bildirimler[-1]) is degisti
+        sayfa.geri_al()
+
+
+def test_hafta_ici_tasimada_gerekce_sorulmaz(uygulama, qtbot) -> None:
+    """Olumsuz senaryo: hafta içine taşımada gerekçe sorusu çıkmaz."""
+    sayfa = plan_uret(uygulama, qtbot)
+    plan = sayfa.plan_sonucu.plan
+    oturum = next(o for o in plan.oturumlar if not o.birim_anahtari)
+    hedef = _bos_is_gunu(plan)
+    sayfa.kart_birakildi(oturum.anahtar, hedef, oturum.saat)
+    assert oturum.tarih == hedef and not uygulama.ileti.turden("metin")
 
 
 def test_ogrenci_cakismasi_tasimayi_engeller(uygulama, qtbot) -> None:

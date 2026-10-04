@@ -151,6 +151,85 @@ def test_yazili_tasininca_uygulama_saat_farkiyla_gelir(vt, tmp_path: Path) -> No
     assert (uygulama.tarih, uygulama.saat) == (hedef, time(10, 0))
 
 
+def test_hafta_sonuna_elle_tasima_gerekceyle_yapilir(vt, tmp_path: Path) -> None:
+    """SP-05 (OKY md.58/2-ç): hafta sonu oturumu gerekçe ister. Planlayıcı kendi
+    koyduğu oturuma gerekçeyi yazar; elle taşımada girilecek yer olmadığından
+    gerçek verinin kopyasıyla denemede (04.10.2026) hafta sonuna her taşıma geri
+    alınıyordu. Olumsuz senaryo: gerekçesiz taşıma SP-05 ile geri alınır."""
+    _kur(vt, tmp_path)
+    sonuc = _plan(vt)
+    oturum = next(o for o in sonuc.plan.oturumlar if not o.birim_anahtari)
+    onceki, cumartesi = oturum.tarih, date(2026, 9, 19)
+    goruntu = hizmet.plan_anlik_goruntusu(sonuc.plan)
+    assert hizmet.hafta_sonu_gerekcesi_gerekir_mi(sonuc.plan, oturum.anahtar, cumartesi)
+    assert not hizmet.hafta_sonu_gerekcesi_gerekir_mi(sonuc.plan, oturum.anahtar,
+                                                      _bos_gun(sonuc))
+    tasima = hizmet.oturum_tasi(vt, sonuc.plan, oturum.anahtar, cumartesi, oturum.saat,
+                                sonuc.yukseltilen_sinirlar)
+    assert not tasima.uygulandi
+    assert [i.kural_kimligi for i in tasima.diger_engeller] == ["SP-05"]
+    assert oturum.tarih == onceki and oturum.hafta_sonu_gerekcesi == ""
+    tasima = hizmet.oturum_tasi(vt, sonuc.plan, oturum.anahtar, cumartesi, oturum.saat,
+                                sonuc.yukseltilen_sinirlar,
+                                hafta_sonu_gerekcesi=hizmet.ELLE_HAFTA_SONU_GEREKCESI)
+    assert tasima.uygulandi, tasima.mesaj()
+    assert oturum.tarih == cumartesi
+    assert "OKY md.58/2-ç" in oturum.hafta_sonu_gerekcesi
+    # Gerekçesi olan oturum öbür hafta sonu gününe yeniden sorulmadan gider.
+    assert not hizmet.hafta_sonu_gerekcesi_gerekir_mi(sonuc.plan, oturum.anahtar,
+                                                      date(2026, 9, 20))
+    hizmet.plani_geri_yukle(sonuc.plan, goruntu)
+    assert oturum.tarih == onceki and oturum.hafta_sonu_gerekcesi == ""
+
+
+def test_geri_alinan_hafta_sonu_tasimasi_gerekce_birakmaz(vt, tmp_path: Path) -> None:
+    """Olumsuz senaryo: gerekçe verilse de öğrenci çakışması taşımayı geri alır;
+    gerekçe de eski hâline döner, kaydedilen planda gerekçesi kalmaz."""
+    _kur(vt, tmp_path)
+    sonuc = _plan(vt)
+    tekler = [o for o in sonuc.plan.oturumlar if not o.birim_anahtari]
+    birinci, ikinci = next((a, b) for a in tekler for b in tekler
+                           if a is not b and set(a.ogrenci_anahtarlari)
+                           & set(b.ogrenci_anahtarlari))
+    cumartesi = date(2026, 9, 19)
+    gerekce = hizmet.ELLE_HAFTA_SONU_GEREKCESI
+    assert hizmet.oturum_tasi(vt, sonuc.plan, birinci.anahtar, cumartesi, time(9, 0),
+                              sonuc.yukseltilen_sinirlar, hafta_sonu_gerekcesi=gerekce).uygulandi
+    tasima = hizmet.oturum_tasi(vt, sonuc.plan, ikinci.anahtar, cumartesi, time(9, 0),
+                                sonuc.yukseltilen_sinirlar, hafta_sonu_gerekcesi=gerekce)
+    assert not tasima.uygulandi and tasima.ogrenci_engelleri
+    assert ikinci.tarih != cumartesi and ikinci.hafta_sonu_gerekcesi == ""
+
+
+def test_dolu_salona_tasinan_oturum_bos_salona_gecer(vt, tmp_path: Path) -> None:
+    """Taşınan oturum salonunu yanında götürüyordu; hedef saatte o salon doluysa
+    öbür salon boş olsa da taşıma SP-03 ile geri alınıyordu. Gerçek verinin
+    kopyasında aynı saatte başka güne 330 taşımanın 76'sı yalnız bu yüzden
+    reddediliyordu (04.10.2026). Olumsuz senaryo: hedef saatte boş salon yoksa
+    salon değişmez, taşıma eskisi gibi geri alınır."""
+    from testler.yardimci import gorevler, oturum, plan as plan_kur
+    _kur(vt, tmp_path)
+    d01, d02 = (s.kimlik for s in sorted(hizmet.salonlari_getir(vt), key=lambda s: s.ad))
+    kisiler = [p.kimlik for p in hizmet.personelleri_getir(vt) if p.gorev_alabilir_mi]
+    a = oturum("a", "MATEMATİK", ["101|9/A"], gun=14, salonlar=(d01,))
+    b = oturum("b", "FİZİK", ["201|10/B"], gun=15, salonlar=(d01,), brans="Fizik")
+    plan = plan_kur([a, b], gorevler("a", komisyon=tuple(kisiler[:2]), gozcu=(kisiler[2],))
+                    + gorevler("b", komisyon=tuple(kisiler[3:5]), gozcu=(kisiler[5],)))
+    goruntu = hizmet.plan_anlik_goruntusu(plan)
+    tasima = hizmet.oturum_tasi(vt, plan, "a", b.tarih, b.saat)
+    assert tasima.uygulandi, tasima.mesaj()
+    assert tasima.salon_degisti and a.salon_kimlikleri == (d02,)
+    hizmet.plani_geri_yukle(plan, goruntu)
+    assert (a.tarih, a.salon_kimlikleri) == (date(2026, 9, 14), (d01,))
+
+    c = oturum("c", "İNGİLİZCE", ["102|9/A"], gun=15, salonlar=(d02,), brans="İngilizce")
+    plan.oturumlar.append(c)
+    plan.gorevlendirmeler += gorevler("c", komisyon=tuple(kisiler[6:8]), gozcu=(kisiler[8],))
+    tasima = hizmet.oturum_tasi(vt, plan, "a", b.tarih, b.saat)
+    assert not tasima.uygulandi and tasima.salon_engelleri and not tasima.salon_degisti
+    assert (a.tarih, a.salon_kimlikleri) == (date(2026, 9, 14), (d01,))
+
+
 def test_iki_asamali_derste_iki_komisyon_uyeligi_ayri_sayilir(vt, tmp_path: Path) -> None:
     """OKY md.58/2-e: yazılı ve uygulama için ayrı komisyon kurulur, komisyonların
     aynı üyelerden oluşması esastır. Yabancı dilde 7. ve 8. Dönem Toplu Sözleşme

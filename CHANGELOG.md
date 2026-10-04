@@ -34,6 +34,16 @@ Gerçek bir okul verisinin geçici kopyasında ekransız yapılan turda
 bulunanlar. Şema değişmedi.
 
 ### Düzeltildi
+- Hafta sonuna sürüklenen kart her zaman geri alınıyordu: hafta sonu oturumu
+  gerekçe ister (SP-05, OKY md.58/2-ç) ama elle taşımada gerekçe girilecek yer
+  yoktu. Artık hafta sonuna bırakılan kart için gerekçe sorulur; önerilen
+  metin değiştirilebilir, vazgeçilirse taşıma yapılmaz. Geri alma gerekçeyi
+  de geri alır.
+- Taşınan oturum salonunu yanında götürüyordu; hedef saatte o salon doluysa
+  başka salon boş olsa da taşıma geri alınıyordu. Oturum artık aynı sayıda
+  boş salona geçer (salon başına bir gözcü kuralı bozulmaz) ve bildirim bunu
+  söyler. Turda aynı saatte başka güne 330 taşıma denemesinden yapılabilenler
+  21'den 97'ye çıktı; kalan retler gerçek öğrenci ya da öğretmen çakışması.
 - Plan, bir öğrencinin yükü günde üç sınavla (ÖDY md.5/1-k) bile pencereye
   sığmadığı için üretilemediğinde ileti "günlük oturum saati ekleyin" de
   diyordu; bu sınırı oturum saati değiştirmez. İleti artık en az kaç gün

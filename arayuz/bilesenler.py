@@ -28,9 +28,9 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QAction, QColor, QFont, QKeyEvent
 from PySide6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDateEdit, QFrame, QHBoxLayout, QHeaderView, QLabel, QLayout,
-    QLayoutItem, QLineEdit, QMessageBox, QProgressBar, QPushButton, QScrollArea, QTableView,
-    QVBoxLayout, QWidget,
+    QAbstractItemView, QComboBox, QDateEdit, QFrame, QHBoxLayout, QHeaderView, QInputDialog,
+    QLabel, QLayout, QLayoutItem, QLineEdit, QMessageBox, QProgressBar, QPushButton,
+    QScrollArea, QTableView, QVBoxLayout, QWidget,
 )
 
 from arayuz.palet import RENK
@@ -952,6 +952,20 @@ class Iletisim:
                                            (hayir, QMessageBox.ButtonRole.NoRole)],
                            varsayilan=1 if uyari else 0, ust=ust)
         return secim == 0
+
+    def metin_iste(self, baslik: str, metin: str, varsayilan: str = "",
+                   ust: QWidget | None = None) -> str | None:
+        """Tek satırlık metin ister (ör. hafta sonu gerekçesi); vazgeçilirse None."""
+        kutu = QInputDialog(ust or self.ust)
+        kutu.setWindowTitle(baslik)
+        kutu.setLabelText(metin)
+        kutu.setTextValue(varsayilan)
+        kutu.setOkButtonText("Tamam")
+        kutu.setCancelButtonText("Vazgeç")
+        kutu.resize(max(kutu.width(), 560), kutu.height())
+        if not kutu.exec():
+            return None
+        return kutu.textValue().strip()
 
 
 # ============================================================== kaydırılan sayfa

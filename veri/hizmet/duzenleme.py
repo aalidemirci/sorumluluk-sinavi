@@ -7,12 +7,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, time
 
-from cekirdek.kurallar import musait_degil_mi, oturumlar_cakisir_mi
+from cekirdek.kurallar import SALON_OGRENCI_UST_SINIRI, musait_degil_mi, oturumlar_cakisir_mi
 from cekirdek.metin import esitle, siralama_anahtari
-from cekirdek.modeller import Gorevlendirme, GorevRolu, Ihlal, OturumTuru, Plan, PlanTuru
+from cekirdek.modeller import (
+    Gorevlendirme, GorevRolu, Ihlal, Oturum, OturumTuru, Plan, PlanTuru, Salon,
+)
 from ..veritabani import Veritabani, simdi
 
-from .ortak import HizmetHatasi
+from .ortak import HizmetHatasi, salonlari_getir
 from .personel import musaitsizlikleri_getir, personelleri_getir
 from .gorev import _sayaclara_cevir, onceki_gorev_kayitlari
 from .plan import _yonetici_mi, plan_yukle, plani_dogrula
@@ -30,6 +32,8 @@ class TasimaSonucu:
     salon_engelleri: list[Ihlal] = field(default_factory=list)
     diger_engeller: list[Ihlal] = field(default_factory=list)
     uyarilar: list[Ihlal] = field(default_factory=list)
+    # Hedef saatte salonu dolu olduğu için boş salona geçirilen oturum var mı.
+    salon_degisti: bool = False
 
     @property
     def engeller(self) -> list[Ihlal]:
@@ -82,8 +86,69 @@ def _engel_imzalari(vt: Veritabani, plan: Plan,
             for i in plani_dogrula(vt, plan, kisisel_sinirlar) if i.engel_mi}
 
 
+# Elle hafta sonuna alınan oturum için önerilen gerekçe; kullanıcı değiştirebilir.
+ELLE_HAFTA_SONU_GEREKCESI = ("Hafta içi saatler yetmediği için OKY md.58/2-ç uyarınca "
+                             "hafta sonuna alındı.")
+
+
+def _tasinacaklar(plan: Plan, oturum: Oturum) -> list[Oturum]:
+    """Yazılı taşınınca iki aşamalı dersin uygulaması da onunla gider."""
+    esler = [o for o in plan.oturumlar
+             if oturum.birim_anahtari and o.birim_anahtari == oturum.birim_anahtari
+             and o is not oturum]
+    return [oturum] + (esler if oturum.oturum_turu is OturumTuru.YAZILI else [])
+
+
+def _bos_salona_gec(plan: Plan, oturum: Oturum, salonlar: dict[int, Salon]) -> bool:
+    """Hedef saatte salonu dolu olan oturumu aynı sayıda boş salona geçirir.
+
+    Taşınan oturum salonunu yanında götürüyordu; hedef saatte o salon doluysa
+    başka salon boş olsa da taşıma SP-03 ile geri alınıyordu. Gerçek verinin
+    kopyasında aynı saatte başka güne 330 taşımanın 76'sı yalnız bu yüzden
+    reddediliyordu ve hepsi boş salona geçerek olurdu (04.10.2026). Salon sayısı
+    değişmez (SP-03: salon başına bir gözcü); boş salon ya da kapasite yetmezse
+    salona dokunulmaz, doğrulayıcı engeli eskisi gibi bildirir. Seçim
+    planlayıcının sırasıyladır: önce büyük salon, eşitse küçük kimlik.
+    """
+    dolu = {k for o in plan.oturumlar if o is not oturum and oturumlar_cakisir_mi(o, oturum)
+            for k in o.salon_kimlikleri}
+    if not dolu & set(oturum.salon_kimlikleri):
+        return False
+    kalan = [k for k in oturum.salon_kimlikleri if k not in dolu]
+    adaylar = sorted((s for s in salonlar.values()
+                      if s.kimlik not in dolu and s.kimlik not in kalan),
+                     key=lambda s: (-s.kapasite, s.kimlik))
+    gereken = len(oturum.salon_kimlikleri) - len(kalan)
+    if len(adaylar) < gereken:
+        return False
+    yeni = kalan + [s.kimlik for s in adaylar[:gereken]]
+    kapasite = sum(min(salonlar[k].kapasite, SALON_OGRENCI_UST_SINIRI)
+                   for k in yeni if k in salonlar)
+    if kapasite < len(oturum.ogrenci_anahtarlari):
+        return False
+    oturum.salon_kimlikleri = tuple(yeni)
+    return True
+
+
+def hafta_sonu_gerekcesi_gerekir_mi(plan: Plan, anahtar: str, yeni_tarih: date) -> bool:
+    """Taşıma bir oturumu gerekçesiz olarak hafta sonuna götürecek mi (SP-05)?
+
+    Planlayıcı hafta sonuna koyduğu oturumun gerekçesini kendisi yazar. Elle
+    taşımada gerekçe girilecek yer yoktu; SP-05 hafta sonuna her taşımayı geri
+    alıyordu (04.10.2026, gerçek verinin kopyasıyla deneme). Arayüz bu durumda
+    gerekçe sorar.
+    """
+    oturum = plan.oturum_bul(anahtar)
+    if oturum is None:
+        return False
+    fark = yeni_tarih - oturum.tarih
+    return any((o.tarih + fark).weekday() >= 5 and not o.hafta_sonu_gerekcesi.strip()
+               for o in _tasinacaklar(plan, oturum))
+
+
 def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni_saat: time,
-                kisisel_sinirlar: dict[str, int] | None = None) -> TasimaSonucu:
+                kisisel_sinirlar: dict[str, int] | None = None,
+                hafta_sonu_gerekcesi: str = "") -> TasimaSonucu:
     """Oturumu yeni gün/saate taşır; yeni engel doğuruyorsa geri alır.
 
     İki aşamalı derste (OKY md.58/2-e) yazılı taşınınca uygulama da aynı gün
@@ -92,6 +157,11 @@ def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni
     sınavları dönemi içinde farklı günlerde de yapılabilir" der. Öğrenci,
     öğretmen ve salon çakışmaları ayrı ayrı raporlanır; uyarı düzeyindeki
     ihlaller taşımayı engellemez.
+
+    Hafta sonuna giden ve gerekçesi olmayan oturuma `hafta_sonu_gerekcesi`
+    yazılır (OKY md.58/2-ç, SP-05). Hedef saatte salonu dolu olan oturum aynı
+    sayıda boş salona geçirilir (bkz. `_bos_salona_gec`). Taşıma geri alınırsa
+    gerekçe ve salon da eski hâline döner.
     """
     oturum = plan.oturum_bul(anahtar)
     if oturum is None:
@@ -100,11 +170,9 @@ def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni
         raise HizmetHatasi("Kesinleşmiş veya kilitli oturum taşınamaz.")
 
     onceki = _engel_imzalari(vt, plan, kisisel_sinirlar)
-    esler = [o for o in plan.oturumlar
-             if oturum.birim_anahtari and o.birim_anahtari == oturum.birim_anahtari
-             and o is not oturum]
-    tasinacaklar = [oturum] + (esler if oturum.oturum_turu is OturumTuru.YAZILI else [])
-    eski_durum = [(o, o.tarih, o.saat) for o in tasinacaklar]
+    tasinacaklar = _tasinacaklar(plan, oturum)
+    eski_durum = [(o, o.tarih, o.saat, o.hafta_sonu_gerekcesi, o.salon_kimlikleri)
+                  for o in tasinacaklar]
     saatler = list(plan.parametreler.slot_saatleri)
     gun_farki = yeni_tarih - oturum.tarih
     for es in tasinacaklar[1:]:
@@ -116,30 +184,45 @@ def oturum_tasi(vt: Veritabani, plan: Plan, anahtar: str, yeni_tarih: date, yeni
                 es.saat = saatler[hedef]
         es.tarih = es.tarih + gun_farki
     oturum.tarih, oturum.saat = yeni_tarih, yeni_saat
+    gerekce = hafta_sonu_gerekcesi.strip()
+    if gerekce:
+        for o in tasinacaklar:
+            if o.tarih.weekday() >= 5 and not o.hafta_sonu_gerekcesi.strip():
+                o.hafta_sonu_gerekcesi = gerekce
+    salonlar = {s.kimlik: s for s in salonlari_getir(vt)}
+    salon_degisti = False
+    for o in tasinacaklar:
+        salon_degisti = _bos_salona_gec(plan, o, salonlar) or salon_degisti
 
     def geri_al() -> None:
-        for nesne, tarih, saat in eski_durum:
+        for nesne, tarih, saat, eski_gerekce, eski_salonlar in eski_durum:
             nesne.tarih, nesne.saat = tarih, saat
+            nesne.hafta_sonu_gerekcesi, nesne.salon_kimlikleri = eski_gerekce, eski_salonlar
 
-    return _yeni_engellere_bak(vt, plan, kisisel_sinirlar, onceki, geri_al)
+    sonuc = _yeni_engellere_bak(vt, plan, kisisel_sinirlar, onceki, geri_al)
+    sonuc.salon_degisti = sonuc.uygulandi and salon_degisti
+    return sonuc
 
 
 def plan_anlik_goruntusu(plan: Plan) -> tuple[tuple, tuple]:
     """Geri al yığını için planın değişebilen durumunu kopyalar.
 
-    Oturumların yeri ve görevlendirmeler birlikte alınır; görevli değişikliği
-    de geri alınabilmelidir.
+    Oturumların yeri, hafta sonu gerekçesi ve görevlendirmeler birlikte
+    alınır; görevli değişikliği de, hafta sonuna taşımayla yazılan gerekçe de
+    geri alınabilmelidir.
     """
-    return (tuple((o.anahtar, o.tarih, o.saat, o.salon_kimlikleri) for o in plan.oturumlar),
+    return (tuple((o.anahtar, o.tarih, o.saat, o.salon_kimlikleri, o.hafta_sonu_gerekcesi)
+                  for o in plan.oturumlar),
             tuple(plan.gorevlendirmeler))
 
 
 def plani_geri_yukle(plan: Plan, goruntu: tuple[tuple, tuple]) -> None:
     oturumlar, gorevlendirmeler = goruntu
-    durumlar = {anahtar: (tarih, saat, salonlar) for anahtar, tarih, saat, salonlar in oturumlar}
+    durumlar = {anahtar: durum for anahtar, *durum in oturumlar}
     for oturum in plan.oturumlar:
         if oturum.anahtar in durumlar:
-            oturum.tarih, oturum.saat, oturum.salon_kimlikleri = durumlar[oturum.anahtar]
+            (oturum.tarih, oturum.saat, oturum.salon_kimlikleri,
+             oturum.hafta_sonu_gerekcesi) = durumlar[oturum.anahtar]
     plan.gorevlendirmeler = list(gorevlendirmeler)
 
 

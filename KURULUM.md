@@ -232,7 +232,11 @@ Aynı yönerge ilgili ekranların üstünde ve Yardım sayfasında da yazılıd�
   dönem). Dönem değiştirilince o dönemin kayıtlı planı açılır.
 - Kartı başka bir gün/saat hücresine **sürükleyip bırakın.** Öğrenci,
   öğretmen ve salon çakışmaları ayrı ayrı denetlenir; engel doğuran taşıma
-  otomatik geri alınır ve kimin çakıştığı yazılır.
+  otomatik geri alınır ve kimin çakıştığı yazılır. Hedef saatte sınavın
+  salonu doluysa sınav aynı sayıda boş salona geçirilir; bildirim bunu
+  söyler.
+- Hafta sonuna bırakılan kart için **gerekçe** sorulur (OKY md.58/2-ç);
+  önerilen metni değiştirebilirsiniz, vazgeçerseniz kart yerinde kalır.
 - İki aşamalı derste yazılı kartı taşınınca uygulama da aynı gün ve saat
   farkıyla gelir; uygulama kartı ise tek başına başka bir güne taşınabilir
   (OKY md.58/2-e: farklı günlerde de yapılabilir).

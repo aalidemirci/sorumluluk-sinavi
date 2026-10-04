@@ -483,10 +483,22 @@ class PlanSayfasi(Sayfa):
         oturum = plan.oturum_bul(anahtar)
         if oturum is None or (oturum.tarih == tarih and oturum.saat == saat):
             return
+        gerekce = ""
+        if hizmet.hafta_sonu_gerekcesi_gerekir_mi(plan, anahtar, tarih):
+            # SP-05: hafta sonu oturumu gerekçe ister; elle taşımada başka
+            # girilecek yer olmadığından burada sorulur (OKY md.58/2-ç).
+            gerekce = self.ileti.metin_iste(
+                "Hafta sonu gerekçesi",
+                f"{oturum.ders_adi} sınavı {tarih_yaz(tarih)} gününe, hafta sonuna "
+                "taşınıyor.\nHafta sonu oturumu için gerekçe yazılır (OKY md.58/2-ç):",
+                hizmet.ELLE_HAFTA_SONU_GEREKCESI) or ""
+            if not gerekce:
+                return
         goruntu = hizmet.plan_anlik_goruntusu(plan)
         try:
             sonuc = hizmet.oturum_tasi(self.vt, plan, anahtar, tarih, saat,
-                                       self.plan_sonucu.yukseltilen_sinirlar)
+                                       self.plan_sonucu.yukseltilen_sinirlar,
+                                       hafta_sonu_gerekcesi=gerekce)
         except HizmetHatasi as hata:
             self.hata("Oturum taşınamadı", hata)
             return
@@ -500,7 +512,10 @@ class PlanSayfasi(Sayfa):
         self.kaydedilmemis = True
         self.secili_oturum = anahtar
         self.takvimi_ciz()
-        self.bildir(f"{oturum.ders_adi} {tarih_yaz(tarih)} {saat:%H:%M} saatine taşındı.",
+        # Salon değişikliği evrakı (salon listeleri) etkiler; kullanıcı bilmelidir.
+        ek = (" Salonu o saatte dolu olduğu için boş salona geçirildi."
+              if sonuc.salon_degisti else "")
+        self.bildir(f"{oturum.ders_adi} {tarih_yaz(tarih)} {saat:%H:%M} saatine taşındı.{ek}",
                     "Geri al", self.geri_al)
 
     # ---------------------------------------------------------- özet ve ihlal

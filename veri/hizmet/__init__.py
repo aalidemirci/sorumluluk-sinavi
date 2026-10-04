@@ -66,8 +66,9 @@ from .plan import (
     slot_saatlerini_coz, yuk_ozetini_getir,
 )
 from .duzenleme import (
-    TasimaSonucu, gorevli_adaylari, gorevli_degisiklikleri, gorevli_degistir,
-    kesin_plan_gorevli_degistir, oturum_tasi, plan_anlik_goruntusu, plani_geri_yukle,
+    ELLE_HAFTA_SONU_GEREKCESI, TasimaSonucu, gorevli_adaylari, gorevli_degisiklikleri,
+    gorevli_degistir, hafta_sonu_gerekcesi_gerekir_mi, kesin_plan_gorevli_degistir,
+    oturum_tasi, plan_anlik_goruntusu, plani_geri_yukle,
 )
 from .evrak_sorgulari import (
     BEKLENEN_EVRAK, EVRAK_ADLARI, EVRAK_TURLERI, OGRENCI_GOSTERIM_ADLARI, OGRENCI_GOSTERIMI,
@@ -100,9 +101,9 @@ __all__ = [
     "sorumluluk_onizle", "yabanci_dil_mi", "PlanBaglami", "brans_eslemelerini_denetle",
     "pencere_araligi", "plan_baglami", "plan_hazirla", "plan_kaydet", "plan_kesinlestir",
     "plan_sil", "plan_yukle", "plani_dogrula", "sinav_birimleri", "slot_saatlerini_coz",
-    "yuk_ozetini_getir", "TasimaSonucu", "gorevli_adaylari", "gorevli_degisiklikleri",
-    "gorevli_degistir", "kesin_plan_gorevli_degistir", "oturum_tasi", "plan_anlik_goruntusu",
-    "plani_geri_yukle", "BEKLENEN_EVRAK", "EVRAK_ADLARI", "EVRAK_TURLERI",
+    "yuk_ozetini_getir", "ELLE_HAFTA_SONU_GEREKCESI", "TasimaSonucu", "gorevli_adaylari",
+    "gorevli_degisiklikleri", "gorevli_degistir", "hafta_sonu_gerekcesi_gerekir_mi",
+    "kesin_plan_gorevli_degistir", "oturum_tasi", "plan_anlik_goruntusu", "plani_geri_yukle", "BEKLENEN_EVRAK", "EVRAK_ADLARI", "EVRAK_TURLERI",
     "OGRENCI_GOSTERIM_ADLARI", "OGRENCI_GOSTERIMI", "TESLIM_SURESI_IS_GUNU", "TeslimSatiri",
     "evrak_gecmisi", "evrak_surumu_kaydet", "gorev_sayaclari", "gorevli_listesi",
     "ilan_ogrenci_cizelgesi", "ilan_takvimi", "kisi_bazli_gorevler", "ogrenci_etiketi_uret",
