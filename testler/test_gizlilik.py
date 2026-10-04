@@ -36,12 +36,14 @@ IZINLI_IKILI_DOSYALAR = {
     "varliklar/logo.ico",
 }
 
-# Üçüncü taraf lisans metinleri: FSF'nin değiştirilmemiş GPL/LGPL metinleri.
-# Qt/PySide6 LGPL-3.0 ile dağıtıldığı için pakete girerler (karar 0016).
+# Lisans metinleri: FSF'nin değiştirilmemiş GPL/LGPL metinleri (Qt/PySide6
+# LGPL-3.0 ile dağıtıldığı için pakete girerler, karar 0016) ve kurulum
+# sihirbazının gösterdiği LICENSE'ın düz metni (araclar/lisans_duz_metin.py).
 # .txt genel olarak izinli değildir; yalnız bu yollar.
 IZINLI_LISANS_METINLERI = {
     "LICENSES/GPL-3.0-only.txt",
     "LICENSES/LGPL-3.0-only.txt",
+    "yapim/lisans.txt",
 }
 
 # .gitignore'da bulunması şart olan kurallar.

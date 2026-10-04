@@ -61,7 +61,9 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 ShowLanguageDialog=no
-LicenseFile=..\LICENSE
+; Sihirbaz Markdown işlemez: LICENSE'ın düz metin hâli gösterilir
+; (araclar/lisans_duz_metin.py üretir; sözcükleri testler/test_lisans.py denetler).
+LicenseFile=lisans.txt
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
 
@@ -95,6 +97,10 @@ Source: "..\KURULUM.md"; DestDir: "{app}"; Flags: ignoreversion
 ; (karar 0016) eski Tcl/Tk dosyaları _internal altında kalıyordu. Veritabanı
 ; bu klasörde değildir, %LOCALAPPDATA%\SorumlulukSinavi\plan altındadır.
 Type: filesandordirs; Name: "{app}\_internal"
+; 0.6.0'dan önceki sihirbaz İngilizce iletilerle (Default.isl) kaldırma
+; kısayolunu "Uninstall …" adıyla kurardı. Türkçe sihirbaz aynı kısayolu başka
+; adla kurduğu için eskisi Başlat menüsünde ikinci bir kısayol olarak kalıyordu.
+Type: files; Name: "{group}\Uninstall {#Ad}.lnk"
 
 [Icons]
 Name: "{group}\{#Ad}"; Filename: "{app}\{#ExeAdi}"

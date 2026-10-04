@@ -74,3 +74,36 @@ def test_lisans_metinleri_pakete_girer() -> None:
     assert 'pathlib.Path("LICENSES").glob("*.txt")' in spec
     iss = (KOK / "yapim" / "sorumluluk_sinavi.iss").read_text(encoding="utf-8")
     assert r'Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"' in iss
+
+
+# ================================================= kurulum sihirbazının lisansı
+
+def _sozcukler(metin: str) -> list[str]:
+    """İşaretlemeden arınmış sözcük dizisi; çapa bağlantısının hedefi sayılmaz."""
+    return re.findall(r"[A-Za-z0-9']+", re.sub(r"\]\(#[^)]*\)", "]", metin))
+
+
+def test_kurulum_sihirbazi_lisansin_duz_metnini_gosterir() -> None:
+    """Inno Setup'ın lisans sayfası Markdown işlemez; LICENSE doğrudan verildiğinde
+    başlık işaretleri ve çapa bağlantıları olduğu gibi görünüyordu (0.8.2). Düz
+    metin LICENSE ile sözcük sözcük aynıdır: lisansın kendisi değişmez."""
+    iss = (KOK / "yapim" / "sorumluluk_sinavi.iss").read_text(encoding="utf-8")
+    assert re.search(r"^LicenseFile=lisans\.txt$", iss, re.MULTILINE)
+    duz = (KOK / "yapim" / "lisans.txt").read_text(encoding="ascii")
+    assert _sozcukler(duz) == _sozcukler((KOK / "LICENSE").read_text(encoding="utf-8"))
+    assert not re.search(r"^#|\*\*|\]\(#|<https?:|`", duz, re.MULTILINE)
+
+
+def test_duz_metin_ureticinin_ciktisidir() -> None:
+    """Elle düzeltilen düz metin bir sonraki üretimde sessizce kaybolurdu."""
+    from araclar.lisans_duz_metin import KAYNAK, duz_metin
+    assert (KOK / "yapim" / "lisans.txt").read_text(encoding="ascii") == duz_metin(
+        KAYNAK.read_text(encoding="utf-8"))
+
+
+def test_eksik_ya_da_fazla_sozcuk_lisansla_eslesmez() -> None:
+    """Olumsuz senaryo: işaretleme farkı sayılmaz, sözcük farkı sayılır."""
+    kaynak = "**You** refers to [the terms](#terms) of `Required Notice:`."
+    assert _sozcukler('You refers to the terms of "Required Notice:".') == _sozcukler(kaynak)
+    assert _sozcukler('You refers to terms of "Required Notice:".') != _sozcukler(kaynak)
+    assert _sozcukler('You refers to all the terms of "Required Notice:".') != _sozcukler(kaynak)
