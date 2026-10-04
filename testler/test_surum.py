@@ -16,6 +16,15 @@ from cekirdek.surum import SURUM
 KOK = Path(__file__).resolve().parents[1]
 
 
+def surum_yazilmis_mi(metin: str, surum: str = SURUM) -> bool:
+    """Sürüm numarası metinde tam sayı dizisi olarak geçiyor mu.
+
+    Düz alt dize araması yanılır: deb_paketi.py'deki "python3-docx paketi
+    0.8.11" sürüm 0.8.1 olunca elle yazılmış sürüm sanılıyordu.
+    """
+    return re.search(rf"(?<![\d.]){re.escape(surum)}(?!\d|\.\d)", metin) is not None
+
+
 def test_surum_bicimi_semverdir() -> None:
     assert re.fullmatch(r"\d+\.\d+\.\d+", SURUM), SURUM
 
@@ -37,7 +46,7 @@ def test_pyproject_surumu_elle_yazmaz() -> None:
 
 def test_inno_setup_betigi_surumu_elle_yazmaz() -> None:
     betik = (KOK / "yapim" / "sorumluluk_sinavi.iss").read_text(encoding="utf-8")
-    assert SURUM not in betik, "sürüm .iss içine elle yazılmış"
+    assert not surum_yazilmis_mi(betik), "sürüm .iss içine elle yazılmış"
     assert 'Pos(\'SURUM = "\', satir)' in betik
 
 
@@ -48,14 +57,14 @@ def test_arayuz_surumu_cekirdekten_alir() -> None:
 
 def test_pyinstaller_betigi_surumu_elle_yazmaz() -> None:
     betik = (KOK / "SorumlulukSinavi.spec").read_text(encoding="utf-8")
-    assert SURUM not in betik, "sürüm .spec içine elle yazılmış"
+    assert not surum_yazilmis_mi(betik), "sürüm .spec içine elle yazılmış"
     assert "from cekirdek.surum import SURUM" in betik
 
 
 def test_deb_betigi_surumu_elle_yazmaz() -> None:
     """Pardus paketinin adı ve control dosyası da aynı kaynaktan gelir."""
     betik = (KOK / "yapim" / "deb_paketi.py").read_text(encoding="utf-8")
-    assert SURUM not in betik, "sürüm deb_paketi.py içine elle yazılmış"
+    assert not surum_yazilmis_mi(betik), "sürüm deb_paketi.py içine elle yazılmış"
     assert "from cekirdek.surum import SURUM" in betik
 
 
@@ -69,3 +78,13 @@ def test_exe_metinleri_kurulum_betigiyle_ayni() -> None:
         assert spec_deger and iss_deger, (spec_adi, iss_adi)
         assert spec_deger.group(1) == iss_deger.group(1), (
             f"{spec_adi}: spec={spec_deger.group(1)!r} iss={iss_deger.group(1)!r}")
+
+
+def test_surum_aramasi_baska_sayinin_parcasini_saymaz() -> None:
+    """Olumsuz senaryo: "0.8.11" ya da "10.8.1" içinde 0.8.1 aranmaz; kendisi bulunur."""
+    assert not surum_yazilmis_mi("python3-docx paketi 0.8.11'dir", "0.8.1")
+    assert not surum_yazilmis_mi("sürüm 10.8.1", "0.8.1")
+    assert not surum_yazilmis_mi("sürüm 0.8.1.2", "0.8.1")
+    assert surum_yazilmis_mi("Version: 0.8.1\n", "0.8.1")
+    assert surum_yazilmis_mi("sürüm 0.8.1.", "0.8.1")
+
