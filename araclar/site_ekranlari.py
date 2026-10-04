@@ -61,7 +61,9 @@ def main(cikti: Path) -> None:
     hizmet.varsayilan_pencere = lambda vt, gecmise_bak=False, bugun=None: "P1"
 
     from arayuz import tema
-    from arayuz.pencereler import GorevliDegistirPenceresi, MusaitlikPenceresi, TekDersPenceresi
+    from arayuz.pencereler import (
+        GorevliDegistirPenceresi, MusaitlikPenceresi, NumaraListesiPenceresi, TekDersPenceresi,
+    )
     from arayuz.uygulama import Uygulama, sayfa_sirasi
     from cekirdek.modeller import GorevRolu
 
@@ -110,10 +112,33 @@ def main(cikti: Path) -> None:
         return uyg.sayfalar[sayfa_sirasi(ad)]
 
     for sayfa, ad in (("Kurum Ayarları", "ekran-kurum-ayarlari"),
-                      ("Başvuru", "ekran-basvuru"),
                       ("Ders / Branş", "ekran-ders-brans")):
         ac(sayfa)
         kaydet(ad, yakala(ad))
+
+    basvuru_sayfasi = ac("Başvuru")
+    basvuru = yakala("ekran-basvuru")
+    kaydet("ekran-basvuru", basvuru)
+
+    # e-Okul'dan kopyalanmış gibi satırlar: üç işaretsiz öğrenci (farklı
+    # şubelerden) ve listede olmayan bir numara.
+    adaylar = {}
+    for satir in basvuru_sayfasi.tablo.gorunen_satirlar():
+        if not satir["bayrakli_mi"]:
+            adaylar.setdefault(satir["sube"], satir)
+    secilen = list(adaylar.values())[:3]
+    metin = "\n".join(f"{s['okul_no']} {s['ad_soyad']} {s['sube']}" for s in secilen)
+    pencere = NumaraListesiPenceresi(uyg)
+    pencere.metin.setPlainText(metin + "\n99999")
+    # Devamsızlık tebligatı her sınıfta olabilir; "mezun olamayan 12. sınıf"
+    # işareti 10. sınıf örneğinde yanıltıcı görünürdü.
+    pencere.tur.setCurrentIndex(
+        [kod for kod, _ in NumaraListesiPenceresi.TURLER].index("devamsizlik_tebligati"))
+    pencere.onizle()
+    pencere.show()
+    pencere.resize(760, 560)
+    kaydet("ekran-numara-listesi", ust_uste(basvuru, yakala("pencere-numara-listesi", pencere)))
+    pencere.close()
 
     ogretmen_sayfasi = ac("Öğretmen Listesi")
     ogretmen = yakala("zemin-ogretmen-listesi")
